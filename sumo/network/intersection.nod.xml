@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    intersection.nod.xml
+    Defines the 5 nodes (junctions) of our simple single-intersection network:
+      - C : the central 4-way junction, forced to be a traffic-light-controlled node
+      - N, S, E, W : the four "edge of network" nodes where vehicles enter/exit
+        (these are plain priority junctions, not traffic lights - they just mark
+        where each approach road begins/ends)
+
+    Coordinates are in metres on an arbitrary local plane, with C at the origin-ish
+    centre (200,200) and each arm 200m long.
+
+    radius="12" on node C:
+    Left without an explicit value, netconvert computes the junction's corner
+    radius from lane widths/speeds, which for a 2-lane, 50 km/h urban road
+    tends to produce an oversized junction shape. That, in turn, is what was
+    causing internal stop lines to render past the visual junction boundary
+    and turning paths to sweep unrealistically wide. 12m is a normal corner
+    radius for a signalized 2-lane urban intersection and gives predictable,
+    compact geometry.
+-->
+<nodes>
+    <!-- Central junction - this is where the traffic light lives -->
+    <node id="C" x="200.0" y="200.0" type="traffic_light" radius="12"/>
+
+    <!-- North arm: vehicles enter from here heading south into C -->
+    <node id="N" x="200.0" y="400.0" type="priority"/>
+
+    <!-- South arm -->
+    <node id="S" x="200.0" y="0.0" type="priority"/>
+
+    <!-- East arm -->
+    <node id="E" x="400.0" y="200.0" type="priority"/>
+
+    <!-- West arm -->
+    <node id="W" x="0.0" y="200.0" type="priority"/>
+</nodes>

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    intersection.tll.xml
+    =====================
+    Fully protected fixed-time signal program for junction "C", built
+    directly against the linkIndex numbering and conflict, foes, matrix
+    read out of the real generated intersection.net.xml, not assumed
+    geometry.
+
+    linkIndex map, confirmed from the actual connection elements in
+    intersection.net.xml:
+      0  = S-left  (S to W)     3 = E-left  (E to S)
+      1  = S-straight (S to N)  4 = E-straight (E to W)
+      2  = S-right (S to E)     5 = E-right (E to N)
+      6  = N-left  (N to E)     9  = W-left  (W to N)
+      7  = N-straight (N to S)  10 = W-straight (W to E)
+      8  = N-right (N to W)     11 = W-right (W to S)
+
+    Decoded foes, straight from the net.xml request block, all four left
+    turns have an empty foe list and are compatible with every other
+    movement at all times. The right turns have real, confirmed conflicts:
+      S-right(2) foes  = E-straight(4), E-right(5), N-straight(7), W-right(11)
+      N-right(8) foes  = S-straight(1), E-right(5), W-straight(10), W-right(11)
+      E-right(5) foes  = S-right(2), N-straight(7), N-right(8), W-straight(10)
+      W-right(11) foes = S-straight(1), S-right(2), E-straight(4), N-right(8)
+
+    Note that S-right and N-right are NOT foes of each other, and E-right
+    and W-right are NOT foes of each other, confirmed by their absence from
+    one another's foe lists above, this is why they are grouped into shared
+    protected phases below.
+
+    This program is a direct, minimal correction of netconvert's own
+    auto-generated 8-phase static program. The only change made is that
+    the two right-turn connections in each main phase, previously given a
+    lowercase g, permissive, yield-controlled, state concurrently with a
+    movement confirmed to be their foe, are now held fully red during that
+    phase and only receive green during their own dedicated protected
+    phase. No other phase, connection, or duration relationship was
+    altered beyond lengthening the two right-turn phases from 6s to 12s to
+    compensate for losing their permissive supplement.
+
+    Cycle length: 30+3+12+3+30+3+12+3 = 96 seconds.
+-->
+<additional>
+    <tlLogic id="C" type="static" programID="0" offset="0">
+
+        <!-- Phase 1: North plus South, straight and left, protected.
+             Green set: S-left, S-straight, E-left, N-left, N-straight,
+             W-left. Verified conflict-free above, all four lefts have no
+             foes, and neither S-straight nor N-straight lists any other
+             member of this set as a foe. -->
+        <phase duration="30" state="GGrGrrGGrGrr"/>
+        <!-- Phase 1 yellow clearance -->
+        <phase duration="3"  state="yyryrryyryrr"/>
+
+        <!-- Phase 3: North and South right turns only, fully protected.
+             Green set: S-right, N-right. Verified conflict-free above,
+             neither appears in the other's foe list. -->
+        <phase duration="12" state="rrGrrrrrGrrr"/>
+        <!-- Phase 3 yellow clearance -->
+        <phase duration="3"  state="rryrrrrryrrr"/>
+
+        <!-- Phase 5: East plus West, straight and left, protected.
+             Green set: E-left, E-straight, N-left, W-left, W-straight,
+             S-left. Verified conflict-free above by the same reasoning
+             as Phase 1, mirrored. -->
+        <phase duration="30" state="GrrGGrGrrGGr"/>
+        <!-- Phase 5 yellow clearance -->
+        <phase duration="3"  state="yrryyryrryyr"/>
+
+        <!-- Phase 7: East and West right turns only, fully protected.
+             Green set: E-right, W-right. Verified conflict-free above,
+             neither appears in the other's foe list. -->
+        <phase duration="12" state="rrrrrGrrrrrG"/>
+        <!-- Phase 7 yellow clearance -->
+        <phase duration="3"  state="rrrrryrrrrry"/>
+
+    </tlLogic>
+</additional>

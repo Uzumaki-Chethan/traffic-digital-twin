@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    intersection.con.xml
+    =====================
+    12 explicit connections, exactly one per lane per approach (4
+    approaches times 3 lanes). No lane carries more than one movement,
+    which is the structural fix for the earlier shared-lane problem.
+
+    Deliberately absent from this file: any tl or linkIndex attribute.
+    Assigning controlled link indices before the network has actually been
+    built and inspected would mean guessing at numbering that netconvert
+    has not generated yet, exactly the mistake being corrected in this
+    revision. Node C is still marked type="traffic_light" in
+    intersection.nod.xml, so netconvert will automatically build controlled
+    links for every one of these 12 connections and assign its own index
+    order. That real, generated order is what gets inspected in NetEdit
+    before any tlLogic is written.
+
+    Lane discipline, identical on every approach:
+      Lane 0 (kerb-side)   = LEFT turn only
+      Lane 1 (middle)      = STRAIGHT only
+      Lane 2 (median-side) = RIGHT turn only
+
+    Target lane rule: each movement preserves its lateral position through
+    the junction wherever geometrically reasonable, left arrives at the
+    destination's lane 0, straight at lane 1, right at lane 2.
+
+    No U-turn connections are defined.
+
+    Movement geometry (from intersection.nod.xml, N=top, S=bottom, E=right,
+    W=left):
+      N_in (heading south)  : left to E, straight to S, right to W
+      S_in (heading north)  : left to W, straight to N, right to E
+      E_in (heading west)   : left to S, straight to W, right to N
+      W_in (heading east)   : left to N, straight to E, right to S
+
+    Whether the left turn connections actually stay clear of the opposing
+    straight lane, rather than sweeping across it, depends on the real
+    turning geometry netconvert computes from the corner radius and lane
+    offsets. That must be checked visually in NetEdit once the network is
+    built, it is not assumed here.
+-->
+<connections>
+    <!-- North approach (N_in) -->
+    <connection from="N_in" to="C_out_E" fromLane="0" toLane="0"/>  <!-- left -->
+    <connection from="N_in" to="C_out_S" fromLane="1" toLane="1"/>  <!-- straight -->
+    <connection from="N_in" to="C_out_W" fromLane="2" toLane="2"/>  <!-- right -->
+
+    <!-- South approach (S_in) -->
+    <connection from="S_in" to="C_out_W" fromLane="0" toLane="0"/>  <!-- left -->
+    <connection from="S_in" to="C_out_N" fromLane="1" toLane="1"/>  <!-- straight -->
+    <connection from="S_in" to="C_out_E" fromLane="2" toLane="2"/>  <!-- right -->
+
+    <!-- East approach (E_in) -->
+    <connection from="E_in" to="C_out_S" fromLane="0" toLane="0"/>  <!-- left -->
+    <connection from="E_in" to="C_out_W" fromLane="1" toLane="1"/>  <!-- straight -->
+    <connection from="E_in" to="C_out_N" fromLane="2" toLane="2"/>  <!-- right -->
+
+    <!-- West approach (W_in) -->
+    <connection from="W_in" to="C_out_N" fromLane="0" toLane="0"/>  <!-- left -->
+    <connection from="W_in" to="C_out_E" fromLane="1" toLane="1"/>  <!-- straight -->
+    <connection from="W_in" to="C_out_S" fromLane="2" toLane="2"/>  <!-- right -->
+</connections>

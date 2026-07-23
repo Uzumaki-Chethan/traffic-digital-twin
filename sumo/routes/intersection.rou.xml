@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    intersection.rou.xml
+    =====================
+    Vehicle type, routes, and flows. Edge IDs are unchanged from the
+    network design above, so every route below uses the same origin and
+    destination edges. With three dedicated lanes per approach and no
+    shared movements, a vehicle following a given route will lane change
+    into the single correct lane well before the stop line, using the
+    250m approach distance for that manoeuvre.
+
+    Flow rates are the same modest, balanced values used previously,
+    kept unchanged here since this revision only concerns the network
+    layer, not traffic demand.
+-->
+<routes>
+    <!-- Generic passenger car -->
+    <vType id="car" accel="2.6" decel="4.5" sigma="0.5" length="5.0"
+           minGap="2.5" maxSpeed="13.89" guiShape="passenger"/>
+
+    <!-- Routes from the NORTH -->
+    <route id="route_N_S" edges="N_in C_out_S"/>
+    <route id="route_N_E" edges="N_in C_out_E"/>
+    <route id="route_N_W" edges="N_in C_out_W"/>
+
+    <!-- Routes from the SOUTH -->
+    <route id="route_S_N" edges="S_in C_out_N"/>
+    <route id="route_S_E" edges="S_in C_out_E"/>
+    <route id="route_S_W" edges="S_in C_out_W"/>
+
+    <!-- Routes from the EAST -->
+    <route id="route_E_W" edges="E_in C_out_W"/>
+    <route id="route_E_N" edges="E_in C_out_N"/>
+    <route id="route_E_S" edges="E_in C_out_S"/>
+
+    <!-- Routes from the WEST -->
+    <route id="route_W_E" edges="W_in C_out_E"/>
+    <route id="route_W_N" edges="W_in C_out_N"/>
+    <route id="route_W_S" edges="W_in C_out_S"/>
+
+    <!-- Flows: vehicles generated 0s to 600s -->
+    <flow id="flow_N_S" type="car" route="route_N_S" begin="0" end="600" vehsPerHour="240"/>
+    <flow id="flow_N_E" type="car" route="route_N_E" begin="0" end="600" vehsPerHour="120"/>
+    <flow id="flow_N_W" type="car" route="route_N_W" begin="0" end="600" vehsPerHour="120"/>
+
+    <flow id="flow_S_N" type="car" route="route_S_N" begin="0" end="600" vehsPerHour="240"/>
+    <flow id="flow_S_E" type="car" route="route_S_E" begin="0" end="600" vehsPerHour="120"/>
+    <flow id="flow_S_W" type="car" route="route_S_W" begin="0" end="600" vehsPerHour="120"/>
+
+    <flow id="flow_E_W" type="car" route="route_E_W" begin="0" end="600" vehsPerHour="240"/>
+    <flow id="flow_E_N" type="car" route="route_E_N" begin="0" end="600" vehsPerHour="120"/>
+    <flow id="flow_E_S" type="car" route="route_E_S" begin="0" end="600" vehsPerHour="120"/>
+
+    <flow id="flow_W_E" type="car" route="route_W_E" begin="0" end="600" vehsPerHour="240"/>
+    <flow id="flow_W_N" type="car" route="route_W_N" begin="0" end="600" vehsPerHour="120"/>
+    <flow id="flow_W_S" type="car" route="route_W_S" begin="0" end="600" vehsPerHour="120"/>
+</routes>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    intersection.edg.xml
+    =====================
+    8 directed edges, an "in" edge and an "out" edge for each of the four
+    approaches, built on the 3-lane "arterial" type. Edge IDs are stable
+    and human readable, N_in, C_out_N, and so on, so the route file and
+    any later Traffic Adapter code can reference them directly.
+-->
+<edges>
+    <edge id="N_in"    from="N" to="C" type="arterial"/>
+    <edge id="C_out_N" from="C" to="N" type="arterial"/>
+
+    <edge id="S_in"    from="S" to="C" type="arterial"/>
+    <edge id="C_out_S" from="C" to="S" type="arterial"/>
+
+    <edge id="E_in"    from="E" to="C" type="arterial"/>
+    <edge id="C_out_E" from="C" to="E" type="arterial"/>
+
+    <edge id="W_in"    from="W" to="C" type="arterial"/>
+    <edge id="C_out_W" from="C" to="W" type="arterial"/>
+</edges>

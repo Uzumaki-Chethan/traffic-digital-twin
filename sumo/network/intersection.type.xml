@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    intersection.type.xml
+    ======================
+    A single reusable road type shared by all 8 edges.
+
+    numLanes="3" is what makes one-movement-per-lane channelization
+    possible in the first place. speed="13.89" (about 50 km/h) and
+    priority="3" describe a typical urban arterial approach.
+-->
+<types>
+    <type id="arterial" priority="3" numLanes="3" speed="13.89"/>
+</types>
