@@ -1,11 +1,12 @@
 """
 app.py
 ======
-Entry point for the TraCI communication layer. Wires Config and
-TraCIManager together and guarantees the TraCI connection is closed even
-if the simulation raises partway through, via try/finally. This file
-intentionally contains no simulation logic of its own, that all lives in
-TraCIManager, app.py only orchestrates startup, run, and shutdown.
+Entry point for the TraCI communication layer. Wires Config, TraCIManager,
+TrafficAdapter, and DigitalTwin together and guarantees the TraCI
+connection is closed even if the simulation raises partway through, via
+try/finally. This file intentionally contains no simulation logic of its
+own, that all lives in TraCIManager, TrafficAdapter, and DigitalTwin,
+app.py only orchestrates startup, run, and shutdown.
 """
 
 import logging
@@ -13,6 +14,7 @@ import logging
 from config import Config
 from traffic.traci_manager import TraCIManager
 from traffic_adapter.adapter import TrafficAdapter
+from digital_twin import DigitalTwin
 
 
 def main():
@@ -29,15 +31,21 @@ def main():
     try:
         manager.start()
         adapter = TrafficAdapter(manager)
-        def print_state():
-         state = adapter.get_current_state()
+        twin = DigitalTwin()
 
-         logger.info(
-            "Time=%.2f | Vehicles=%d",
-            state.simulation_time,
-            len(state.vehicles),
-         )
-        manager.run(print_state)
+        def update_twin():
+            state = adapter.get_current_state()
+            twin.update(state)
+
+            # Temporary logging only, this will be replaced once a real
+            # consumer (Feature Engineering) reads from the Digital Twin.
+            logger.info(
+                "Time=%.2f | Vehicles=%d",
+                twin.current_state.simulation_time,
+                len(twin.current_state.vehicles),
+            )
+
+        manager.run(update_twin)
     except Exception:
         logger.exception("Simulation stopped due to an unexpected error.")
         raise
