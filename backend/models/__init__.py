@@ -8,5 +8,6 @@ construct a raw dictionary of vehicle data again.
 """
 
 from .state_models import SimulationState, VehicleState
+from .feature_models import LaneFeatures, TrafficFeatures
 
-__all__ = ["SimulationState", "VehicleState"]
+__all__ = ["SimulationState", "VehicleState", "LaneFeatures", "TrafficFeatures"]

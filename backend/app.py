@@ -15,6 +15,7 @@ from config import Config
 from traffic.traci_manager import TraCIManager
 from traffic_adapter.adapter import TrafficAdapter
 from digital_twin import DigitalTwin
+from feature_engineering import FeatureEngineer
 
 
 def main():
@@ -32,17 +33,23 @@ def main():
         manager.start()
         adapter = TrafficAdapter(manager)
         twin = DigitalTwin()
+        feature_engineer = FeatureEngineer(twin)
 
         def update_twin():
             state = adapter.get_current_state()
             twin.update(state)
+            features = feature_engineer.generate_features()
 
             # Temporary logging only, this will be replaced once a real
-            # consumer (Feature Engineering) reads from the Digital Twin.
+            # consumer (Machine Learning / Decision Engine) reads from
+            # TrafficFeatures instead.
             logger.info(
-                "Time=%.2f | Vehicles=%d",
-                twin.current_state.simulation_time,
-                len(twin.current_state.vehicles),
+                "Time=%.2f | Vehicles=%d | AvgSpeed=%.2f | AvgWait=%.2f | Stopped=%d",
+                features.simulation_time,
+                features.total_vehicle_count,
+                features.average_speed,
+                features.average_waiting_time,
+                features.stopped_vehicle_count,
             )
 
         manager.run(update_twin)

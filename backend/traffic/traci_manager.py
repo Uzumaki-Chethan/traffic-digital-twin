@@ -97,13 +97,26 @@ class TraCIManager:
         )
 
     def close(self):
-        """
-        Close the TraCI connection safely. Guarded by self._connected so
-        that calling close() more than once, or calling it when start()
-        never actually succeeded, never raises, this makes it safe to
-        call unconditionally from a finally block.
-        """
-        if self._connected:
-            traci.close()
-            self._connected = False
-            logger.info("TraCI closed")
+     """
+     Close the TraCI connection safely.
+
+     Safe to call unconditionally from a finally block. If the SUMO
+     window has already been closed by the user, TraCI may already have
+     disconnected, in which case the resulting FatalTraCIError is treated
+     as a normal shutdown condition rather than an application error.
+     """
+     if not self._connected:
+        return
+
+     try:
+        traci.close()
+        logger.info("TraCI closed")
+
+     except FatalTraCIError:
+        logger.info(
+            "TraCI connection was already closed by SUMO."
+        )
+
+     finally:
+        self._connected = False
+            
