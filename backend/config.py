@@ -1,10 +1,3 @@
-"""Configuration values for the traffic digital twin backend."""
-
-APP_NAME = "traffic-digital-twin"
-APP_VERSION = "0.1.0"
-HOST = "0.0.0.0"
-PORT = 8000
-DEBUG = True
 """
 config.py
 =========
@@ -37,6 +30,13 @@ class Config:
 
     # The frozen SUMO configuration file, never edited by this module.
     SUMOCFG_PATH = os.path.join(PROJECT_ROOT, "sumo", "config", "intersection.sumocfg")
+
+    # Where the trained ML model is expected to live. Training is a
+    # separate milestone, this path may not exist yet, app.py checks for
+    # that and skips prediction gracefully rather than crashing.
+    ML_MODEL_PATH = os.path.join(
+        PROJECT_ROOT, "backend", "ml", "trained_models", "random_forest_predictor.joblib"
+    )
 
     # "sumo-gui" for a visible simulation window during development and
     # demos, "sumo" for a headless run. sumolib resolves this to the
