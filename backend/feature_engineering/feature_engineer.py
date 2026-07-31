@@ -19,13 +19,33 @@ from types import MappingProxyType
 from typing import Dict, List, Sequence
 
 from digital_twin import DigitalTwin
-from models import LaneFeatures, SimulationState, TrafficFeatures, VehicleState
+from models import (
+    LaneFeatures,
+    SignalFeatures,
+    SignalState,
+    SimulationState,
+    TrafficFeatures,
+    VehicleState,
+)
 
 # The speed, in metres per second, below which a vehicle is considered
 # stopped. This is not an arbitrary choice, it is the same threshold
 # SUMO itself uses to define a "halting" vehicle internally, reusing it
 # keeps our definition of "stopped" consistent with SUMO's own.
 STOPPED_SPEED_THRESHOLD_MPS = 0.1
+
+# Ordinal mapping from a raw single-character TraCI signal state to the
+# small integer scale SignalFeatures.lane_signal_states uses. Both 'G'
+# (major/protected green) and 'g' (minor/yield green) map to the same
+# ordinal, from a "what color is a driver on this lane looking at right
+# now" perspective they are both green, the major/minor distinction is a
+# controller-internal detail this feature intentionally does not expose,
+# consistent with also excluding phase index as an ML feature.
+_SIGNAL_CHAR_TO_ORDINAL = {
+    "r": 0, "R": 0,
+    "y": 1, "Y": 1,
+    "g": 2, "G": 2,
+}
 
 
 class FeatureEngineer:
@@ -72,10 +92,11 @@ class FeatureEngineer:
 
     def _build_features(self, state: SimulationState) -> TrafficFeatures:
         """
-        Aggregate a SimulationState's vehicles into a TrafficFeatures
-        object, both network-wide and per-lane.
+        Aggregate a SimulationState's vehicles and signal into a
+        TrafficFeatures object.
         """
         vehicles = state.vehicles
+        signal_features = self._build_signal_features(state.signal)
 
         if not vehicles:
             return TrafficFeatures(
@@ -85,6 +106,7 @@ class FeatureEngineer:
                 average_waiting_time=0.0,
                 stopped_vehicle_count=0,
                 lane_features=TrafficFeatures.empty_lane_mapping(),
+                signal=signal_features,
             )
 
         lane_features = self._build_lane_features(vehicles)
@@ -96,6 +118,23 @@ class FeatureEngineer:
             average_waiting_time=self._mean(v.waiting_time for v in vehicles),
             stopped_vehicle_count=self._count_stopped(vehicles),
             lane_features=lane_features,
+            signal=signal_features,
+        )
+
+    def _build_signal_features(self, signal: SignalState) -> SignalFeatures:
+        """
+        Translate a raw SignalState into the small, ML-facing
+        SignalFeatures. This is the only place a raw signal character
+        ('G', 'g', 'y', 'r') is converted into the ordinal scale ML
+        input features use, see _SIGNAL_CHAR_TO_ORDINAL above.
+        """
+        lane_signal_states = {
+            lane_id: _SIGNAL_CHAR_TO_ORDINAL.get(char, 0)
+            for lane_id, char in signal.lane_states.items()
+        }
+        return SignalFeatures(
+            seconds_until_next_switch=signal.seconds_until_next_switch,
+            lane_signal_states=MappingProxyType(lane_signal_states),
         )
 
     def _build_lane_features(

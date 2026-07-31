@@ -15,6 +15,7 @@ At this stage it has exactly three responsibilities:
        objects.
     3. Expose both through safe, read-only properties.
 
+    
 State only ever enters through update(). Nothing else in this class
 mutates its internal state, and nothing outside this class can reach in
 and mutate it either, both _current_state and _history are private, and

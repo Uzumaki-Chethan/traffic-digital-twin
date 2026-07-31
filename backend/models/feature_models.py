@@ -32,6 +32,12 @@ class LaneFeatures:
     movement), so these per-lane figures are what a future Decision
     Engine will actually read from when allocating green time per phase.
 
+    Deliberately vehicle-derived facts only. Signal color is a different
+    concern that happens to also vary per lane, it lives in
+    SignalFeatures instead, kept separate so this class's single
+    responsibility (aggregated vehicle facts) stays intact as more
+    per-lane concerns (weather, incidents) are added later.
+
     Attributes
     ----------
     lane_id : str
@@ -65,16 +71,54 @@ class LaneFeatures:
 
 
 @dataclass(frozen=True)
+class SignalFeatures:
+    """
+    Engineered, ML-facing traffic signal features for a single
+    simulation step. This is the small, deliberately selective
+    engineered-tier counterpart to SignalState (the raw tier).
+
+    Most of SignalState's fields are intentionally excluded here.
+    Current phase index, phase name, elapsed phase time, next phase, and
+    cycle length were all considered and rejected as ML input features,
+    see the architecture design review for the reasoning behind each
+    rejection, the short version: several are redundant with what is
+    included here, one (next phase) risks feeding a not-yet-made future
+    decision back into a model that predicts the future, and phase index
+    is a fragile, signal-program-specific quantity rather than a direct
+    physical fact.
+
+    Attributes
+    ----------
+    seconds_until_next_switch : float
+        Seconds remaining until the signal's current phase ends. A
+        network-wide quantity, this junction has a single shared
+        tlLogic clock, not an independent one per lane.
+    lane_signal_states : Mapping[str, int]
+        Per-lane current signal color, keyed by lane_id, as an ordinal:
+        0 = red, 1 = yellow, 2 = green. An ordinal rather than three
+        one-hot columns per lane, since a tree-based model does not need
+        one-hot encoding to exploit an ordered relationship, and it keeps
+        the feature vector from tripling in size for this addition. A
+        read-only mapping (backed by types.MappingProxyType).
+    """
+
+    seconds_until_next_switch: float
+    lane_signal_states: Mapping[str, int]
+
+
+@dataclass(frozen=True)
 class TrafficFeatures:
     """
     A single, complete set of engineered traffic features for one
     simulation step, derived from the Digital Twin's current
     SimulationState.
 
-    Carries both network-wide scalars (useful for the Dashboard and
-    Performance Evaluation, which care about overall system health) and
-    a per-lane breakdown (useful for the Decision Engine, which needs to
-    reason about individual signal-controlled movements).
+    Carries network-wide vehicle scalars, a per-lane vehicle breakdown,
+    and engineered signal features, the complete engineered state of the
+    intersection, not vehicles alone. Signal features are held as a
+    separate, composed SignalFeatures object rather than merged into the
+    vehicle-derived fields above, keeping each concern's single
+    responsibility intact.
 
     Attributes
     ----------
@@ -92,9 +136,12 @@ class TrafficFeatures:
         Number of vehicles across the whole network considered stopped
         (speed below 0.1 metres per second).
     lane_features : Mapping[str, LaneFeatures]
-        Per-lane engineered features, keyed by lane_id. A read-only
-        mapping (backed by types.MappingProxyType), never a plain dict,
-        so it cannot be mutated after this TrafficFeatures is created.
+        Per-lane engineered vehicle features, keyed by lane_id. A
+        read-only mapping (backed by types.MappingProxyType), never a
+        plain dict, so it cannot be mutated after this TrafficFeatures
+        is created.
+    signal : SignalFeatures
+        Engineered signal features for this same simulation step.
     """
 
     simulation_time: float
@@ -103,6 +150,7 @@ class TrafficFeatures:
     average_waiting_time: float
     stopped_vehicle_count: int
     lane_features: Mapping[str, LaneFeatures]
+    signal: SignalFeatures
 
     @staticmethod
     def empty_lane_mapping() -> Mapping[str, LaneFeatures]:
