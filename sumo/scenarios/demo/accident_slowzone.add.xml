@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    accident_slowzone.add.xml
+    ===========================
+    A variableSpeedSign (VSS) - real, documented SUMO additional-file
+    element (https://sumo.dlr.de/docs/Simulation/Variable_Speed_Signs.html)
+    - covering all three East approach lanes so the accident produces
+    genuine congestion across the whole approach, not just in the one
+    lane the stalled truck physically occupies (see accident.rou.xml).
+
+    Honest limitation, stated plainly: a variableSpeedSign applies to
+    the entire lane it's placed on for as long as it's active - SUMO
+    has no mechanism for a slow zone localized to a small radius around
+    a specific point within a lane. This is confirmed against SUMO's
+    own documentation and issue tracker, not assumed. Since E_in is a
+    single short approach block, applying the crawl to the whole lane
+    is a reasonable visual proxy for "slow near the accident," but it
+    is genuinely the whole lane, every vehicle on it, for the active
+    window - not a small zone around the truck specifically.
+
+    Three steps:
+      t=100  speed drops to 2.78 m/s (~10 km/h) on all three East
+             lanes - matches the truck's stop start, forcing a
+             visible crawl through the whole approach while it's
+             blocked.
+      t=650  speed rises to 8.33 m/s (~30 km/h) - the truck's stop
+             ends here too (see accident.rou.xml), so this is the
+             start of recovery, not instant normal-speed traffic.
+      t=680  speed="-1" resets the lane to its own real speed limit
+             (13.89 m/s / 50 km/h, per intersection.type.xml) rather
+             than hard-coding that number here, so this file can never
+             silently drift out of sync with the network's actual
+             speed limit if that ever changes.
+-->
+<additional>
+    <variableSpeedSign id="accident_slowzone" lanes="E_in_0 E_in_1 E_in_2">
+        <step time="100" speed="2.78"/>
+        <step time="650" speed="8.33"/>
+        <step time="680" speed="-1"/>
+    </variableSpeedSign>
+</additional>

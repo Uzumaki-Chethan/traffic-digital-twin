@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    emergency_response.rou.xml
+    ============================
+    Demo scenario: ordinary background traffic with ambulance,
+    fire_engine, and police_vehicle appearing at distinct, individually
+    scheduled moments (t=100/250/400/550/700, not a background flow) so
+    each one is clearly visible on sumo-gui. No priority logic - vClass
+    "emergency" alone grants no signal priority here.
+
+    REVISED: turning-movement volume added on every approach at
+    ~65-70% of that approach's straight background volume (previously
+    this scenario had no turning background traffic at all). Left-hand
+    traffic movement mapping: from N: straight=S, left=E, right=W.
+    from S: straight=N, left=W, right=E. from E: straight=W, left=S,
+    right=N. from W: straight=E, left=N, right=S.
+-->
+<routes>
+    <!-- ===================== Routes (identical topology to the frozen network) ===================== -->
+    <route id="route_N_S" edges="N_in C_out_S"/>
+    <route id="route_N_E" edges="N_in C_out_E"/>
+    <route id="route_N_W" edges="N_in C_out_W"/>
+    <route id="route_S_N" edges="S_in C_out_N"/>
+    <route id="route_S_E" edges="S_in C_out_E"/>
+    <route id="route_S_W" edges="S_in C_out_W"/>
+    <route id="route_E_W" edges="E_in C_out_W"/>
+    <route id="route_E_N" edges="E_in C_out_N"/>
+    <route id="route_E_S" edges="E_in C_out_S"/>
+    <route id="route_W_E" edges="W_in C_out_E"/>
+    <route id="route_W_N" edges="W_in C_out_N"/>
+    <route id="route_W_S" edges="W_in C_out_S"/>
+
+    <!-- ===================== Background traffic (0-800s, flat, ~75% of normal_traffic) ===================== -->
+    <flow id="bg_car_NS" type="car" route="route_N_S" begin="0" end="800" vehsPerHour="195"/>
+    <flow id="bg_car_SN" type="car" route="route_S_N" begin="0" end="800" vehsPerHour="185"/>
+    <flow id="bg_car_EW" type="car" route="route_E_W" begin="0" end="800" vehsPerHour="165"/>
+    <flow id="bg_car_WE" type="car" route="route_W_E" begin="0" end="800" vehsPerHour="160"/>
+
+    <flow id="bg_moto_NS" type="motorcycle" route="route_N_S" begin="0" end="800" vehsPerHour="130"/>
+    <flow id="bg_moto_SN" type="motorcycle" route="route_S_N" begin="0" end="800" vehsPerHour="120"/>
+    <flow id="bg_moto_EW" type="motorcycle" route="route_E_W" begin="0" end="800" vehsPerHour="105"/>
+    <flow id="bg_moto_WE" type="motorcycle" route="route_W_E" begin="0" end="800" vehsPerHour="100"/>
+
+    <!-- ===================== Turning background traffic: ~65-70% of this approach's straight volume ===================== -->
+    <flow id="bg_car_left_NE" type="car" route="route_N_E" begin="0" end="800" vehsPerHour="133"/>
+    <flow id="bg_car_right_NW" type="car" route="route_N_W" begin="0" end="800" vehsPerHour="125"/>
+    <flow id="bg_car_left_SW" type="car" route="route_S_W" begin="0" end="800" vehsPerHour="125"/>
+    <flow id="bg_car_right_SE" type="car" route="route_S_E" begin="0" end="800" vehsPerHour="118"/>
+    <flow id="bg_car_left_ES" type="car" route="route_E_S" begin="0" end="800" vehsPerHour="112"/>
+    <flow id="bg_car_right_EN" type="car" route="route_E_N" begin="0" end="800" vehsPerHour="105"/>
+    <flow id="bg_car_left_WN" type="car" route="route_W_N" begin="0" end="800" vehsPerHour="108"/>
+    <flow id="bg_car_right_WS" type="car" route="route_W_S" begin="0" end="800" vehsPerHour="100"/>
+
+    <flow id="bg_auto_NS" type="auto_rickshaw" route="route_N_S" begin="0" end="800" vehsPerHour="34"/>
+    <flow id="bg_auto_EW" type="auto_rickshaw" route="route_E_W" begin="0" end="800" vehsPerHour="28"/>
+
+    <flow id="bg_bus_NS" type="bus" route="route_N_S" begin="0" end="800" vehsPerHour="10"/>
+    <flow id="bg_bus_EW" type="bus" route="route_E_W" begin="0" end="800" vehsPerHour="8"/>
+
+    <!-- ===================== Emergency vehicles - individual, scheduled, no priority logic ===================== -->
+    <vehicle id="emergency_ambulance_1" type="ambulance" route="route_N_S" depart="100"/>
+    <vehicle id="emergency_fire_1" type="fire_engine" route="route_W_E" depart="250"/>
+    <vehicle id="emergency_police_1" type="police_vehicle" route="route_S_N" depart="400"/>
+    <vehicle id="emergency_ambulance_2" type="ambulance" route="route_E_W" depart="550"/>
+    <vehicle id="emergency_fire_2" type="fire_engine" route="route_N_E" depart="700"/>
+</routes>

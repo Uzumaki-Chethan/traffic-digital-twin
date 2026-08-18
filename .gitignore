@@ -243,3 +243,9 @@ datasets/
 # OS
 .DS_Store
 Thumbs.db
+.venv/
+__pycache__/
+*.pyc
+*.bak
+ml/trained_models/*.joblib
+datasets/*.csv

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    rush_hour.rou.xml
+    ===================
+    Demo scenario: office rush hour. Three phases exactly as specified:
+      low    0   - 120  (early commuters, light)
+      peak   120 - 400  (the actual rush - heavy, sustained)
+      taper  400 - 700  (winding down, still substantial)
+    Simulation end is 800s so the queue built up during peak/taper can
+    fully drain and be visible doing so.
+
+    REVISED: turning-movement volume raised to ~65-70% of the
+    corresponding straight-movement volume in EVERY phase, on EVERY
+    approach (the previous version only had N/S turns, and only in the
+    peak phase - E/W turns and low/taper-phase turns were both missing
+    entirely). Left-hand traffic movement mapping: from N: straight=S,
+    left=E, right=W. from S: straight=N, left=W, right=E. from E:
+    straight=W, left=S, right=N. from W: straight=E, left=N, right=S.
+-->
+<routes>
+    <!-- ===================== Routes (identical topology to the frozen network) ===================== -->
+    <route id="route_N_S" edges="N_in C_out_S"/>
+    <route id="route_N_E" edges="N_in C_out_E"/>
+    <route id="route_N_W" edges="N_in C_out_W"/>
+    <route id="route_S_N" edges="S_in C_out_N"/>
+    <route id="route_S_E" edges="S_in C_out_E"/>
+    <route id="route_S_W" edges="S_in C_out_W"/>
+    <route id="route_E_W" edges="E_in C_out_W"/>
+    <route id="route_E_N" edges="E_in C_out_N"/>
+    <route id="route_E_S" edges="E_in C_out_S"/>
+    <route id="route_W_E" edges="W_in C_out_E"/>
+    <route id="route_W_N" edges="W_in C_out_N"/>
+    <route id="route_W_S" edges="W_in C_out_S"/>
+
+    <!-- ===================== Phase 1: low, 0-120s (early commuters) ===================== -->
+    <flow id="low_car_NS" type="car" route="route_N_S" begin="0" end="120" vehsPerHour="220"/>
+    <flow id="low_car_SN" type="car" route="route_S_N" begin="0" end="120" vehsPerHour="200"/>
+    <flow id="low_car_EW" type="car" route="route_E_W" begin="0" end="120" vehsPerHour="160"/>
+    <flow id="low_car_WE" type="car" route="route_W_E" begin="0" end="120" vehsPerHour="150"/>
+    <flow id="low_moto_NS" type="motorcycle" route="route_N_S" begin="0" end="120" vehsPerHour="150"/>
+    <flow id="low_moto_SN" type="motorcycle" route="route_S_N" begin="0" end="120" vehsPerHour="140"/>
+    <flow id="low_bus_NS" type="bus" route="route_N_S" begin="0" end="120" vehsPerHour="12"/>
+    <flow id="low_bus_EW" type="bus" route="route_E_W" begin="0" end="120" vehsPerHour="10"/>
+    <!-- low-phase turns: ~65-70% of this phase's straight volume, each approach -->
+    <flow id="low_car_left_NE" type="car" route="route_N_E" begin="0" end="120" vehsPerHour="150"/>
+    <flow id="low_car_right_NW" type="car" route="route_N_W" begin="0" end="120" vehsPerHour="140"/>
+    <flow id="low_car_left_SW" type="car" route="route_S_W" begin="0" end="120" vehsPerHour="135"/>
+    <flow id="low_car_right_SE" type="car" route="route_S_E" begin="0" end="120" vehsPerHour="125"/>
+    <flow id="low_car_left_ES" type="car" route="route_E_S" begin="0" end="120" vehsPerHour="105"/>
+    <flow id="low_car_right_EN" type="car" route="route_E_N" begin="0" end="120" vehsPerHour="100"/>
+    <flow id="low_car_left_WN" type="car" route="route_W_N" begin="0" end="120" vehsPerHour="100"/>
+    <flow id="low_car_right_WS" type="car" route="route_W_S" begin="0" end="120" vehsPerHour="95"/>
+
+    <!-- ===================== Phase 2: peak, 120-400s (the actual rush) ===================== -->
+    <flow id="peak_car_NS" type="car" route="route_N_S" begin="120" end="400" vehsPerHour="650"/>
+    <flow id="peak_car_SN" type="car" route="route_S_N" begin="120" end="400" vehsPerHour="620"/>
+    <flow id="peak_car_EW" type="car" route="route_E_W" begin="120" end="400" vehsPerHour="520"/>
+    <flow id="peak_car_WE" type="car" route="route_W_E" begin="120" end="400" vehsPerHour="500"/>
+    <flow id="peak_moto_NS" type="motorcycle" route="route_N_S" begin="120" end="400" vehsPerHour="420"/>
+    <flow id="peak_moto_SN" type="motorcycle" route="route_S_N" begin="120" end="400" vehsPerHour="400"/>
+    <flow id="peak_moto_EW" type="motorcycle" route="route_E_W" begin="120" end="400" vehsPerHour="320"/>
+    <flow id="peak_moto_WE" type="motorcycle" route="route_W_E" begin="120" end="400" vehsPerHour="300"/>
+    <flow id="peak_auto_NS" type="auto_rickshaw" route="route_N_S" begin="120" end="400" vehsPerHour="70"/>
+    <flow id="peak_auto_EW" type="auto_rickshaw" route="route_E_W" begin="120" end="400" vehsPerHour="60"/>
+    <flow id="peak_bus_NS" type="bus" route="route_N_S" begin="120" end="400" vehsPerHour="20"/>
+    <flow id="peak_bus_SN" type="bus" route="route_S_N" begin="120" end="400" vehsPerHour="20"/>
+    <flow id="peak_bus_EW" type="bus" route="route_E_W" begin="120" end="400" vehsPerHour="16"/>
+    <flow id="peak_truck_NS" type="truck" route="route_N_S" begin="120" end="400" vehsPerHour="22"/>
+    <flow id="peak_truck_EW" type="truck" route="route_E_W" begin="120" end="400" vehsPerHour="16"/>
+    <!-- peak-phase turns: ~65-70% of this phase's straight volume, each approach -->
+    <flow id="peak_car_left_NE" type="car" route="route_N_E" begin="120" end="400" vehsPerHour="440"/>
+    <flow id="peak_car_right_NW" type="car" route="route_N_W" begin="120" end="400" vehsPerHour="420"/>
+    <flow id="peak_car_left_SW" type="car" route="route_S_W" begin="120" end="400" vehsPerHour="420"/>
+    <flow id="peak_car_right_SE" type="car" route="route_S_E" begin="120" end="400" vehsPerHour="400"/>
+    <flow id="peak_car_left_ES" type="car" route="route_E_S" begin="120" end="400" vehsPerHour="350"/>
+    <flow id="peak_car_right_EN" type="car" route="route_E_N" begin="120" end="400" vehsPerHour="340"/>
+    <flow id="peak_car_left_WN" type="car" route="route_W_N" begin="120" end="400" vehsPerHour="340"/>
+    <flow id="peak_car_right_WS" type="car" route="route_W_S" begin="120" end="400" vehsPerHour="320"/>
+
+    <!-- ===================== Phase 3: taper, 400-700s (winding down, still heavy) ===================== -->
+    <flow id="taper_car_NS" type="car" route="route_N_S" begin="400" end="700" vehsPerHour="380"/>
+    <flow id="taper_car_SN" type="car" route="route_S_N" begin="400" end="700" vehsPerHour="360"/>
+    <flow id="taper_car_EW" type="car" route="route_E_W" begin="400" end="700" vehsPerHour="280"/>
+    <flow id="taper_car_WE" type="car" route="route_W_E" begin="400" end="700" vehsPerHour="260"/>
+    <flow id="taper_moto_NS" type="motorcycle" route="route_N_S" begin="400" end="700" vehsPerHour="220"/>
+    <flow id="taper_moto_SN" type="motorcycle" route="route_S_N" begin="400" end="700" vehsPerHour="200"/>
+    <flow id="taper_bus_NS" type="bus" route="route_N_S" begin="400" end="700" vehsPerHour="14"/>
+    <flow id="taper_bus_EW" type="bus" route="route_E_W" begin="400" end="700" vehsPerHour="12"/>
+    <!-- taper-phase turns: ~65-70% of this phase's straight volume, each approach -->
+    <flow id="taper_car_left_NE" type="car" route="route_N_E" begin="400" end="700" vehsPerHour="260"/>
+    <flow id="taper_car_right_NW" type="car" route="route_N_W" begin="400" end="700" vehsPerHour="245"/>
+    <flow id="taper_car_left_SW" type="car" route="route_S_W" begin="400" end="700" vehsPerHour="245"/>
+    <flow id="taper_car_right_SE" type="car" route="route_S_E" begin="400" end="700" vehsPerHour="230"/>
+    <flow id="taper_car_left_ES" type="car" route="route_E_S" begin="400" end="700" vehsPerHour="190"/>
+    <flow id="taper_car_right_EN" type="car" route="route_E_N" begin="400" end="700" vehsPerHour="180"/>
+    <flow id="taper_car_left_WN" type="car" route="route_W_N" begin="400" end="700" vehsPerHour="175"/>
+    <flow id="taper_car_right_WS" type="car" route="route_W_S" begin="400" end="700" vehsPerHour="165"/>
+</routes>

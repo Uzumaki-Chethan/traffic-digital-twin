@@ -7,11 +7,12 @@
 <configuration>
     <input>
         <net-file value="../../network/intersection.net.xml"/>
-        <route-files value="../../routes/scenarios/west_heavy.rou.xml"/>
+        <route-files value="../../routes/scenarios/west_heavy_seed2.rou.xml"/>
+        <additional-files value="../../vehicles/vehicle_types.add.xml"/>
     </input>
     <time>
         <begin value="0"/>
-        <end value="600"/>
+        <end value="800"/>
         <step-length value="0.05"/>
     </time>
     <random>

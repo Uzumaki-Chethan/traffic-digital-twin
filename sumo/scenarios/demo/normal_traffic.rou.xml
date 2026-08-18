@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    normal_traffic.rou.xml
+    =======================
+    Demo scenario: an ordinary, non-peak traffic day. Flat demand for the
+    entire run (no ramp, no phases) - this is the visual baseline every
+    other scenario is meant to look different from.
+
+    REVISED: turning-movement volume raised to ~65-70% of the
+    corresponding straight-movement volume on every approach (was ~25%,
+    and only covered N/S with car turns - E/W turns are now included
+    too), so the left/right lanes carry genuinely comparable traffic to
+    the straight lane rather than sitting mostly empty next to a busy
+    middle lane. Left-hand traffic movement mapping used throughout:
+    from N: straight=S, left=E, right=W. from S: straight=N, left=W,
+    right=E. from E: straight=W, left=S, right=N. from W: straight=E,
+    left=N, right=S.
+-->
+<routes>
+    <!-- ===================== Routes (identical topology to the frozen network) ===================== -->
+    <route id="route_N_S" edges="N_in C_out_S"/>
+    <route id="route_N_E" edges="N_in C_out_E"/>
+    <route id="route_N_W" edges="N_in C_out_W"/>
+    <route id="route_S_N" edges="S_in C_out_N"/>
+    <route id="route_S_E" edges="S_in C_out_E"/>
+    <route id="route_S_W" edges="S_in C_out_W"/>
+    <route id="route_E_W" edges="E_in C_out_W"/>
+    <route id="route_E_N" edges="E_in C_out_N"/>
+    <route id="route_E_S" edges="E_in C_out_S"/>
+    <route id="route_W_E" edges="W_in C_out_E"/>
+    <route id="route_W_N" edges="W_in C_out_N"/>
+    <route id="route_W_S" edges="W_in C_out_S"/>
+
+    <!-- ===================== Through movements (0-800s, flat) ===================== -->
+    <flow id="normal_car_NS" type="car" route="route_N_S" begin="0" end="800" vehsPerHour="260"/>
+    <flow id="normal_car_SN" type="car" route="route_S_N" begin="0" end="800" vehsPerHour="250"/>
+    <flow id="normal_car_EW" type="car" route="route_E_W" begin="0" end="800" vehsPerHour="220"/>
+    <flow id="normal_car_WE" type="car" route="route_W_E" begin="0" end="800" vehsPerHour="215"/>
+
+    <flow id="normal_moto_NS" type="motorcycle" route="route_N_S" begin="0" end="800" vehsPerHour="170"/>
+    <flow id="normal_moto_SN" type="motorcycle" route="route_S_N" begin="0" end="800" vehsPerHour="160"/>
+    <flow id="normal_moto_EW" type="motorcycle" route="route_E_W" begin="0" end="800" vehsPerHour="140"/>
+    <flow id="normal_moto_WE" type="motorcycle" route="route_W_E" begin="0" end="800" vehsPerHour="135"/>
+
+    <!-- ===================== Turning movements: ~65-70% of the straight volume on the SAME approach, every approach covered ===================== -->
+    <!-- From N (straight=260): left(N->E)=180 (69%), right(N->W)=170 (65%) -->
+    <flow id="normal_car_left_NE" type="car" route="route_N_E" begin="0" end="800" vehsPerHour="180"/>
+    <flow id="normal_car_right_NW" type="car" route="route_N_W" begin="0" end="800" vehsPerHour="170"/>
+    <!-- From S (straight=250): left(S->W)=170 (68%), right(S->E)=160 (64%) -->
+    <flow id="normal_car_left_SW" type="car" route="route_S_W" begin="0" end="800" vehsPerHour="170"/>
+    <flow id="normal_car_right_SE" type="car" route="route_S_E" begin="0" end="800" vehsPerHour="160"/>
+    <!-- From E (straight=220): left(E->S)=150 (68%), right(E->N)=140 (64%) -->
+    <flow id="normal_car_left_ES" type="car" route="route_E_S" begin="0" end="800" vehsPerHour="150"/>
+    <flow id="normal_car_right_EN" type="car" route="route_E_N" begin="0" end="800" vehsPerHour="140"/>
+    <!-- From W (straight=215): left(W->N)=145 (67%), right(W->S)=135 (63%) -->
+    <flow id="normal_car_left_WN" type="car" route="route_W_N" begin="0" end="800" vehsPerHour="145"/>
+    <flow id="normal_car_right_WS" type="car" route="route_W_S" begin="0" end="800" vehsPerHour="135"/>
+
+    <!-- ===================== Auto-rickshaw (light, all approaches) ===================== -->
+    <flow id="normal_auto_NS" type="auto_rickshaw" route="route_N_S" begin="0" end="800" vehsPerHour="45"/>
+    <flow id="normal_auto_SN" type="auto_rickshaw" route="route_S_N" begin="0" end="800" vehsPerHour="42"/>
+    <flow id="normal_auto_EW" type="auto_rickshaw" route="route_E_W" begin="0" end="800" vehsPerHour="38"/>
+    <flow id="normal_auto_WE" type="auto_rickshaw" route="route_W_E" begin="0" end="800" vehsPerHour="36"/>
+
+    <!-- ===================== Bus (scheduled, light) ===================== -->
+    <flow id="normal_bus_NS" type="bus" route="route_N_S" begin="0" end="800" vehsPerHour="12"/>
+    <flow id="normal_bus_SN" type="bus" route="route_S_N" begin="0" end="800" vehsPerHour="12"/>
+    <flow id="normal_bus_EW" type="bus" route="route_E_W" begin="0" end="800" vehsPerHour="10"/>
+    <flow id="normal_bus_WE" type="bus" route="route_W_E" begin="0" end="800" vehsPerHour="10"/>
+
+    <!-- ===================== Truck (light freight background) ===================== -->
+    <flow id="normal_truck_NS" type="truck" route="route_N_S" begin="0" end="800" vehsPerHour="10"/>
+    <flow id="normal_truck_EW" type="truck" route="route_E_W" begin="0" end="800" vehsPerHour="8"/>
+</routes>
