@@ -233,6 +233,11 @@ datasets/
 # Generated CSVs
 *.csv
 
+# SQLite runtime logs (dashboard/persistence)
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
 # Logs
 *.log
 

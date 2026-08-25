@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Traffic Digital Twin Dashboard</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e;
+    --green: #3fb950; --yellow: #d29922; --red: #f85149;
+    --blue: #58a6ff; --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif; padding: 16px;
+  }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: 12px; }
+  .grid {
+    display: grid; gap: 14px; margin-top: 14px;
+    grid-template-columns: repeat(12, 1fr);
+  }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px;
+  }
+  .c3 { grid-column: span 3; } .c4 { grid-column: span 4; }
+  .c5 { grid-column: span 5; } .c6 { grid-column: span 6; }
+  .c7 { grid-column: span 7; } .c8 { grid-column: span 8; }
+  .c12 { grid-column: span 12; }
+  .panel h2 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted); margin-bottom: 10px;
+  }
+  /* Signal light */
+  .signal-box { display: flex; align-items: center; gap: 18px; }
+  .lamp-col {
+    background: #010409; border: 2px solid var(--border);
+    border-radius: 14px; padding: 10px; display: flex;
+    flex-direction: column; gap: 8px; align-items: center;
+  }
+  .lamp {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: #21262d; opacity: 0.35; transition: all .15s;
+  }
+  .lamp.red.on { background: var(--red); opacity: 1; box-shadow: 0 0 14px var(--red); }
+  .lamp.yellow.on { background: var(--yellow); opacity: 1; box-shadow: 0 0 14px var(--yellow); }
+  .lamp.green.on { background: var(--green); opacity: 1; box-shadow: 0 0 14px var(--green); }
+  .countdown { font-size: 42px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .phase-name { font-size: 15px; color: var(--blue); font-weight: 600; }
+  /* Metric cards */
+  .metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .metric { text-align: center; background: #0d1117; border-radius: 8px; padding: 10px 4px; }
+  .metric .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .metric .l { font-size: 10px; color: var(--muted); text-transform: uppercase; }
+  /* Lane bars */
+  .lane-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 11px; }
+  .lane-id { width: 52px; color: var(--muted); font-family: monospace; }
+  .lane-bar-track { flex: 1; height: 12px; background: #0d1117; border-radius: 6px; overflow: hidden; }
+  .lane-bar { height: 100%; border-radius: 6px; transition: width .3s; }
+  .sig-g { color: var(--green); } .sig-y { color: var(--yellow); } .sig-r { color: var(--red); }
+  /* Phase history */
+  .timeline { display: flex; gap: 2px; height: 26px; align-items: stretch; }
+  .tl-block { flex: 1; border-radius: 3px; min-width: 4px; }
+  .tl-NS_straight_left { background: var(--green); }
+  .tl-EW_straight_left { background: var(--blue); }
+  .tl-NS_right { background: #2ea04366; outline: 1px solid var(--green); }
+  .tl-EW_right { background: #1f6feb66; outline: 1px solid var(--blue); }
+  .tl-yellow { background: var(--yellow); }
+  /* Decision */
+  .mode-badge {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 700; background: #1f6feb33;
+    color: var(--blue); border: 1px solid #1f6feb66; margin-bottom: 8px;
+  }
+  .reason { font-size: 13px; line-height: 1.5; color: var(--text); max-height: 110px; overflow-y: auto; }
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { padding: 5px 8px; text-align: right; border-bottom: 1px solid var(--border); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 600; }
+  .imp-pos { color: var(--green); font-weight: 700; }
+  .imp-neg { color: var(--red); font-weight: 700; }
+  .conf-bar-track { height: 8px; background: #0d1117; border-radius: 4px; margin-top: 6px; }
+  .conf-bar { height: 100%; background: var(--purple); border-radius: 4px; }
+  /* Emergency banner */
+  .emergency-banner {
+    display: none; background: #f8514922; border: 1px solid var(--red);
+    color: var(--red); border-radius: 8px; padding: 10px 14px;
+    font-weight: 700; margin-top: 14px; animation: pulse 1s infinite;
+  }
+  @keyframes pulse { 50% { opacity: 0.55; } }
+  .status-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--red); margin-right: 6px; }
+  .status-dot.live { background: var(--green); }
+  .legend { display: flex; gap: 14px; font-size: 11px; color: var(--muted); margin-top: 8px; flex-wrap: wrap; }
+  .legend span::before { content: "■ "; }
+  .lg-ns::before { color: var(--green); } .lg-ew::before { color: var(--blue); }
+  .lg-yr::before { color: var(--yellow); }
+</style>
+</head>
+<body>
+  <h1>🚦 Traffic Digital Twin — Live Dashboard</h1>
+  <div class="sub"><span class="status-dot" id="connDot"></span><span id="connText">connecting…</span> · sim time <b id="simTime">–</b>s · AI adaptive control vs SUMO default baseline</div>
+
+  <div class="emergency-banner" id="emgBanner">🚨 EMERGENCY VEHICLE PRIORITY ACTIVE — lanes: <span id="emgLanes"></span></div>
+
+  <div class="grid">
+    <!-- SIGNAL -->
+    <div class="panel c4">
+      <h2>Signal State (live from SUMO)</h2>
+      <div class="signal-box">
+        <div class="lamp-col">
+          <div class="lamp red" id="lampR"></div>
+          <div class="lamp yellow" id="lampY"></div>
+          <div class="lamp green" id="lampG"></div>
+        </div>
+        <div>
+          <div class="countdown" id="countdown">–</div>
+          <div class="phase-name" id="phaseName">waiting…</div>
+        </div>
+      </div>
+      <div class="legend">
+        <span class="lg-ns">NS straight+left</span><span class="lg-ew">EW straight+left</span>
+        <span class="lg-yr">right-only / yellow</span>
+      </div>
+    </div>
+
+    <!-- METRICS -->
+    <div class="panel c8">
+      <h2>Network Metrics (AI simulation)</h2>
+      <div class="metrics">
+        <div class="metric"><div class="v" id="mVeh">–</div><div class="l">Vehicles</div></div>
+        <div class="metric"><div class="v" id="mSpeed">–</div><div class="l">Avg Speed m/s</div></div>
+        <div class="metric"><div class="v" id="mWait">–</div><div class="l">Avg Wait s</div></div>
+        <div class="metric"><div class="v" id="mQueue">–</div><div class="l">Queue Len</div></div>
+        <div class="metric"><div class="v" id="mStopped">–</div><div class="l">Stopped</div></div>
+      </div>
+      <h2 style="margin-top:14px">Phase History (last ~60 s)</h2>
+      <div class="timeline" id="timeline"></div>
+    </div>
+
+    <!-- LANES -->
+    <div class="panel c6">
+      <h2>Lane Density & Signal (Digital Twin)</h2>
+      <div id="lanes"></div>
+    </div>
+
+    <!-- DECISION -->
+    <div class="panel c6">
+      <h2>Decision Explanation (why the AI chose this)</h2>
+      <span class="mode-badge" id="decMode">–</span>
+      <div class="reason" id="decReason">Waiting for first decision…</div>
+    </div>
+
+    <!-- PREDICTION -->
+    <div class="panel c6">
+      <h2>Prediction vs Actual (15 s horizon)</h2>
+      <table id="predTable">
+        <thead><tr><th>Lane</th><th>Pred veh</th><th>Act veh</th><th>Pred wait</th><th>Act wait</th><th>Conf %</th></tr></thead>
+        <tbody><tr><td colspan="6" style="color:var(--muted)">No evaluated prediction yet…</td></tr></tbody>
+      </table>
+      <div class="conf-bar-track"><div class="conf-bar" id="confBar" style="width:0%"></div></div>
+    </div>
+
+    <!-- COMPARISON -->
+    <div class="panel c6">
+      <h2>AI vs Baseline (SUMO default) — live comparison</h2>
+      <table id="cmpTable">
+        <thead><tr><th>Metric</th><th>AI</th><th>Baseline</th><th>Change</th></tr></thead>
+        <tbody><tr><td colspan="4" style="color:var(--muted)">Run the evaluator with --dashboard to populate…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+<script>
+const PHASE_LABELS = {
+  NS_straight_left: "N-S Straight + Left",
+  NS_right: "N-S Right",
+  EW_straight_left: "E-W Straight + Left",
+  EW_right: "E-W Right",
+};
+let ws = null;
+
+function connect() {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(proto + "://" + location.host + "/ws");
+  ws.onopen = () => setStatus(true);
+  ws.onclose = () => { setStatus(false); setTimeout(connect, 2000); };
+  ws.onerror = () => ws.close();
+  ws.onmessage = (ev) => update(JSON.parse(ev.data));
+}
+
+function setStatus(live) {
+  document.getElementById("connDot").classList.toggle("live", live);
+  document.getElementById("connText").textContent = live ? "LIVE" : "reconnecting…";
+}
+
+function fmt(x, d=2) { return (x === null || x === undefined || isNaN(x)) ? "–" : Number(x).toFixed(d); }
+
+function update(s) {
+  if (!s || s.status) return;
+  document.getElementById("simTime").textContent = fmt(s.sim_time, 1);
+
+  // Signal
+  const sig = s.signal || {};
+  const isYellow = !!sig.is_yellow;
+  document.getElementById("lampR").classList.toggle("on", isYellow ? false : !sig.green);
+  document.getElementById("lampY").classList.toggle("on", isYellow);
+  document.getElementById("lampG").classList.toggle("on", isYellow ? false : !!sig.green);
+  document.getElementById("countdown").textContent = Math.max(0, sig.countdown ?? 0).toFixed(1);
+  document.getElementById("phaseName").textContent =
+    (isYellow ? "YELLOW → " : "") + (PHASE_LABELS[sig.phase] || sig.phase || "–");
+
+  // Metrics
+  const m = s.metrics || {};
+  document.getElementById("mVeh").textContent = m.vehicles ?? "–";
+  document.getElementById("mSpeed").textContent = fmt(m.avg_speed, 1);
+  document.getElementById("mWait").textContent = fmt(m.avg_wait, 1);
+  document.getElementById("mQueue").textContent = m.queue ?? "–";
+  document.getElementById("mStopped").textContent = m.stopped ?? "–";
+
+  // Timeline
+  const tl = document.getElementById("timeline");
+  tl.innerHTML = "";
+  (s.phase_history || []).forEach(h => {
+    const b = document.createElement("div");
+    b.className = "tl-block " + (h.is_yellow ? "tl-yellow" : "tl-" + h.phase);
+    b.title = fmt(h.time,1) + "s " + (PHASE_LABELS[h.phase] || h.phase);
+    tl.appendChild(b);
+  });
+
+  // Lanes
+  const lanesEl = document.getElementById("lanes");
+  lanesEl.innerHTML = "";
+  (s.lanes || []).forEach(l => {
+    const row = document.createElement("div"); row.className = "lane-row";
+    const maxCount = Math.max(10, ...(s.lanes||[]).map(x=>x.vehicles));
+    const pct = Math.min(100, l.vehicles / maxCount * 100);
+    const color = l.signal === "g" ? "var(--green)" : l.signal === "y" ? "var(--yellow)" : "var(--red)";
+    row.innerHTML =
+      '<span class="lane-id">' + l.lane_id + '</span>' +
+      '<span class="' + (l.signal==="g"?"sig-g":l.signal==="y"?"sig-y":"sig-r") + '">' +
+      (l.signal==="g"?"● G":l.signal==="y"?"● Y":"● R") + '</span>' +
+      '<div class="lane-bar-track"><div class="lane-bar" style="width:'+pct+'%;background:'+color+'"></div></div>' +
+      '<span style="width:70px;text-align:right;color:var(--muted)">' + l.vehicles + ' veh · ' + fmt(l.avg_wait,0) + 's</span>';
+    lanesEl.appendChild(row);
+  });
+
+  // Decision
+  const d = s.decision || {};
+  document.getElementById("decMode").textContent = (d.mode || "–") + (d.switched ? " · SWITCHED" : "");
+  document.getElementById("decReason").textContent = d.reason || "";
+
+  // Emergency
+  const emg = s.emergency_lanes || [];
+  document.getElementById("emgBanner").style.display = emg.length ? "block" : "none";
+  document.getElementById("emgLanes").textContent = emg.join(", ");
+
+  // Prediction
+  const p = s.prediction;
+  const tbody = document.querySelector("#predTable tbody");
+  if (p && p.rows && p.rows.length) {
+    tbody.innerHTML = "";
+    p.rows.forEach(r => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = "<td>"+r.lane+"</td><td>"+fmt(r.pred_veh,1)+"</td><td>"+fmt(r.act_veh,0)+
+                     "</td><td>"+fmt(r.pred_wait,1)+"</td><td>"+fmt(r.act_wait,1)+"</td><td>"+fmt(r.confidence,0)+"</td>";
+      tbody.appendChild(tr);
+    });
+    document.getElementById("confBar").style.width = (p.avg_confidence || 0) + "%";
+  }
+
+  // Comparison
+  const cmp = s.comparison;
+  const cbody = document.querySelector("#cmpTable tbody");
+  if (cmp && cmp.rows && cmp.rows.length) {
+    cbody.innerHTML = "";
+    cmp.rows.forEach(r => {
+      const cls = r.improvement >= 0 ? "imp-pos" : "imp-neg";
+      const arrow = r.improvement >= 0 ? "▼/▲ better" : "worse";
+      const tr = document.createElement("tr");
+      tr.innerHTML = "<td>"+r.label+"</td><td>"+fmt(r.ai)+"</td><td>"+fmt(r.baseline)+
+                     "</td><td class='"+cls+"'>"+(r.improvement>=0?"+":"")+fmt(r.improvement,1)+"%</td>";
+      cbody.appendChild(tr);
+    });
+  }
+}
+connect();
+</script>
+</body>
+</html>

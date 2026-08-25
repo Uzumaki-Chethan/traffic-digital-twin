@@ -1063,3 +1063,201 @@ This would reduce the current mix of runtime code, training code, and asset-gene
 The project is a well-structured prototype for a traffic digital twin with strong modular boundaries between simulation, state, feature engineering, and machine learning. It is not yet a complete intelligent traffic control system, but it already has the foundations for a functional simulation + prediction architecture.
 
 The main gaps are not in the low-level pipeline design; they are in the missing control layer, the lack of a real decision engine, the absence of a completed dashboard, and the need to align tests and runtime entry points with the current architecture.
+
+---
+
+## SECTION 15 — Performance Evaluation implementation (CURRENT STATE)
+
+> NOTE: Sections 8-14 above were written before the control layer existed
+> and are partially outdated. This section records what is actually built
+> NOW. Current status summary: simulation ✔, ML model + calibration ✔,
+> DecisionEngine ✔, SignalController ✔, closed-loop app.py integration ✔,
+> Performance Evaluation ✔ (this section) — remaining: Dashboard,
+> emergency detection, database persistence, final demo polish.
+
+### 15.1 What was built
+
+A parallel-simulation performance evaluation system under
+`backend/performance/`:
+
+| File | Role |
+|---|---|
+| `performance/metrics_collector.py` | `MetricsCollector` - aggregates all six core metric families from raw `SimulationState` snapshots. One instance per simulation. |
+| `performance/evaluator.py` | `PerformanceEvaluator` - runs TWO PARALLEL, LOCKSTEP-SYNCHRONIZED SUMO instances of the same scenario (AI vs SUMO-default baseline) and produces the comparison panel + CSV with % improvement. |
+| `performance/baseline_controllers.py` | Python-side alternative baselines (`FixedTimerController`, `VehicleActuatedController`) emitting real `Decision` objects. |
+| `performance/evaluate.py` | Batch runner comparing fixed_timer / vac / ai across many scenarios sequentially. |
+
+### 15.2 The two-simulation design (hard rules)
+
+1. Simulation A ("ai") runs the FULL pipeline:
+   TrafficAdapter -> DigitalTwin -> FeatureEngineer -> MLPredictor ->
+   DecisionEngine -> SignalController.
+2. Simulation B ("baseline") runs TrafficAdapter + MetricsCollector ONLY.
+   NO DecisionEngine, NO SignalController. The frozen network's own
+   static tlLogic program controls it; it NEVER receives a trafficlight
+   command.
+3. Both are SEPARATE SUMO processes on separate labeled TraCI connections
+   ("ai" / "baseline"). They are never merged into one instance - one
+   traffic light cannot run two control strategies, and shared vehicle
+   state would couple every metric.
+4. Fairness is structural: both managers launch the SAME sumocfg (same
+   network, same route files, same seed). Lockstep stepping keeps both at
+   identical simulated timestamps.
+
+### 15.3 Metrics collected (per simulation)
+
+All metrics are TIME-WEIGHTED INTEGRALS (value * dt summed over simulated
+time, divided by total simulated time), computed from the raw
+SimulationState through the IDENTICAL collection path on both sides:
+
+1. Average waiting time (+ worst instantaneous average)
+2. Queue length - vehicles below 0.1 m/s (SUMO's halting definition),
+   network-wide AND per-lane breakdown
+3. Throughput - unique vehicles completing trips, plus veh/hour
+4. Average speed
+5. Stopped vehicles count
+6. Travel time - per-vehicle entry->exit duration paired from
+   adapter-reported departure/arrival timestamps (avg + worst)
+
+### 15.4 Infrastructure changes that enabled this
+
+- `TraCIManager(config, label=...)`: labeled TraCI connections;
+  `manager.connection` exposes THIS instance's Connection object.
+  Verified against the installed traci API: `traci.start()` returns a
+  `(label, subprocess)` tuple there, so the Connection is fetched via
+  `traci.getConnection(label)`. `run()`/`close()` operate on the
+  manager's OWN connection so closing one simulation never kills the
+  other. `numRetries=30` fixes intermittent Windows startup failures.
+- `TrafficAdapter`: binds to its own manager's connection (no cross-talk
+  between parallel simulations); added `get_arrived_vehicle_ids()`
+  alongside `get_departed_vehicle_ids()` for travel-time pairing.
+- `SignalController(tls_id, traci_connection=None)`: optional explicit
+  connection binding so signal commands ALWAYS land on the AI instance
+  only. Its per-tick prints became `logger.debug` (console I/O was a
+  measurable drag on long runs).
+- `app.py`: status logging moved from every step (20 Hz) to decision
+  ticks (1 Hz); `SUMO_BINARY_NAME` restored to "sumo-gui".
+
+### 15.5 How to run
+
+From `backend/`:
+
+    python -m performance.evaluator --scenario heavy_seed1          # headless
+    python -m performance.evaluator --scenario rush_hour_seed1 --gui # dual GUI demo
+
+Output: side-by-side panel with signed % improvement per metric
+(IMPROVED / REGRESSED verdicts - regressions are reported honestly),
+plus `results/comparison_<scenario>.csv`.
+
+### 15.6 First verified result (light_seed1)
+
+    Avg Waiting Time : AI 2.56s  vs Baseline 11.56s  -> 77.9% IMPROVED
+    Avg Travel Time  : AI 46.34s vs Baseline 53.14s  -> 12.8% IMPROVED
+    Avg Queue Length : AI 3.11   vs Baseline 4.94    -> 37.1% IMPROVED
+    Avg Speed        : AI 7.98   vs Baseline 6.85    -> 16.4% IMPROVED
+    Throughput       : 240 = 240 (identical demand confirmed)
+    Worst Travel Time: 1.8% REGRESSED (honest outlier reporting)
+
+### 15.6b Second verified result (heavy_seed1, 888 vehicles per sim)
+
+    Avg Waiting Time : AI 3.17s   vs Baseline 16.81s  -> 81.1% IMPROVED
+    Avg Travel Time  : AI 55.26s  vs Baseline 84.55s  -> 34.6% IMPROVED
+    Worst Travel Time: AI 123.10s vs Baseline 317.40s -> 61.2% IMPROVED
+    Avg Queue Length : AI 14.87   vs Baseline 33.78   -> 56.0% IMPROVED
+    Max Queue Length : AI 35      vs Baseline 77      -> 54.5% IMPROVED
+    Avg Speed        : AI 7.17    vs Baseline 4.52    -> 58.7% IMPROVED
+    Throughput       : 888 = 888 (identical demand confirmed)
+
+Under heavy load the AI's advantage GROWS (waiting time improvement rises
+from 77.9% at light demand to 81.1% at heavy demand) - exactly the
+behaviour adaptive control is supposed to exhibit.
+
+### 15.7 Remaining roadmap
+
+1. Dashboard (Digital Twin UI): live phase, countdown, density,
+   prediction-vs-actual, decision reasoning, AI-vs-baseline panel.
+2. Emergency detection: feed real `emergency_lanes` into DecisionEngine.
+3. Database persistence (`backend/database/`): decision_log /
+   prediction_log / performance_log tables for history + graphs.
+4. Final optimization + demo script.
+
+---
+
+## SECTION 16 — Dashboard, Emergency Detection, Database Logging (CURRENT STATE)
+
+> All three components from the 15.7 roadmap are now IMPLEMENTED and
+> VERIFIED end-to-end. Only final demo polish remains.
+
+### 16.1 Real-time Dashboard
+
+Files:
+- `backend/services/live_state.py` — thread-safe snapshot store
+  (`LiveStateStore`); simulation publishes, dashboard reads; nothing
+  flows back into the simulation (read-only rule is structural).
+- `backend/services/dashboard_server.py` — FastAPI app: serves
+  `frontend/dashboard.html`, pushes snapshots over WebSocket `/ws`
+  every 0.5 s, plus an HTTP fallback at `/api/latest`. Runs as a daemon
+  thread inside the simulation process via `start_dashboard_server()`.
+- `frontend/dashboard.html` — single-file dark-theme dashboard.
+
+Panels: live signal light (red/yellow/green) with countdown · network
+metrics cards · 60 s phase-history timeline · per-lane density bars
+colored by signal state · decision explanation (mode badge + full
+reason_text) · prediction-vs-actual table with confidence bar ·
+emergency alert banner · live AI-vs-baseline comparison table with
+signed % improvements.
+
+Config: `DASHBOARD_ENABLED / DASHBOARD_HOST / DASHBOARD_PORT`
+(default http://127.0.0.1:8000). The evaluator exposes live comparison
+via `python -m performance.evaluator --scenario X --dashboard`.
+
+VERIFIED: full headless app.py run (320 vehicles, 644 s sim time)
+published snapshots for the whole run; HTTP 200 page serve +
+/api/latest snapshot confirmed; evaluator --dashboard feeds the
+comparison panel live.
+
+### 16.2 Emergency Vehicle Detection
+
+- `TrafficAdapter.get_emergency_vehicle_lanes()` reads SUMO vehicle
+  classes via `traci.vehicle.getVehicleClass()` — raw fact only,
+  consistent with the adapter's boundary role.
+- app.py passes the frozenset of lanes holding "emergency"-class
+  vehicles straight into `DecisionEngine.decide(..., emergency_lanes=...)`.
+- ALL prioritization logic remains inside DecisionEngine (existing
+  EMERGENCY_MINIMUM_SAFETY_SECONDS cut-in + EMERGENCY_SERVICE_WINDOW
+  hold). No new decision logic was added anywhere else.
+- The emergency_response demo scenario contains emergency-class
+  vehicles to exercise this path during demos.
+
+### 16.3 Database Logging (SQLite)
+
+File: `backend/database/db_logger.py`; DB at `data/traffic_dashboard.db`.
+
+| Table | Row cadence | Columns |
+|---|---|---|
+| decision_log | 1/decision | time, phase, duration, mode, reason |
+| performance_log | 1/tick | time, avg_wait, avg_speed, queue_length, stopped |
+| prediction_log | 1/lane/matured prediction | time, predicted_values JSON, actual_values JSON, confidence |
+
+Design: WAL journal mode, insert-only, lock-guarded single connection,
+ALL database errors swallowed+logged (a DB failure can never cost a
+control tick). Predictions are parked in a pending dict until their 15 s
+horizon elapses, then paired with observed values before writing - so
+every prediction row is a genuine predicted-vs-actual record usable for
+model-quality graphs.
+
+VERIFIED on a full run: decision_log = 645 rows, performance_log =
+645 rows, prediction_log = 7,560 rows (12 lanes x ~630 matured
+predictions), sample rows well-formed.
+
+### 16.4 Integration points (app.py)
+
+app.py now orchestrates three read-only side-channels alongside control:
+SQLite logging, dashboard publishing, and emergency-lane feeding. None
+of them can influence control decisions; all existing module
+responsibilities are unchanged.
+
+### 16.5 Remaining roadmap
+
+1. Final optimization + demo script (presentation flow, optional
+   SQLite-backed history charts).

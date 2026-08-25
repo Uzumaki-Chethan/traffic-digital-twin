@@ -41,12 +41,50 @@ class Config:
     # "sumo-gui" for a visible simulation window during development and
     # demos, "sumo" for a headless run. sumolib resolves this to the
     # correct executable name and path for the current platform.
+    #
+    # NOTE: keep "sumo-gui" during development/debugging. A previous
+    # debugging session switched this to headless "sumo", which made it
+    # LOOK like the simulation was not running (no window appears) while
+    # the process was actually simulating invisibly at full speed.
     SUMO_BINARY_NAME = "sumo-gui"
+
+    # The traffic light ID in the frozen network, verified directly
+    # against sumo/network/intersection.tll.xml (<tlLogic id="C">).
+    # DecisionEngine and SignalController both operate on this one
+    # junction; a multi-intersection version would need this to become
+    # a list, not a single constant (documented future scope, not
+    # needed for this project).
+    TLS_ID = "C"
+
+    # How often, in real simulated seconds, DecisionEngine actually
+    # makes a new decision. intersection.sumocfg's step-length is 0.05s,
+    # so TraCIManager's per-step callback fires 20x per real second -
+    # calling decide() on every single step would make its internal
+    # phase timers run 20x too fast. Matches
+    # ml.training.config.TrainingConfig.SAMPLING_INTERVAL_SECONDS
+    # deliberately: the model was trained on features sampled at this
+    # same cadence, so decisions happening at any other interval would
+    # be feeding it a temporal pattern it never saw in training.
+    DECISION_INTERVAL_SECONDS = 1.0
 
     # Logging configuration, read once by app.py at startup.
     LOG_LEVEL = "INFO"
     LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
     LOG_DATE_FORMAT = "%H:%M:%S"
+
+    # ---- Dashboard / persistence configuration ----
+
+    # SQLite database file for decision_log / performance_log /
+    # prediction_log tables. Lives under data/ next to the datasets.
+    DB_PATH = os.path.join(PROJECT_ROOT, "data", "traffic_dashboard.db")
+
+    # Real-time dashboard: when True, app.py starts the FastAPI
+    # dashboard server in a background thread and pushes one snapshot
+    # per decision tick (1 Hz). The dashboard is a pure READ-ONLY
+    # consumer - it never sends commands back into the simulation.
+    DASHBOARD_ENABLED = True
+    DASHBOARD_HOST = "127.0.0.1"
+    DASHBOARD_PORT = 8000
 
     @classmethod
     def get_sumo_binary(cls):
