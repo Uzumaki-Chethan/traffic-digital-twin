@@ -111,11 +111,19 @@ python app.py
 # then open http://127.0.0.1:8000 in a browser
 ```
 
-Panels: live signal light + countdown · network metrics · phase history
-timeline (~60 s) · lane density bars colored by signal state · decision
-explanation (mode + full reason text) · prediction-vs-actual with model
-confidence · emergency-vehicle alert banner · live AI-vs-baseline
-comparison (when running the evaluator).
+A professional multi-page **Traffic Command Center** UI with sidebar
+navigation (Overview / Digital Twin / Performance / Decisions):
+
+- **Overview** — large signal visualization with countdown, KPI cards,
+  emergency alert banner, AI-vs-baseline summary, 60 s phase timeline.
+- **Digital Twin** — lane density bars color-coded by signal state,
+  prediction-vs-actual table, model confidence visualization.
+- **Performance** — waiting-time and queue-length charts over time,
+  throughput comparison bars, signed improvement percentages.
+- **Decisions** — current phase, decision-mode badge
+  (NORMAL / STARVATION / EMERGENCY), full reason_text, phase history.
+
+Dependency-free canvas charting (no CDN needed — works offline).
 
 For the comparison panel during evaluation runs:
 
