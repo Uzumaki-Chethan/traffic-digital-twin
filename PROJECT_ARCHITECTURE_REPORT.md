@@ -1188,7 +1188,7 @@ behaviour adaptive control is supposed to exhibit.
 > All three components from the 15.7 roadmap are now IMPLEMENTED and
 > VERIFIED end-to-end. Only final demo polish remains.
 
-### 16.1 Real-time Dashboard
+### 16.1 Real-time Dashboard — Traffic Command Center UI
 
 Files:
 - `backend/services/live_state.py` — thread-safe snapshot store
@@ -1198,14 +1198,31 @@ Files:
   `frontend/dashboard.html`, pushes snapshots over WebSocket `/ws`
   every 0.5 s, plus an HTTP fallback at `/api/latest`. Runs as a daemon
   thread inside the simulation process via `start_dashboard_server()`.
-- `frontend/dashboard.html` — single-file dark-theme dashboard.
+- `frontend/dashboard.html` — single-entry multi-page **Traffic Command
+  Center** UI (dark professional theme, CSS design tokens, internally
+  modular JS: WS client / Router / History buffers / dependency-free
+  canvas Charts / per-page renderers).
 
-Panels: live signal light (red/yellow/green) with countdown · network
-metrics cards · 60 s phase-history timeline · per-lane density bars
-colored by signal state · decision explanation (mode badge + full
-reason_text) · prediction-vs-actual table with confidence bar ·
-emergency alert banner · live AI-vs-baseline comparison table with
-signed % improvements.
+Sidebar navigation with four pages:
+1. **Overview** — large signal visualization (3-lamp housing +
+   countdown + progress), KPI cards (vehicles / avg speed / avg wait /
+   stopped), emergency alert banner, AI-vs-baseline summary table,
+   ~60 s phase-history timeline.
+2. **Digital Twin** — lane density bars color-coded by live signal
+   state (G/Y/R), real-time network state cards, model confidence
+   visualization, prediction-vs-actual table (15 s horizon).
+3. **Performance** — waiting-time and queue-length line charts over
+   time, AI-vs-baseline throughput comparison bars, signed improvement
+   percentage table.
+4. **Decisions** — current phase, decision-mode badge color-coded
+   NORMAL (blue) / STARVATION OVERRIDE (orange) / EMERGENCY OVERRIDE
+   (red), full reason_text reasoning box, phase timeline, emergency
+   status panel.
+
+Charting is dependency-free canvas rendering (no CDN - works offline
+during demos). WebSocket transport requires the `websockets` package
+(uvicorn does not support WS upgrades without it; pinned in
+requirements.txt).
 
 Config: `DASHBOARD_ENABLED / DASHBOARD_HOST / DASHBOARD_PORT`
 (default http://127.0.0.1:8000). The evaluator exposes live comparison
@@ -1214,7 +1231,8 @@ via `python -m performance.evaluator --scenario X --dashboard`.
 VERIFIED: full headless app.py run (320 vehicles, 644 s sim time)
 published snapshots for the whole run; HTTP 200 page serve +
 /api/latest snapshot confirmed; evaluator --dashboard feeds the
-comparison panel live.
+comparison panel live; browser client connected and receiving over
+WebSocket after the websockets dependency fix.
 
 ### 16.2 Emergency Vehicle Detection
 
