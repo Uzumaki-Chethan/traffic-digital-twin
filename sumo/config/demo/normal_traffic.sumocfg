@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <input>
+        <net-file value="../../network/intersection.net.xml"/>
+        <route-files value="../../scenarios/demo/normal_traffic.rou.xml"/>
+        <additional-files value="../../vehicles/vehicle_types.add.xml"/>
+    </input>
+    <time>
+        <begin value="0"/>
+        <end value="800"/>
+        <step-length value="0.1"/>
+    </time>
+    <random>
+        <seed value="1"/>
+    </random>
+    <gui_only>
+        <start value="false"/>
+    </gui_only>
+</configuration>

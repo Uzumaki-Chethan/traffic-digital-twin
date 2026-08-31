@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    demo_view.xml
+    ===============
+    An alternate view-settings file, colors vehicles by current SPEED
+    instead of vehicle class, a genuine speed-based heatmap effect
+    using sumo-gui's own real, built-in coloring modes, not a custom
+    feature. Useful for a specific part of a presentation focused on
+    congestion/flow rather than fleet composition, swap to this file
+    using the gui settings file option pointed at demo_view.xml for
+    that segment, swap back to default_view.xml afterward.
+-->
+<viewsettings>
+    <scheme name="smart_city_speed_heatmap"/>
+    <background backgroundColor="0.1,0.1,0.12" showGrid="0"/>
+    <vehicles vehicleQuality="2" vehicleColorer="1" vehicleSize.exaggeration="1.3"/>
+    <lanes laneColorer="1"/>
+    <junctions junctionColorer="0"/>
+</viewsettings>

@@ -47,14 +47,17 @@ NETWORK_FEATURE_NAMES: Tuple[str, ...] = (
 )
 
 # Per-lane feature names, in the order each lane's block appears in the
-# feature vector. The first five are read directly off LaneFeatures,
-# current_signal_state is read off TrafficFeatures.signal.lane_signal_states
-# for the same lane_id, an ordinal (0=red, 1=yellow, 2=green). Included
-# specifically because it is the direct, phase-table-independent answer
-# to "is this lane's traffic likely to keep moving or start queuing over
-# the prediction horizon", see the architecture design review for why
-# phase index, phase name, elapsed time, next phase, and cycle length
-# were all considered and rejected instead.
+# feature vector. The first five are instantaneous facts read directly
+# off LaneFeatures, current_signal_state is read off
+# TrafficFeatures.signal.lane_signal_states for the same lane_id, an
+# ordinal (0=red, 1=yellow, 2=green). The final four
+# (arrival_rate, departure_rate, stopped_vehicle_count_trend,
+# waiting_time_trend) are short-horizon temporal trend features,
+# computed by FeatureEngineer from DigitalTwin.history rather than from
+# the current snapshot alone, see FeatureEngineer.TREND_LOOKBACK_SECONDS
+# and the milestone's design review for why each was chosen and why
+# vehicle-count growth rate was deliberately NOT included as a separate
+# column (it is a linear combination of arrival_rate and departure_rate).
 LANE_FEATURE_NAMES: Tuple[str, ...] = (
     "vehicle_count",
     "average_speed",
@@ -62,6 +65,10 @@ LANE_FEATURE_NAMES: Tuple[str, ...] = (
     "max_waiting_time",
     "stopped_vehicle_count",
     "current_signal_state",
+    "arrival_rate",
+    "departure_rate",
+    "stopped_vehicle_count_trend",
+    "waiting_time_trend",
 )
 
 # Per-lane target names, the two raw LaneFeatures fields a future
@@ -79,7 +86,23 @@ TARGET_FEATURE_NAMES: Tuple[str, ...] = (
 # This value must eventually be written into the trained model's
 # metadata file (see training/train.py), this constant is the default
 # used to produce that metadata, not a substitute for storing it.
-PREDICTION_HORIZON_SECONDS: float = 5.0
+#
+# Raised from 5.0 to 15.0 in the second training milestone. 5s was too
+# close to "now" to count as genuine anticipation - it mostly captured
+# noise-scale continuation of the current trend, not a horizon useful
+# for a signal-timing decision. The Decision Engine's own min/max green
+# constraints (10-45s per phase, see the execution guide Section 10.5)
+# and the junction's ~96-110s cycle length are the actual timescale a
+# prediction needs to be useful at. 15s is the sweet spot chosen: long
+# enough to be a real forecast that could inform "does this lane need
+# more green next phase," short enough to still be predictable given
+# traffic's inherent stochasticity (going much further, e.g. to a full
+# phase or cycle length, means predicting through multiple un-modelled
+# signal changes and driver decisions, which is a materially harder,
+# noisier target than this project's current feature set supports).
+# See FeatureEngineer.TREND_LOOKBACK_SECONDS, which must be kept equal
+# to this value by convention (see that constant's own comment).
+PREDICTION_HORIZON_SECONDS: float = 15.0
 
 FEATURE_VECTOR_LENGTH: int = len(NETWORK_FEATURE_NAMES) + (
     len(EXPECTED_LANE_IDS) * len(LANE_FEATURE_NAMES)
@@ -95,15 +118,16 @@ def features_to_vector(features: TrafficFeatures) -> List[float]:
     Column order: NETWORK_FEATURE_NAMES, then one block per lane in
     EXPECTED_LANE_IDS order, each block in LANE_FEATURE_NAMES order.
 
-    Lanes with no vehicles currently present are not included in
-    TrafficFeatures.lane_features at all (FeatureEngineer only creates
-    entries for lanes with at least one vehicle), any lane missing from
-    features.lane_features is filled with zeros for its vehicle-derived
-    columns here, consistent with FeatureEngineer's own "no vehicles
-    means 0.0" convention. Signal state is looked up separately from
+    A lane with no entry at all in features.lane_features (never had a
+    vehicle, currently or at FeatureEngineer's lookback point) is filled
+    with zeros for every vehicle-derived and trend column, consistent
+    with FeatureEngineer's own "no data means 0.0" convention. Note that
+    FeatureEngineer now creates an entry for any lane that had vehicles
+    EITHER now or at the lookback point (see FeatureEngineer for why),
+    so this all-zero fallback is only hit for lanes with no activity in
+    either snapshot. Signal state is looked up separately from
     features.signal.lane_signal_states, which always has an entry for
-    every controlled lane regardless of vehicle presence, a lane with no
-    vehicles still has a real, current signal color.
+    every controlled lane regardless of vehicle presence.
 
     Parameters
     ----------
@@ -124,8 +148,37 @@ def features_to_vector(features: TrafficFeatures) -> List[float]:
 
     for lane_id in EXPECTED_LANE_IDS:
         lane = features.lane_features.get(lane_id)
+        signal_state = features.signal.lane_signal_states.get(lane_id, 0)
+
+        # Built as one ordered block per lane, matching LANE_FEATURE_NAMES
+        # exactly: vehicle_count, average_speed, average_waiting_time,
+        # max_waiting_time, stopped_vehicle_count, current_signal_state,
+        # arrival_rate, departure_rate, stopped_vehicle_count_trend,
+        # waiting_time_trend - always exactly 10 values.
+        #
+        # BUGFIX (second training milestone): the previous version built
+        # this in two separately-conditioned pieces (an "instantaneous"
+        # extend, then an unconditional signal_state append, then a
+        # second "trend" extend gated on the SAME `lane is None` check).
+        # For lane is None, the first piece already wrote 9 zeros meant
+        # to cover both the instantaneous AND trend slots (per its own
+        # comment), but the second, separately-gated trend block then
+        # ALSO fired, appending 4 more zeros - 14 values instead of 10
+        # for every lane with no current-or-lookback activity. Confirmed
+        # by direct reproduction: a single such lane inflated the
+        # feature vector from 125 to 129, which is exactly the "154 vs
+        # 158 fields" corruption found in generated datasets. It also
+        # put signal_state at relative position 9 instead of 5 even
+        # ignoring the length bug, silently swapping it into what should
+        # be the waiting_time_trend column. Building the whole block in
+        # one pass, keyed on a single `lane is None` check, makes both
+        # bugs structurally impossible to reintroduce.
         if lane is None:
-            vector.extend([0.0] * (len(LANE_FEATURE_NAMES) - 1))
+            vector.extend([
+                0.0, 0.0, 0.0, 0.0, 0.0,       # vehicle_count .. stopped_vehicle_count
+                float(signal_state),            # current_signal_state
+                0.0, 0.0, 0.0, 0.0,             # arrival_rate .. waiting_time_trend
+            ])
         else:
             vector.extend([
                 float(lane.vehicle_count),
@@ -133,9 +186,12 @@ def features_to_vector(features: TrafficFeatures) -> List[float]:
                 float(lane.average_waiting_time),
                 float(lane.max_waiting_time),
                 float(lane.stopped_vehicle_count),
+                float(signal_state),
+                float(lane.arrival_rate),
+                float(lane.departure_rate),
+                float(lane.stopped_vehicle_count_trend),
+                float(lane.waiting_time_trend),
             ])
-        signal_state = features.signal.lane_signal_states.get(lane_id, 0)
-        vector.append(float(signal_state))
 
     return vector
 

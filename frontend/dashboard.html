@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Traffic Command Center</title>
+<style>
+/* ============================================================
+   DESIGN SYSTEM — tokens
+   ============================================================ */
+:root {
+  /* surfaces */
+  --bg-0: #07090d;
+  --bg-1: #0c1016;
+  --bg-2: #11161f;
+  --bg-3: #161d29;
+  --border: #1e2735;
+  --border-strong: #2a3648;
+
+  /* text */
+  --text-0: #eef2f7;
+  --text-1: #aab4c4;
+  --text-2: #66738a;
+
+  /* semantic */
+  --green: #34d17b;
+  --green-dim: #34d17b26;
+  --red: #ff5c5c;
+  --red-dim: #ff5c5c1f;
+  --yellow: #ffc53d;
+  --yellow-dim: #ffc53d22;
+  --blue: #4da3ff;
+  --blue-dim: #4da3ff1f;
+  --orange: #ff9f43;
+  --orange-dim: #ff9f4322;
+  --purple: #a78bfa;
+
+  /* type */
+  --font: "Segoe UI", -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --mono: "Cascadia Code", Consolas, monospace;
+
+  /* space */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px;
+
+  --radius: 10px;
+  --sidebar-w: 220px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--bg-0);
+  color: var(--text-0);
+  font-family: var(--font);
+  font-size: 14px;
+  display: flex;
+  overflow: hidden;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--bg-1);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+.brand {
+  padding: var(--sp-5) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+.brand .logo {
+  font-size: 22px;
+  line-height: 1;
+}
+.brand h1 {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  margin-top: var(--sp-2);
+}
+.brand p {
+  font-size: 11px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+.nav { padding: var(--sp-3); flex: 1; }
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: 10px var(--sp-3);
+  margin-bottom: 2px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-1);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  text-align: left;
+}
+.nav-item:hover { background: var(--bg-2); color: var(--text-0); }
+.nav-item.active {
+  background: var(--blue-dim);
+  color: var(--blue);
+}
+.nav-item .ico { font-size: 16px; width: 20px; text-align: center; }
+.sidebar-footer {
+  padding: var(--sp-4);
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-2);
+}
+.conn { display: flex; align-items: center; gap: var(--sp-2); }
+.conn-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--red);
+  transition: background .2s;
+}
+.conn-dot.live { background: var(--green); box-shadow: 0 0 8px var(--green-dim); }
+
+/* ============================================================
+   MAIN LAYOUT
+   ============================================================ */
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.topbar {
+  height: 56px;
+  flex-shrink: 0;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--sp-5);
+}
+.topbar h2 { font-size: 16px; font-weight: 700; letter-spacing: .3px; }
+.topbar-right { display: flex; align-items: center; gap: var(--sp-4); }
+.clock {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-1);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  padding: 4px 12px;
+  border-radius: 6px;
+}
+.live-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: var(--green);
+  background: var(--green-dim);
+  border: 1px solid var(--green);
+  padding: 3px 10px;
+  border-radius: 20px;
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe { 50% { opacity: .55; } }
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sp-5);
+}
+
+.page { display: none; animation: fadein .25s ease; }
+.page.active { display: block; }
+@keyframes fadein { from { opacity: 0; transform: translateY(4px); } }
+
+/* ============================================================
+   COMPONENTS
+   ============================================================ */
+.panel {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--sp-4);
+}
+.panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-2);
+  margin-bottom: var(--sp-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.grid { display: grid; gap: var(--sp-4); }
+.g2 { grid-template-columns: repeat(2, 1fr); }
+.g3 { grid-template-columns: repeat(3, 1fr); }
+.g4 { grid-template-columns: repeat(4, 1fr); }
+.row-flex { display: flex; gap: var(--sp-4); }
+.row-flex > * { flex: 1; min-width: 0; }
+
+/* KPI cards */
+.kpi {
+  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--sp-4);
+  position: relative;
+  overflow: hidden;
+}
+.kpi::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--accent, var(--blue));
+}
+.kpi .label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-2);
+}
+.kpi .value {
+  font-size: 30px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin-top: var(--sp-1);
+  line-height: 1.1;
+}
+.kpi .unit { font-size: 12px; color: var(--text-2); font-weight: 400; margin-left: 4px; }
+.kpi.green { --accent: var(--green); }
+.kpi.blue   { --accent: var(--blue); }
+.kpi.yellow { --accent: var(--yellow); }
+.kpi.red    { --accent: var(--red); }
+.kpi.purple { --accent: var(--purple); }
+
+/* Signal visualization */
+.signal-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-6);
+  padding: var(--sp-4) 0;
+}
+.signal-housing {
+  background: #04060a;
+  border: 2px solid var(--border-strong);
+  border-radius: 18px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  box-shadow: inset 0 0 30px #00000088;
+}
+.lamp {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: #141a24;
+  opacity: .28;
+  transition: all .18s ease;
+}
+.lamp.red.on    { background: var(--red);    opacity: 1; box-shadow: 0 0 22px var(--red); }
+.lamp.yellow.on { background: var(--yellow); opacity: 1; box-shadow: 0 0 22px var(--yellow); }
+.lamp.green.on  { background: var(--green);  opacity: 1; box-shadow: 0 0 22px var(--green); }
+.countdown-wrap { text-align: center; min-width: 190px; }
+.countdown {
+  font-family: var(--mono);
+  font-size: 64px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.countdown-unit { font-size: 12px; color: var(--text-2); letter-spacing: 2px; text-transform: uppercase; }
+.phase-chip {
+  display: inline-block;
+  margin-top: var(--sp-3);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--blue);
+  background: var(--blue-dim);
+  border: 1px solid var(--blue);
+  padding: 5px 14px;
+  border-radius: 20px;
+}
+.progress-track {
+  margin-top: var(--sp-3);
+  height: 6px;
+  background: var(--bg-3);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--blue);
+  border-radius: 3px;
+  transition: width .4s linear;
+}
+
+/* Emergency banner */
+.emergency-banner {
+  display: none;
+  align-items: center;
+  gap: var(--sp-3);
+  background: var(--red-dim);
+  border: 1px solid var(--red);
+  color: var(--red);
+  border-radius: var(--radius);
+  padding: var(--sp-3) var(--sp-4);
+  font-weight: 700;
+  margin-bottom: var(--sp-4);
+  animation: pulse 1.1s ease-in-out infinite;
+}
+.emergency-banner.show { display: flex; }
+@keyframes pulse { 50% { opacity: .6; } }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th, td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--border); }
+th:first-child, td:first-child { text-align: left; }
+thead th {
+  color: var(--text-2);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 1px solid var(--border-strong);
+}
+td { font-variant-numeric: tabular-nums; }
+.imp-pos { color: var(--green); font-weight: 700; }
+.imp-neg { color: var(--red); font-weight: 700; }
+.muted { color: var(--text-2); }
+
+/* Lane bars */
+.lane-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 4px 0;
+  font-size: 12px;
+}
+.lane-id { width: 58px; font-family: var(--mono); color: var(--text-1); }
+.lane-sig { width: 42px; font-weight: 700; }
+.lane-sig.g { color: var(--green); }
+.lane-sig.y { color: var(--yellow); }
+.lane-sig.r { color: var(--red); }
+.lane-track {
+  flex: 1;
+  height: 14px;
+  background: var(--bg-3);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.lane-fill {
+  height: 100%;
+  border-radius: 7px;
+  transition: width .35s ease, background .35s ease;
+}
+.lane-val { width: 96px; text-align: right; color: var(--text-2); font-variant-numeric: tabular-nums; }
+
+/* Phase timeline */
+.timeline {
+  display: flex;
+  gap: 2px;
+  height: 30px;
+  align-items: stretch;
+  background: var(--bg-2);
+  border-radius: 6px;
+  padding: 3px;
+}
+.tl-block { flex: 1; min-width: 3px; border-radius: 3px; }
+.tl-NS_straight_left { background: var(--green); }
+.tl-EW_straight_left { background: var(--blue); }
+.tl-NS_right { background: #34d17b55; outline: 1px solid var(--green); }
+.tl-EW_right { background: #4da3ff55; outline: 1px solid var(--blue); }
+.tl-yellow { background: var(--yellow); }
+.legend {
+  display: flex; gap: var(--sp-4); flex-wrap: wrap;
+  margin-top: var(--sp-3);
+  font-size: 11px; color: var(--text-2);
+}
+.legend span::before { content: "■ "; }
+.lg-ns::before { color: var(--green); }
+.lg-ew::before { color: var(--blue); }
+.lg-r::before  { color: var(--yellow); }
+
+/* Decision */
+.mode-badge {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.mode-normal     { background: var(--blue-dim);   color: var(--blue);   border: 1px solid var(--blue); }
+.mode-starvation { background: var(--orange-dim); color: var(--orange); border: 1px solid var(--orange); }
+.mode-emergency  { background: var(--red-dim);    color: var(--red);    border: 1px solid var(--red); }
+.reason-box {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--blue);
+  border-radius: 8px;
+  padding: var(--sp-3) var(--sp-4);
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-1);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* Confidence */
+.conf-track {
+  height: 10px;
+  background: var(--bg-3);
+  border-radius: 5px;
+  overflow: hidden;
+  margin-top: var(--sp-3);
+}
+.conf-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--orange), var(--purple), var(--green));
+  border-radius: 5px;
+  transition: width .4s ease;
+}
+
+/* Charts */
+.chart-canvas { width: 100%; height: 190px; display: block; }
+canvas { outline: none; }
+
+.empty-note { color: var(--text-2); font-size: 12px; padding: var(--sp-3) 0; }
+</style>
+</head>
+<body>
+
+<!-- ==================== SIDEBAR ==================== -->
+<aside class="sidebar">
+  <div class="brand">
+    <div class="logo">🚦</div>
+    <h1>TRAFFIC COMMAND</h1>
+    <p>Adaptive Control Center</p>
+  </div>
+  <nav class="nav">
+    <button class="nav-item active" data-page="overview"><span class="ico">◉</span>Overview</button>
+    <button class="nav-item" data-page="twin"><span class="ico">▦</span>Digital Twin</button>
+    <button class="nav-item" data-page="performance"><span class="ico">📈</span>Performance</button>
+    <button class="nav-item" data-page="decisions"><span class="ico">🧠</span>Decisions</button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="conn"><span class="conn-dot" id="connDot"></span><span id="connText">connecting…</span></div>
+    <div style="margin-top:6px">Read-only · WebSocket feed</div>
+  </div>
+</aside>
+
+<!-- ==================== MAIN ==================== -->
+<div class="main">
+  <header class="topbar">
+    <h2 id="pageTitle">Command Center — Overview</h2>
+    <div class="topbar-right">
+      <span class="clock" id="simClock">t = –</span>
+      <span class="live-badge">LIVE</span>
+    </div>
+  </header>
+
+  <main class="content">
+
+    <!-- ========== PAGE: OVERVIEW ========== -->
+    <section class="page active" id="page-overview">
+      <div class="emergency-banner" id="emgBanner">
+        🚨 EMERGENCY VEHICLE PRIORITY ACTIVE — lanes: <span id="emgLanes"></span>
+      </div>
+
+      <div class="row-flex" style="margin-bottom: var(--sp-4)">
+        <!-- Signal stage -->
+        <div class="panel" style="flex: 1.15">
+          <div class="panel-title"><span>Signal State — Live from SUMO</span></div>
+          <div class="signal-stage">
+            <div class="signal-housing">
+              <div class="lamp red" id="lampR"></div>
+              <div class="lamp yellow" id="lampY"></div>
+              <div class="lamp green" id="lampG"></div>
+            </div>
+            <div class="countdown-wrap">
+              <div class="countdown" id="countdown">–</div>
+              <div class="countdown-unit">seconds remaining</div>
+              <div class="phase-chip" id="phaseChip">waiting…</div>
+              <div class="progress-track"><div class="progress-fill" id="cdProgress" style="width:0%"></div></div>
+            </div>
+          </div>
+          <div class="legend">
+            <span class="lg-ns">NS straight + left</span>
+            <span class="lg-ew">EW straight + left</span>
+            <span class="lg-r">right-only / yellow</span>
+          </div>
+        </div>
+
+        <!-- KPIs -->
+        <div style="flex: 1.85; display: grid; gap: var(--sp-4); grid-template-columns: 1fr 1fr;">
+          <div class="kpi blue"><div class="label">Total Vehicles</div><div class="value" id="kpiVeh">–</div></div>
+          <div class="kpi green"><div class="label">Avg Speed</div><div class="value" id="kpiSpeed">–<span class="unit">m/s</span></div></div>
+          <div class="kpi yellow"><div class="label">Avg Waiting Time</div><div class="value" id="kpiWait">–<span class="unit">s</span></div></div>
+          <div class="kpi red"><div class="label">Stopped Vehicles</div><div class="value" id="kpiStopped">–</div></div>
+          <div class="panel c-span" style="grid-column: span 2;">
+            <div class="panel-title"><span>AI vs Baseline — Summary</span></div>
+            <table id="cmpMini">
+              <tbody><tr><td class="muted">Run the evaluator with --dashboard to populate…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><span>Phase History — Last ~60 s</span></div>
+        <div class="timeline" id="timeline"></div>
+        <div class="legend">
+          <span class="lg-ns">NS straight+left</span>
+          <span class="lg-ew">EW straight+left</span>
+          <span class="lg-r">right-only / yellow</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== PAGE: DIGITAL TWIN ========== -->
+    <section class="page" id="page-twin">
+      <div class="grid g2">
+        <div class="panel">
+          <div class="panel-title"><span>Lane Density & Signal State</span></div>
+          <div id="lanes"></div>
+        </div>
+        <div style="display: grid; gap: var(--sp-4); align-content: start;">
+          <div class="panel">
+            <div class="panel-title"><span>Real-time Network State</span></div>
+            <div class="grid g2" style="gap: var(--sp-3)">
+              <div class="kpi blue"><div class="label">Vehicles in network</div><div class="value" id="twVeh">–</div></div>
+              <div class="kpi green"><div class="label">Avg speed</div><div class="value" id="twSpeed">–<span class="unit">m/s</span></div></div>
+              <div class="kpi yellow"><div class="label">Avg waiting</div><div class="value" id="twWait">–<span class="unit">s</span></div></div>
+              <div class="kpi red"><div class="label">Queue length</div><div class="value" id="twQueue">–</div></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-title"><span>Model Confidence — Latest Evaluated Prediction</span></div>
+            <div style="font-size: 26px; font-weight: 700;" id="confValue">–</div>
+            <div class="conf-track"><div class="conf-fill" id="confBar" style="width:0%"></div></div>
+            <div class="empty-note" id="confNote">Awaiting first matured 15 s prediction…</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top: var(--sp-4)">
+        <div class="panel-title"><span>Prediction vs Actual — 15 s Horizon</span></div>
+        <table id="predTable">
+          <thead><tr><th>Lane</th><th>Predicted veh</th><th>Actual veh</th><th>Predicted wait</th><th>Actual wait</th><th>Confidence</th></tr></thead>
+          <tbody><tr><td colspan="6" class="muted">No evaluated prediction yet…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ========== PAGE: PERFORMANCE ========== -->
+    <section class="page" id="page-performance">
+      <div class="grid g2">
+        <div class="panel">
+          <div class="panel-title"><span>Avg Waiting Time — over time (AI)</span></div>
+          <canvas class="chart-canvas" id="chartWait"></canvas>
+        </div>
+        <div class="panel">
+          <div class="panel-title"><span>Queue Length — over time (AI)</span></div>
+          <canvas class="chart-canvas" id="chartQueue"></canvas>
+        </div>
+      </div>
+      <div class="grid g2" style="margin-top: var(--sp-4)">
+        <div class="panel">
+          <div class="panel-title"><span>Throughput — AI vs Baseline (completed trips)</span></div>
+          <canvas class="chart-canvas" id="chartThroughput" style="height:150px"></canvas>
+        </div>
+        <div class="panel">
+          <div class="panel-title"><span>Improvement — AI over Baseline</span></div>
+          <table id="cmpFull">
+            <thead><tr><th>Metric</th><th>AI</th><th>Baseline</th><th>Change</th></tr></thead>
+            <tbody><tr><td colspan="4" class="muted">Run the evaluator with --dashboard…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== PAGE: DECISIONS ========== -->
+    <section class="page" id="page-decisions">
+      <div class="grid g2">
+        <div class="panel">
+          <div class="panel-title"><span>Current Decision</span></div>
+          <div style="display:flex; align-items:center; gap: var(--sp-4); flex-wrap: wrap;">
+            <div>
+              <div class="kpi-label muted" style="font-size:10px;text-transform:uppercase;letter-spacing:1px;">Active phase</div>
+              <div style="font-size:20px;font-weight:700;color:var(--blue)" id="dcPhase">–</div>
+            </div>
+            <span class="mode-badge mode-normal" id="dcMode">–</span>
+          </div>
+          <div class="panel-title" style="margin-top: var(--sp-4)"><span>Reasoning (full explanation)</span></div>
+          <div class="reason-box" id="dcReason">Waiting for the first decision tick…</div>
+        </div>
+        <div class="panel">
+          <div class="panel-title"><span>Phase History Timeline — Last ~60 s</span></div>
+          <div class="timeline" id="tlDecisions" style="height:44px"></div>
+          <div class="legend">
+            <span class="lg-ns">NS straight+left</span>
+            <span class="lg-ew">EW straight+left</span>
+            <span class="lg-r">right-only / yellow</span>
+          </div>
+          <div class="panel-title" style="margin-top: var(--sp-4)"><span>Emergency Status</span></div>
+          <div id="emgStatus" class="reason-box" style="border-left-color: var(--green)">No emergency vehicles detected.</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   MODULE: PHASES — shared phase metadata
+   ============================================================ */
+const Phases = {
+  LABELS: {
+    NS_straight_left: "N-S Straight + Left",
+    NS_right: "N-S Right",
+    EW_straight_left: "E-W Straight + Left",
+    EW_right: "E-W Right",
+  },
+  MODE_CLASS: {
+    priority: "mode-normal",
+    min_green_hold: "mode-normal",
+    starvation_override: "mode-starvation",
+    emergency: "mode-emergency",
+    fixed_timer: "mode-normal",
+  },
+  MODE_LABEL: {
+    priority: "NORMAL · PRIORITY",
+    min_green_hold: "NORMAL · MIN GREEN",
+    starvation_override: "STARVATION OVERRIDE",
+    emergency: "EMERGENCY OVERRIDE",
+    fixed_timer: "FIXED TIMER",
+  },
+};
+
+/* ============================================================
+   MODULE: WS — websocket client with auto-reconnect
+   ============================================================ */
+const WS = {
+  sock: null,
+  handlers: [],
+  connect() {
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    this.sock = new WebSocket(proto + "://" + location.host + "/ws");
+    this.sock.onopen = () => UI.setConnection(true);
+    this.sock.onclose = () => { UI.setConnection(false); setTimeout(() => this.connect(), 2000); };
+    this.sock.onerror = () => this.sock.close();
+    this.sock.onmessage = (ev) => {
+      const snap = JSON.parse(ev.data);
+      if (!snap || snap.status) return;
+      this.handlers.forEach(fn => fn(snap));
+    };
+  },
+  onUpdate(fn) { this.handlers.push(fn); },
+};
+
+/* ============================================================
+   MODULE: HISTORY — rolling buffers for Performance charts
+   ============================================================ */
+const History = {
+  MAX: 300,
+  wait: [], queue: [], speed: [], veh: [],
+  push(snap) {
+    const m = snap.metrics || {};
+    const pt = { t: snap.sim_time, v: m.avg_wait ?? 0 };
+    this.wait.push(pt); this.queue.push({ t: snap.sim_time, v: m.queue ?? 0 });
+    this.speed.push({ t: snap.sim_time, v: m.avg_speed ?? 0 });
+    this.veh.push({ t: snap.sim_time, v: m.vehicles ?? 0 });
+    for (const arr of [this.wait, this.queue, this.speed, this.veh]) {
+      if (arr.length > this.MAX) arr.splice(0, arr.length - this.MAX);
+    }
+  },
+};
+
+/* ============================================================
+   MODULE: CHARTS — dependency-free canvas line/bar renderer
+   ============================================================ */
+const Charts = {
+  _prep(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth || canvas.parentElement.clientWidth;
+    const h = canvas.clientHeight || 190;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, w, h };
+  },
+
+  line(canvas, series, opts = {}) {
+    const { ctx, w, h } = this._prep(canvas);
+    const padL = 44, padR = 10, padT = 12, padB = 22;
+    const all = series.flatMap(s => s.data.map(p => p.v));
+    if (!all.length) { this._empty(ctx, w, h); return; }
+    let lo = Math.min(...all), hi = Math.max(...all);
+    if (opts.zeroBase) lo = Math.min(0, lo);
+    if (hi === lo) hi = lo + 1;
+    const span = hi - lo;
+    lo -= span * 0.08; hi += span * 0.08;
+
+    // grid + y labels
+    ctx.strokeStyle = "#1e2735"; ctx.fillStyle = "#66738a";
+    ctx.font = "10px " + getComputedStyle(document.body).fontFamily;
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = padT + (h - padT - padB) * i / 4;
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+      const val = hi - (hi - lo) * i / 4;
+      ctx.textAlign = "right";
+      ctx.fillText(val.toFixed(opts.decimals ?? 1), padL - 6, y + 3);
+    }
+
+    const n = Math.max(...series.map(s => s.data.length));
+    const xAt = i => padL + (w - padL - padR) * (n <= 1 ? 0 : i / (n - 1));
+    const yAt = v => padT + (h - padT - padB) * (1 - (v - lo) / (hi - lo));
+
+    for (const s of series) {
+      ctx.strokeStyle = s.color; ctx.lineWidth = 2;
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      s.data.forEach((p, i) => {
+        const x = xAt(i), y = yAt(p.v);
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      });
+      ctx.stroke();
+      // soft fill under the first series
+      if (s.fill && s.data.length > 1) {
+        ctx.lineTo(xAt(s.data.length - 1), h - padB);
+        ctx.lineTo(xAt(0), h - padB);
+        ctx.closePath();
+        ctx.globalAlpha = 0.10;
+        ctx.fillStyle = s.color;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+    // legend
+    let lx = padL;
+    ctx.font = "10px " + getComputedStyle(document.body).fontFamily;
+    for (const s of series) {
+      ctx.fillStyle = s.color;
+      ctx.fillRect(lx, h - 12, 10, 3);
+      ctx.fillStyle = "#aab4c4";
+      ctx.textAlign = "left";
+      ctx.fillText(s.label, lx + 14, h - 8);
+      lx += 14 + ctx.measureText(s.label).width + 18;
+    }
+  },
+
+  bars(canvas, items) {
+    const { ctx, w, h } = this._prep(canvas);
+    const padL = 44, padR = 10, padT = 12, padB = 26;
+    if (!items.length) { this._empty(ctx, w, h); return; }
+    const hi = Math.max(...items.map(i => i.value)) * 1.15 || 1;
+    const bw = Math.min(90, (w - padL - padR) / items.length * 0.5);
+    items.forEach((it, idx) => {
+      const cx = padL + (w - padL - padR) * (idx + 0.5) / items.length;
+      const bh = (h - padT - padB) * it.value / hi;
+      ctx.fillStyle = it.color;
+      ctx.beginPath();
+      ctx.roundRect(cx - bw / 2, h - padB - bh, bw, bh, [4, 4, 0, 0]);
+      ctx.fill();
+      ctx.fillStyle = "#eef2f7";
+      ctx.font = "bold 12px " + getComputedStyle(document.body).fontFamily;
+      ctx.textAlign = "center";
+      ctx.fillText(it.value.toLocaleString(), cx, h - padB - bh - 6);
+      ctx.fillStyle = "#66738a";
+      ctx.font = "10px " + getComputedStyle(document.body).fontFamily;
+      ctx.fillText(it.label, cx, h - 10);
+    });
+  },
+
+  _empty(ctx, w, h) {
+    ctx.fillStyle = "#66738a";
+    ctx.font = "12px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("collecting data…", w / 2, h / 2);
+  },
+};
+
+/* ============================================================
+   MODULE: UI — DOM helpers + page rendering
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const fmt = (x, d = 2) =>
+  (x === null || x === undefined || isNaN(x)) ? "–" : Number(x).toFixed(d);
+
+const UI = {
+  setConnection(live) {
+    $("connDot").classList.toggle("live", live);
+    $("connText").textContent = live ? "connected" : "reconnecting…";
+  },
+
+  overview(snap) {
+    $("simClock").textContent = "t = " + fmt(snap.sim_time, 1) + " s";
+
+    const sig = snap.signal || {};
+    const yellow = !!sig.is_yellow;
+    $("lampR").classList.toggle("on", !yellow && !sig.green);
+    $("lampY").classList.toggle("on", yellow);
+    $("lampG").classList.toggle("on", !yellow && !!sig.green);
+    $("countdown").textContent = fmt(Math.max(0, sig.countdown ?? 0), 1);
+    $("phaseChip").textContent =
+      (yellow ? "YELLOW → " : "") + (Phases.LABELS[sig.phase] || sig.phase || "–");
+    // progress heuristic: fraction of the largest green seen so far
+    const cd = sig.countdown ?? 0;
+    const maxSeen = Math.max(UI._maxCd || 0, cd);
+    UI._maxCd = maxSeen;
+    $("cdProgress").style.width = (maxSeen ? cd / maxSeen * 100 : 0) + "%";
+
+    const m = snap.metrics || {};
+    $("kpiVeh").textContent = m.vehicles ?? "–";
+    $("kpiSpeed").innerHTML = fmt(m.avg_speed, 1) + '<span class="unit">m/s</span>';
+    $("kpiWait").innerHTML = fmt(m.avg_wait, 1) + '<span class="unit">s</span>';
+    $("kpiStopped").textContent = m.stopped ?? "–";
+
+    // emergency
+    const emg = snap.emergency_lanes || [];
+    $("emgBanner").classList.toggle("show", emg.length > 0);
+    $("emgLanes").textContent = emg.join(", ");
+
+    // timeline
+    this.renderTimeline($("timeline"), snap.phase_history || []);
+    this.renderComparison($("cmpMini"), snap.comparison, true);
+  },
+
+  twin(snap) {
+    const m = snap.metrics || {};
+    $("twVeh").textContent = m.vehicles ?? "–";
+    $("twSpeed").innerHTML = fmt(m.avg_speed, 1) + '<span class="unit">m/s</span>';
+    $("twWait").innerHTML = fmt(m.avg_wait, 1) + '<span class="unit">s</span>';
+    $("twQueue").textContent = m.queue ?? "–";
+
+    const lanesEl = $("lanes");
+    lanesEl.innerHTML = "";
+    const lanes = snap.lanes || [];
+    const maxCount = Math.max(10, ...lanes.map(l => l.vehicles));
+    lanes.forEach(l => {
+      const pct = Math.min(100, l.vehicles / maxCount * 100);
+      const color = l.signal === "g" ? "var(--green)"
+                  : l.signal === "y" ? "var(--yellow)" : "var(--red)";
+      const row = document.createElement("div");
+      row.className = "lane-row";
+      row.innerHTML =
+        '<span class="lane-id">' + l.lane_id + '</span>' +
+        '<span class="lane-sig ' + l.signal + '">● ' + l.signal.toUpperCase() + '</span>' +
+        '<div class="lane-track"><div class="lane-fill" style="width:' + pct +
+        '%;background:' + color + '"></div></div>' +
+        '<span class="lane-val">' + l.vehicles + ' veh · ' + fmt(l.avg_wait, 0) + ' s</span>';
+      lanesEl.appendChild(row);
+    });
+
+    // prediction panel
+    const p = snap.prediction;
+    const tbody = document.querySelector("#predTable tbody");
+    if (p && p.rows && p.rows.length) {
+      tbody.innerHTML = "";
+      p.rows.forEach(r => {
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>" + r.lane + "</td>" +
+          "<td>" + fmt(r.pred_veh, 1) + "</td><td>" + fmt(r.act_veh, 0) + "</td>" +
+          "<td>" + fmt(r.pred_wait, 1) + "</td><td>" + fmt(r.act_wait, 1) + "</td>" +
+          "<td>" + fmt(r.confidence, 0) + "%</td>";
+        tbody.appendChild(tr);
+      });
+      $("confBar").style.width = (p.avg_confidence || 0) + "%";
+      $("confValue").textContent = fmt(p.avg_confidence, 1) + "%";
+      $("confNote").textContent = "Prediction target t = " + fmt(p.target_time, 1) + " s";
+    }
+  },
+
+  performance() {
+    Charts.line($("chartWait"), [
+      { label: "avg wait (s)", color: "#ffc53d", fill: true, data: History.wait },
+    ], { decimals: 1 });
+    Charts.line($("chartQueue"), [
+      { label: "queue length (veh)", color: "#ff5c5c", fill: true, data: History.queue },
+    ], { decimals: 0, zeroBase: true });
+
+    // throughput comparison from latest comparison payload
+    const cmp = App.latest ? App.latest.comparison : null;
+    const tpRow = cmp && cmp.rows
+      ? cmp.rows.find(r => r.key === "throughput_vehicles") : null;
+    Charts.bars($("chartThroughput"), tpRow ? [
+      { label: "AI", value: Math.round(tpRow.ai), color: "#34d17b" },
+      { label: "Baseline", value: Math.round(tpRow.baseline), color: "#4da3ff" },
+    ] : []);
+    this.renderComparison($("cmpFull"), cmp, false);
+  },
+
+  decisions(snap) {
+    const d = snap.decision || {};
+    $("dcPhase").textContent = Phases.LABELS[d.active_phase] || d.active_phase || "–";
+    const badge = $("dcMode");
+    badge.textContent = Phases.MODE_LABEL[d.mode] || (d.mode || "–").toUpperCase();
+    badge.className = "mode-badge " + (Phases.MODE_CLASS[d.mode] || "mode-normal");
+    $("dcReason").textContent = d.reason || "";
+
+    this.renderTimeline($("tlDecisions"), snap.phase_history || []);
+
+    const emg = snap.emergency_lanes || [];
+    const el = $("emgStatus");
+    if (emg.length) {
+      el.style.borderLeftColor = "var(--red)";
+      el.innerHTML = "🚨 <b>Emergency override engaged.</b> Vehicles detected on: " +
+                     emg.join(", ");
+    } else {
+      el.style.borderLeftColor = "var(--green)";
+      el.textContent = "No emergency vehicles detected.";
+    }
+  },
+
+  renderTimeline(el, history) {
+    el.innerHTML = "";
+    history.forEach(h => {
+      const b = document.createElement("div");
+      b.className = "tl-block " + (h.is_yellow ? "tl-yellow" : "tl-" + h.phase);
+      b.title = fmt(h.time, 1) + " s — " + (Phases.LABELS[h.phase] || h.phase);
+      el.appendChild(b);
+    });
+  },
+
+  renderComparison(tableEl, cmp, compact) {
+    const tbody = tableEl.querySelector("tbody");
+    if (!cmp || !cmp.rows || !cmp.rows.length) return;
+    tbody.innerHTML = "";
+    cmp.rows.forEach(r => {
+      const cls = r.improvement >= 0 ? "imp-pos" : "imp-neg";
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        "<td>" + r.label + "</td>" +
+        "<td>" + fmt(r.ai) + "</td>" +
+        "<td>" + fmt(r.baseline) + "</td>" +
+        "<td class='" + cls + "'>" + (r.improvement >= 0 ? "+" : "") +
+        fmt(r.improvement, 1) + "%</td>";
+      tbody.appendChild(tr);
+    });
+  },
+};
+
+/* ============================================================
+   MODULE: ROUTER — sidebar navigation
+   ============================================================ */
+const Router = {
+  TITLES: {
+    overview: "Command Center — Overview",
+    twin: "Digital Twin — Lane State & Predictions",
+    performance: "Performance — AI vs Baseline",
+    decisions: "Decision Intelligence — Why the AI chose this",
+  },
+  init() {
+    document.querySelectorAll(".nav-item").forEach(btn => {
+      btn.addEventListener("click", () => this.go(btn.dataset.page));
+    });
+  },
+  go(page) {
+    document.querySelectorAll(".nav-item").forEach(b =>
+      b.classList.toggle("active", b.dataset.page === page));
+    document.querySelectorAll(".page").forEach(p =>
+      p.classList.toggle("active", p.id === "page-" + page));
+    $("pageTitle").textContent = this.TITLES[page];
+    if (page === "performance") UI.performance(); // redraw canvases when visible
+  },
+};
+
+/* ============================================================
+   APP — wire everything together
+   ============================================================ */
+const App = {
+  latest: null,
+  start() {
+    Router.init();
+    WS.connect();
+    WS.onUpdate(snap => {
+      this.latest = snap;
+      History.push(snap);
+      UI.overview(snap);
+      UI.twin(snap);
+      UI.decisions(snap);
+      if (document.getElementById("page-performance").classList.contains("active")) {
+        UI.performance();
+      }
+    });
+  },
+};
+App.start();
+</script>
+</body>
+</html>

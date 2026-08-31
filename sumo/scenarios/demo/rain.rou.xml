@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    rain.rou.xml
+    =============
+    Demo scenario: same demand shape/volume as normal_traffic, but every
+    vehicle uses the "_wet" vTypes from vehicle_types_wet_weather.add.xml
+    (lower maxSpeed, higher sigma, lower accel/decel) instead of the
+    normal vehicle_types.add.xml types - the scenario's identity is
+    entirely in the driving physics, not inflated/reduced volume.
+
+    REVISED: turning-movement volume raised to ~65-70% of the
+    corresponding straight-movement volume on every approach, matching
+    the same fix applied to normal_traffic.rou.xml (previously only
+    N/S had turns, at ~25% of straight). Left-hand traffic movement
+    mapping: from N: straight=S, left=E, right=W. from S: straight=N,
+    left=W, right=E. from E: straight=W, left=S, right=N. from W:
+    straight=E, left=N, right=S.
+-->
+<routes>
+    <!-- ===================== Routes (identical topology to the frozen network) ===================== -->
+    <route id="route_N_S" edges="N_in C_out_S"/>
+    <route id="route_N_E" edges="N_in C_out_E"/>
+    <route id="route_N_W" edges="N_in C_out_W"/>
+    <route id="route_S_N" edges="S_in C_out_N"/>
+    <route id="route_S_E" edges="S_in C_out_E"/>
+    <route id="route_S_W" edges="S_in C_out_W"/>
+    <route id="route_E_W" edges="E_in C_out_W"/>
+    <route id="route_E_N" edges="E_in C_out_N"/>
+    <route id="route_E_S" edges="E_in C_out_S"/>
+    <route id="route_W_E" edges="W_in C_out_E"/>
+    <route id="route_W_N" edges="W_in C_out_N"/>
+    <route id="route_W_S" edges="W_in C_out_S"/>
+
+    <!-- ===================== Through movements (0-800s, flat) ===================== -->
+    <flow id="rain_car_NS" type="car_wet" route="route_N_S" begin="0" end="800" vehsPerHour="260"/>
+    <flow id="rain_car_SN" type="car_wet" route="route_S_N" begin="0" end="800" vehsPerHour="250"/>
+    <flow id="rain_car_EW" type="car_wet" route="route_E_W" begin="0" end="800" vehsPerHour="220"/>
+    <flow id="rain_car_WE" type="car_wet" route="route_W_E" begin="0" end="800" vehsPerHour="215"/>
+
+    <flow id="rain_moto_NS" type="motorcycle_wet" route="route_N_S" begin="0" end="800" vehsPerHour="170"/>
+    <flow id="rain_moto_SN" type="motorcycle_wet" route="route_S_N" begin="0" end="800" vehsPerHour="160"/>
+    <flow id="rain_moto_EW" type="motorcycle_wet" route="route_E_W" begin="0" end="800" vehsPerHour="140"/>
+    <flow id="rain_moto_WE" type="motorcycle_wet" route="route_W_E" begin="0" end="800" vehsPerHour="135"/>
+
+    <!-- ===================== Turning movements: ~65-70% of the straight volume on the SAME approach, every approach covered ===================== -->
+    <flow id="rain_car_left_NE" type="car_wet" route="route_N_E" begin="0" end="800" vehsPerHour="180"/>
+    <flow id="rain_car_right_NW" type="car_wet" route="route_N_W" begin="0" end="800" vehsPerHour="170"/>
+    <flow id="rain_car_left_SW" type="car_wet" route="route_S_W" begin="0" end="800" vehsPerHour="170"/>
+    <flow id="rain_car_right_SE" type="car_wet" route="route_S_E" begin="0" end="800" vehsPerHour="160"/>
+    <flow id="rain_car_left_ES" type="car_wet" route="route_E_S" begin="0" end="800" vehsPerHour="150"/>
+    <flow id="rain_car_right_EN" type="car_wet" route="route_E_N" begin="0" end="800" vehsPerHour="140"/>
+    <flow id="rain_car_left_WN" type="car_wet" route="route_W_N" begin="0" end="800" vehsPerHour="145"/>
+    <flow id="rain_car_right_WS" type="car_wet" route="route_W_S" begin="0" end="800" vehsPerHour="135"/>
+
+    <!-- ===================== Auto-rickshaw ===================== -->
+    <flow id="rain_auto_NS" type="auto_rickshaw_wet" route="route_N_S" begin="0" end="800" vehsPerHour="45"/>
+    <flow id="rain_auto_EW" type="auto_rickshaw_wet" route="route_E_W" begin="0" end="800" vehsPerHour="38"/>
+
+    <!-- ===================== Bus ===================== -->
+    <flow id="rain_bus_NS" type="bus_wet" route="route_N_S" begin="0" end="800" vehsPerHour="12"/>
+    <flow id="rain_bus_EW" type="bus_wet" route="route_E_W" begin="0" end="800" vehsPerHour="10"/>
+
+    <!-- ===================== Truck ===================== -->
+    <flow id="rain_truck_NS" type="truck_wet" route="route_N_S" begin="0" end="800" vehsPerHour="10"/>
+    <flow id="rain_truck_EW" type="truck_wet" route="route_E_W" begin="0" end="800" vehsPerHour="8"/>
+</routes>

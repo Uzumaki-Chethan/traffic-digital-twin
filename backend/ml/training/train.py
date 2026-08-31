@@ -144,6 +144,53 @@ def _evaluate_per_scenario(model, X: np.ndarray, Y: np.ndarray, scenario_names: 
     return metrics
 
 
+def _compute_sample_weights(scenario_names: List[str]) -> Tuple[np.ndarray, Dict[str, float]]:
+    """
+    Inverse-frequency sample weights, one per training row, so every
+    scenario contributes proportionally to what the ensemble learns
+    regardless of how many rows it happens to have.
+
+    Added in the second training milestone specifically because the
+    features_to_vector empty-lane bugfix (see feature_schema.py) meant
+    repairing the raw datasets by dropping malformed rows - and that
+    drop rate varies a lot by scenario (a scenario with more idle lanes
+    for more of its run, e.g. a directional-heavy scenario where 9 of
+    12 lanes sit at light demand the whole time, loses proportionally
+    more rows than one with almost always-active lanes, e.g. rain,
+    where slower-moving traffic keeps lanes occupied longer). Left
+    uncorrected, RandomForestRegressor would fit best to whatever
+    scenario happens to have the most surviving rows, which has nothing
+    to do with which scenario matters most to learn.
+
+    A row's weight is (mean row count across all scenarios) / (that
+    row's own scenario's row count), so an average-sized scenario gets
+    weight ~1.0, an underrepresented one gets weight > 1.0, and an
+    overrepresented one gets weight < 1.0 - capped at
+    _SAMPLE_WEIGHT_CAP so a pathologically small scenario can't end up
+    dominating the loss function instead of just being fairly
+    represented in it.
+    """
+    scenario_array = np.array(scenario_names)
+    unique_scenarios, counts = np.unique(scenario_array, return_counts=True)
+    counts_by_scenario = dict(zip(unique_scenarios, counts))
+    mean_count = float(np.mean(counts))
+
+    weight_by_scenario = {
+        name: min(_SAMPLE_WEIGHT_CAP, mean_count / count)
+        for name, count in counts_by_scenario.items()
+    }
+    weights = np.array([weight_by_scenario[name] for name in scenario_names])
+    return weights, weight_by_scenario
+
+
+# Ceiling on any single scenario's inverse-frequency weight multiplier,
+# see _compute_sample_weights. 3.0 is generous headroom above the
+# largest actual imbalance seen so far (~2.4x, emergency_response vs
+# heavy) without being so high that a future, much smaller scenario
+# could dominate the loss on row count alone.
+_SAMPLE_WEIGHT_CAP = 3.0
+
+
 def train_and_evaluate() -> None:
     """
     The full training entry point: load data, fit the model, evaluate on
@@ -153,8 +200,13 @@ def train_and_evaluate() -> None:
     TrainingConfig.ensure_output_directories()
 
     logger.info("Loading training dataset...")
-    X_train, Y_train, _ = _load_dataset(TrainingConfig.TRAIN_DATASET_PATH)
+    X_train, Y_train, train_scenarios = _load_dataset(TrainingConfig.TRAIN_DATASET_PATH)
     logger.info("Loaded %d training rows.", len(X_train))
+
+    sample_weights, weight_by_scenario = _compute_sample_weights(train_scenarios)
+    logger.info("Per-scenario sample weights (inverse-frequency, capped at %.1fx):", _SAMPLE_WEIGHT_CAP)
+    for name, weight in sorted(weight_by_scenario.items(), key=lambda kv: -kv[1]):
+        logger.info("  %-22s weight=%.3f", name, weight)
 
     logger.info("Loading chronological test dataset...")
     X_test, Y_test, test_scenarios = _load_dataset(TrainingConfig.TEST_DATASET_PATH)
@@ -176,10 +228,14 @@ def train_and_evaluate() -> None:
     # silently break the confidence calculation at inference time.
     model = RandomForestRegressor(
         n_estimators=TrainingConfig.MODEL_N_ESTIMATORS,
+        max_depth=TrainingConfig.MODEL_MAX_DEPTH,
+        min_samples_leaf=TrainingConfig.MODEL_MIN_SAMPLES_LEAF,
+        min_samples_split=TrainingConfig.MODEL_MIN_SAMPLES_SPLIT,
+        max_features=TrainingConfig.MODEL_MAX_FEATURES,
         random_state=TrainingConfig.MODEL_RANDOM_STATE,
         n_jobs=-1,
     )
-    model.fit(X_train, Y_train)
+    model.fit(X_train, Y_train, sample_weight=sample_weights)
 
     logger.info("Evaluating on chronological test set...")
     test_metrics = _evaluate(model, X_test, Y_test)
@@ -214,6 +270,8 @@ def train_and_evaluate() -> None:
         "training_row_count": len(X_train),
         "test_row_count": len(X_test),
         "held_out_row_count": len(X_held_out),
+        "sample_weight_cap": _SAMPLE_WEIGHT_CAP,
+        "sample_weight_by_scenario": weight_by_scenario,
         "test_metrics": test_metrics,
         "test_metrics_per_scenario": test_metrics_per_scenario,
         "held_out_metrics": held_out_metrics,

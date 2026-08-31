@@ -25,7 +25,9 @@ from typing import Mapping
 @dataclass(frozen=True)
 class LaneFeatures:
     """
-    Aggregated, per-lane traffic features for a single simulation step.
+    Aggregated, per-lane traffic features for a single simulation step:
+    both instantaneous facts and short-horizon (see
+    FeatureEngineer.TREND_LOOKBACK_SECONDS) trend facts about this lane.
 
     Each lane in this network is dedicated to exactly one signal-controlled
     movement (for example N_in_1 carries only the North-straight
@@ -37,6 +39,15 @@ class LaneFeatures:
     SignalFeatures instead, kept separate so this class's single
     responsibility (aggregated vehicle facts) stays intact as more
     per-lane concerns (weather, incidents) are added later.
+
+    The four trend fields (arrival_rate, departure_rate,
+    stopped_vehicle_count_trend, waiting_time_trend) are computed from a
+    single, fixed lookback window today. If multiple lookback windows or
+    multiple prediction horizons are ever introduced, that is the signal
+    to extract these into a separate composed class (mirroring how
+    SignalFeatures is already separate from this class), not before,
+    extracting them now would be speculative design for a future that
+    does not exist yet.
 
     Attributes
     ----------
@@ -60,6 +71,31 @@ class LaneFeatures:
         Number of vehicles on this lane considered stopped, defined as
         speed below 0.1 metres per second, the same threshold SUMO
         itself uses to define a halting vehicle.
+    arrival_rate : float
+        Vehicles per second newly present on this lane (by vehicle ID)
+        since the lookback snapshot, that were not present at that
+        snapshot. A demand-pressure signal, independent of how fast
+        vehicles are currently leaving. 0.0 if no lookback snapshot is
+        available yet (the first few seconds of any run).
+    departure_rate : float
+        Vehicles per second that were present on this lane at the
+        lookback snapshot but are no longer present now. Effectively
+        this lane's current discharge rate, deliberately kept separate
+        from arrival_rate rather than only exposing their difference,
+        see FeatureEngineer for the full reasoning. 0.0 if no lookback
+        snapshot is available yet.
+    stopped_vehicle_count_trend : float
+        Change in stopped_vehicle_count per second over the lookback
+        window. Positive means a queue is forming, negative means one is
+        dissipating, independent of arrival/departure counts, this
+        tracks vehicles not moving right now, not vehicles crossing the
+        lane's boundary. 0.0 if no lookback snapshot is available yet.
+    waiting_time_trend : float
+        Change in average_waiting_time per second over the lookback
+        window. Can be climbing even while queue size is stable, for
+        example in the seconds right after a signal switches to red,
+        catching a dynamic the count-based features cannot. 0.0 if no
+        lookback snapshot is available yet.
     """
 
     lane_id: str
@@ -68,6 +104,10 @@ class LaneFeatures:
     average_waiting_time: float
     max_waiting_time: float
     stopped_vehicle_count: int
+    arrival_rate: float
+    departure_rate: float
+    stopped_vehicle_count_trend: float
+    waiting_time_trend: float
 
 
 @dataclass(frozen=True)

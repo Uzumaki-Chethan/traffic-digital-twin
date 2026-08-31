@@ -36,7 +36,12 @@ class TrainingConfig:
     RAW_RUNS_DIR = os.path.join(DATASETS_DIR, "raw")
     TRAIN_DATASET_PATH = os.path.join(DATASETS_DIR, "master_dataset_train.csv")
     TEST_DATASET_PATH = os.path.join(DATASETS_DIR, "master_dataset_test.csv")
-    HELD_OUT_DATASET_PATH = os.path.join(DATASETS_DIR, "held_out_extreme.csv")
+    # Renamed from held_out_extreme.csv in the second training milestone:
+    # this file now also holds the seed-level held-out runs from
+    # accident and emergency_response (see dataset_builder.py and
+    # scenario_manifest.Scenario.held_out_seeds), not only the extreme
+    # scenario, so a name implying "extreme only" would be misleading.
+    HELD_OUT_DATASET_PATH = os.path.join(DATASETS_DIR, "held_out.csv")
 
     # Where the trained model and its metadata are written, matching the
     # path runtime Config.ML_MODEL_PATH already expects to find them at.
@@ -72,7 +77,50 @@ class TrainingConfig:
 
     # Fixed random_state for the trained model, for reproducibility.
     MODEL_RANDOM_STATE = 42
-    MODEL_N_ESTIMATORS = 200
+    # Raised 200 -> 300 in the second training milestone: more trees
+    # means a smoother, more stable tree-spread estimate specifically
+    # where confidence was weakest (heavy/extreme) - the confidence
+    # score itself is noisier with fewer trees, independent of how much
+    # data those trees were trained on.
+    MODEL_N_ESTIMATORS = 300
+
+    # Regularization added in the second training milestone. Previously
+    # unset (sklearn defaults: max_depth=None, unlimited; max_features=1.0,
+    # every feature considered at every split). Both defaults are a real
+    # contributor to the low-confidence problem this milestone is fixing:
+    # confidence is computed from tree-prediction spread (see
+    # MLPredictor._confidence), and unconstrained trees with
+    # max_features=1.0 tend toward similar, highly-fit splits in
+    # well-sampled regions (light/balanced) but diverge sharply from each
+    # other in sparsely-sampled regions (heavy/extreme/directional) where
+    # each tree's bootstrap sample barely overlaps - that divergence
+    # reads as "low confidence," but some of it is an artifact of
+    # insufficiently-decorrelated trees, not only genuine data sparsity.
+    #   MODEL_MAX_DEPTH: caps how deep any single tree can grow, so a
+    #     tree can't chase noise all the way down to single-sample leaves
+    #     in a thinly-covered region. 20 is generous for a 125-feature
+    #     input (plenty of room for real structure) while still bounding
+    #     worst-case overfit depth.
+    #   MODEL_MIN_SAMPLES_LEAF: a leaf must represent at least this many
+    #     training rows, a standard, documented RandomForestRegressor
+    #     regularization lever, again aimed at the same sparse-region
+    #     overfitting.
+    #   MODEL_MIN_SAMPLES_SPLIT: an internal node needs at least this
+    #     many samples before it's allowed to split at all - a
+    #     complementary regularizer to MIN_SAMPLES_LEAF (this one gates
+    #     splitting itself, the other gates the resulting leaf size),
+    #     standard practice to set both rather than relying on either
+    #     alone.
+    #   MODEL_MAX_FEATURES: "sqrt" restores genuine per-split feature
+    #     subsampling (sklearn's regressor default of 1.0 disables this,
+    #     considering every feature at every split - if all trees see all
+    #     features, they correlate more than a proper random forest
+    #     should, which undermines the whole premise of using
+    #     tree-disagreement as a confidence signal).
+    MODEL_MAX_DEPTH = 20
+    MODEL_MIN_SAMPLES_LEAF = 3
+    MODEL_MIN_SAMPLES_SPLIT = 5
+    MODEL_MAX_FEATURES = "sqrt"
 
     @classmethod
     def ensure_output_directories(cls) -> None:

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    accident.rou.xml
+    ==================
+    Demo scenario: a broken-down/crashed vehicle blocking the East
+    approach's single straight lane (E_in_1) via a <stop> element,
+    starting at t=100 (departs t=90, reaches the stop position and
+    halts within ~10s) and clearing at t=650 (560s stop duration).
+
+    REVISED (accident timing + broader congestion): moved the accident
+    to t=100 as requested, and added a variableSpeedSign (VSS) - a
+    real, documented SUMO additional-file element, see
+    accident_slowzone.add.xml - covering all three East approach lanes
+    (E_in_0, E_in_1, E_in_2), not just the blocked one. This forces a
+    genuine crawl (10 km/h) across the whole East approach for the
+    duration of the blockage, then a two-step recovery back to the
+    lane's real 50 km/h limit shortly after the truck clears. This is
+    an honest approximation, not a small radius around the truck: SUMO's
+    variableSpeedSign applies to the entire lane it's placed on, not a
+    localized zone within it (confirmed against SUMO's own
+    documentation - there is no "slow zone near position X" feature).
+    Since the East approach here is a single short block, applying the
+    crawl to the whole lane reads, visually, as "slow near the
+    accident" without overclaiming spatial precision SUMO doesn't have.
+
+    Left (E_in_0) and right (E_in_2) still have no physical obstacle -
+    the truck is the only thing blocking a lane - but they now crawl
+    too, per the VSS, giving genuine three-lane congestion rather than
+    a contrast between one jammed lane and two freely-flowing ones.
+
+    REVISED: turning-movement volume added on every approach at
+    ~65-70% of that approach's straight background volume (previously
+    only the East approach had any turn traffic, and even that was
+    below target ratio). This also makes the accident's effect more
+    visually legible: East's now-busier left/right lanes keep flowing
+    freely right next to the blocked, backed-up straight lane, making
+    the contrast unmistakable rather than all three East lanes looking
+    similarly quiet. Left-hand traffic movement mapping: from N:
+    straight=S, left=E, right=W. from S: straight=N, left=W, right=E.
+    from E: straight=W, left=S, right=N. from W: straight=E, left=N,
+    right=S.
+-->
+<routes>
+    <!-- ===================== Routes (identical topology to the frozen network) ===================== -->
+    <route id="route_N_S" edges="N_in C_out_S"/>
+    <route id="route_N_E" edges="N_in C_out_E"/>
+    <route id="route_N_W" edges="N_in C_out_W"/>
+    <route id="route_S_N" edges="S_in C_out_N"/>
+    <route id="route_S_E" edges="S_in C_out_E"/>
+    <route id="route_S_W" edges="S_in C_out_W"/>
+    <route id="route_E_W" edges="E_in C_out_W"/>
+    <route id="route_E_N" edges="E_in C_out_N"/>
+    <route id="route_E_S" edges="E_in C_out_S"/>
+    <route id="route_W_E" edges="W_in C_out_E"/>
+    <route id="route_W_N" edges="W_in C_out_N"/>
+    <route id="route_W_S" edges="W_in C_out_S"/>
+
+    <!-- ===================== Background traffic (0-800s, flat, same as normal_traffic) ===================== -->
+    <flow id="accident_bg_car_NS" type="car" route="route_N_S" begin="0" end="800" vehsPerHour="260"/>
+    <flow id="accident_bg_car_SN" type="car" route="route_S_N" begin="0" end="800" vehsPerHour="250"/>
+    <flow id="accident_bg_car_EW" type="car" route="route_E_W" begin="0" end="800" vehsPerHour="220"/>
+    <flow id="accident_bg_car_WE" type="car" route="route_W_E" begin="0" end="800" vehsPerHour="215"/>
+
+    <flow id="accident_bg_moto_NS" type="motorcycle" route="route_N_S" begin="0" end="800" vehsPerHour="170"/>
+    <flow id="accident_bg_moto_SN" type="motorcycle" route="route_S_N" begin="0" end="800" vehsPerHour="160"/>
+    <flow id="accident_bg_moto_EW" type="motorcycle" route="route_E_W" begin="0" end="800" vehsPerHour="140"/>
+    <flow id="accident_bg_moto_WE" type="motorcycle" route="route_W_E" begin="0" end="800" vehsPerHour="135"/>
+
+    <!-- ===================== Turning background traffic: ~65-70% of this approach's straight volume ===================== -->
+    <flow id="accident_bg_car_left_NE" type="car" route="route_N_E" begin="0" end="800" vehsPerHour="180"/>
+    <flow id="accident_bg_car_right_NW" type="car" route="route_N_W" begin="0" end="800" vehsPerHour="170"/>
+    <flow id="accident_bg_car_left_SW" type="car" route="route_S_W" begin="0" end="800" vehsPerHour="170"/>
+    <flow id="accident_bg_car_right_SE" type="car" route="route_S_E" begin="0" end="800" vehsPerHour="160"/>
+    <!-- East approach: left uses E_in_0, right uses E_in_2 - neither is the blocked lane (E_in_1) -->
+    <flow id="accident_bg_car_left_ES" type="car" route="route_E_S" begin="0" end="800" vehsPerHour="150"/>
+    <flow id="accident_bg_car_right_EN" type="car" route="route_E_N" begin="0" end="800" vehsPerHour="140"/>
+    <flow id="accident_bg_car_left_WN" type="car" route="route_W_N" begin="0" end="800" vehsPerHour="145"/>
+    <flow id="accident_bg_car_right_WS" type="car" route="route_W_S" begin="0" end="800" vehsPerHour="135"/>
+
+    <flow id="accident_bg_auto_EW" type="auto_rickshaw" route="route_E_W" begin="0" end="800" vehsPerHour="38"/>
+    <flow id="accident_bg_bus_EW" type="bus" route="route_E_W" begin="0" end="800" vehsPerHour="10"/>
+
+    <!-- ===================== The blockage ===================== -->
+    <!-- Departs at t=90, reaches the stop position shortly after
+         (~t=100, as requested), and occupies lane E_in_1 (the straight
+         lane) for 550s, clearing at t=650. Left/right East lanes have
+         no physical obstacle, but see accident_slowzone.add.xml for
+         the speed-crawl that covers all three lanes during this
+         window. -->
+    <vehicle id="accident_vehicle" type="truck" route="route_E_W" depart="90">
+        <stop lane="E_in_1" endPos="80" duration="550"/>
+    </vehicle>
+</routes>

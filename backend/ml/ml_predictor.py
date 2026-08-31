@@ -76,6 +76,7 @@ numbers from then on. This is a one-time cost paid at startup, not per
 prediction.
 """
 
+import logging
 import os
 from types import MappingProxyType
 from typing import Any
@@ -92,6 +93,8 @@ from ml.feature_schema import (
     lane_output_index,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class MLPredictor:
     """
@@ -104,7 +107,7 @@ class MLPredictor:
     validates a model from disk, the normal production path.
     """
 
-    def __init__(self, model: Any):
+    def __init__(self, model: Any, confidence_calibrators: Any = None, target_weights: Any = None):
         """
         Parameters
         ----------
@@ -117,9 +120,39 @@ class MLPredictor:
             the fast manual-aggregation path matches the model's own
             public predict() exactly, a one-time cost at construction,
             not per prediction.
+        confidence_calibrators : dict | None
+            Optional {target_name: IsotonicRegression}, one entry per
+            feature_schema.TARGET_FEATURE_NAMES value. Added in the
+            second training milestone (see
+            ml/training/fit_confidence_calibration.py) after evaluating
+            the raw tree-spread confidence score and finding it was
+            only reliably ordered at its extremes, not in between.
+            When provided, each raw _confidence() output is passed
+            through the matching calibrator before being used, so the
+            resulting score's ordering actually tracks real error
+            across its whole range, not just near 0 and 100. When None
+            (the default, and what from_path() falls back to if no
+            calibrators file exists next to the model), confidence
+            behaves exactly as it always has, uncalibrated - this
+            parameter is strictly additive, nothing about predict() or
+            the model itself changes because of it.
+        target_weights : dict | None
+            Optional {target_name: weight}, summing to 1.0, used to
+            combine vehicle_count_confidence and
+            waiting_time_confidence into one per-lane confidence value
+            (see _build_lane_prediction). Added alongside
+            confidence_calibrators: fitting calibration against a real
+            dataset can reveal that one target's confidence carries
+            real information (correlates with actual error) while the
+            other's does not, in which case an equal-weight average
+            would dilute the informative one for no reason. Falls back
+            to an equal 50/50 split (the original, pre-calibration
+            behaviour) when not provided.
         """
         self._validate_model(model)
         self._model = model
+        self._confidence_calibrators = confidence_calibrators or {}
+        self._target_weights = target_weights or {}
         self._verify_fast_path()
 
     @classmethod
@@ -127,6 +160,16 @@ class MLPredictor:
         """
         Load a trained model from disk and construct an MLPredictor
         around it.
+
+        Also looks for a confidence_calibrators.joblib file in the same
+        directory as model_path (see
+        ml/training/fit_confidence_calibration.py) and loads it if
+        present. This lookup is best-effort: a missing file is normal
+        (not every trained model has been calibrated) and a corrupt or
+        unreadable one is logged and skipped rather than raised, since
+        the calibrator is an optional refinement, not a requirement for
+        MLPredictor to function - failing to load it should never be
+        the reason inference itself becomes unavailable.
 
         Raises
         ------
@@ -147,9 +190,9 @@ class MLPredictor:
                 )
             )
 
-        try:
-            import joblib
+        import joblib
 
+        try:
             model = joblib.load(model_path)
         except Exception as exc:
             raise RuntimeError(
@@ -158,7 +201,29 @@ class MLPredictor:
                 "valid joblib file.".format(model_path)
             ) from exc
 
-        return cls(model)
+        confidence_calibrators = {}
+        target_weights = {}
+        calibrators_path = os.path.join(
+            os.path.dirname(model_path), "confidence_calibrators.joblib"
+        )
+        if os.path.isfile(calibrators_path):
+            try:
+                saved = joblib.load(calibrators_path)
+                confidence_calibrators = saved.get("calibrators", {})
+                target_weights = saved.get("target_weights", {})
+            except Exception:
+                logger.warning(
+                    "Found %s but could not load it, continuing with "
+                    "uncalibrated confidence.", calibrators_path,
+                )
+                confidence_calibrators = {}
+                target_weights = {}
+
+        return cls(
+            model,
+            confidence_calibrators=confidence_calibrators,
+            target_weights=target_weights,
+        )
 
     @staticmethod
     def _validate_model(model: Any) -> None:
@@ -318,13 +383,20 @@ class MLPredictor:
         predicted_vehicle_count = float(mean_prediction[vehicle_count_col])
         predicted_waiting_time = float(mean_prediction[waiting_time_col])
 
-        vehicle_count_confidence = self._confidence(
-            predicted_vehicle_count, std_per_output[vehicle_count_col]
+        vehicle_count_confidence = self._calibrated_confidence(
+            self._confidence(predicted_vehicle_count, std_per_output[vehicle_count_col]),
+            "vehicle_count",
         )
-        waiting_time_confidence = self._confidence(
-            predicted_waiting_time, std_per_output[waiting_time_col]
+        waiting_time_confidence = self._calibrated_confidence(
+            self._confidence(predicted_waiting_time, std_per_output[waiting_time_col]),
+            "average_waiting_time",
         )
-        confidence = (vehicle_count_confidence + waiting_time_confidence) / 2.0
+        vehicle_count_weight = self._target_weights.get("vehicle_count", 0.5)
+        waiting_time_weight = self._target_weights.get("average_waiting_time", 0.5)
+        confidence = (
+            vehicle_count_confidence * vehicle_count_weight
+            + waiting_time_confidence * waiting_time_weight
+        )
 
         return LanePrediction(
             lane_id=lane_id,
@@ -341,6 +413,27 @@ class MLPredictor:
         prediction yields higher confidence. The denominator is floored
         at 1.0 to avoid a near-zero mean prediction producing an
         artificially extreme confidence value.
+
+        This is the raw score, unchanged since it was first written.
+        See _calibrated_confidence() for the optional post-hoc
+        remapping added in the second training milestone - this method
+        itself is not being replaced, only optionally adjusted after
+        the fact.
         """
         denominator = max(abs(mean_value), 1.0)
         return float(max(0.0, 100.0 - (std_value / denominator) * 100.0))
+
+    def _calibrated_confidence(self, raw_confidence: float, target_name: str) -> float:
+        """
+        Apply this predictor's fitted calibrator for target_name to a
+        raw _confidence() score, if one was loaded (see from_path() and
+        ml/training/fit_confidence_calibration.py). Returns
+        raw_confidence unchanged if no calibrator is available for this
+        target_name - this is the fallback path every MLPredictor used
+        before calibration existed, and still the behaviour for any
+        model that has not had a calibrator fit for it.
+        """
+        calibrator = self._confidence_calibrators.get(target_name)
+        if calibrator is None:
+            return raw_confidence
+        return float(calibrator.predict([raw_confidence])[0])
