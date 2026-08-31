@@ -1,0 +1,93 @@
+@import "tailwindcss";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+
+/*
+ * Traffic Command Center - design tokens.
+ *
+ * Palette is a graphite-navy control-room surface (not pure black), with
+ * a fixed 6-color signal system that carries meaning consistently
+ * everywhere in the app: green = flow/improved, red = stop/regressed,
+ * yellow = transition, blue = neutral/normal decision, violet = AI /
+ * prediction, orange = starvation-override warning.
+ */
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --color-bg: #0b0f14;
+  --color-panel: #12181f;
+  --color-panel-raised: #1a222b;
+  --color-panel-inset: #0e1319;
+  --color-border: #232c36;
+  --color-border-soft: #1a2129;
+
+  --color-text: #e8edf2;
+  --color-text-dim: #8a97a6;
+  --color-text-faint: #5b6672;
+
+  --color-flow: #35c97c;
+  --color-flow-dim: #1d3b2c;
+  --color-stop: #f0473f;
+  --color-stop-dim: #3d2220;
+  --color-transition: #f5b942;
+  --color-transition-dim: #3d3319;
+  --color-neutral: #4c8dff;
+  --color-neutral-dim: #1c2a41;
+  --color-ai: #8b7cf6;
+  --color-ai-dim: #2a2540;
+  --color-warn: #f0883e;
+  --color-warn-dim: #3a2a1a;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+/* Tabular figures everywhere numbers live-update, so digit width never
+   jitters as values change - a small detail that matters a lot in a
+   control-room UI glanced at from across a room. */
+.font-mono, .tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-neutral);
+  outline-offset: 2px;
+}

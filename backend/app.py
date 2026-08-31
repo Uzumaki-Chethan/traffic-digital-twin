@@ -303,6 +303,8 @@ def main():
                     "mode": decision.decision_mode,
                     "switched": decision.switched,
                     "reason": decision.reason_text,
+                    "duration": decision.green_duration_seconds,
+                    "phase_scores": dict(decision.phase_scores),
                 },
                 "emergency_lanes": sorted(emergency_lanes),
                 "prediction": latest_evaluated,
