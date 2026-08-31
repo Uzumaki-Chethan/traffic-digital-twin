@@ -225,13 +225,13 @@ venv/
 .venv/
 
 # Trained models
-backend/ml/trained_models/*.joblib
+# backend/ml/trained_models/*.joblib  # UNCOMMENTED: Now tracking trained models
 
 # Generated datasets
-datasets/
+# datasets/  # UNCOMMENTED: Now tracking datasets
 
 # Generated CSVs
-*.csv
+# *.csv  # UNCOMMENTED: Now tracking CSV files
 
 # SQLite runtime logs (dashboard/persistence)
 data/*.db
