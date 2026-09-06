@@ -35,6 +35,7 @@ from signal_controller.signal_controller import SignalController, PHASE_TO_INDEX
 from database import DatabaseLogger
 from services.live_state import DEFAULT_STORE as LIVE_STATE
 from services.dashboard_server import start_dashboard_server
+from services.control_routes import build_control_router
 
 # Inverse of SignalController.PHASE_TO_INDEX: green index -> phase name.
 _INDEX_TO_PHASE = {idx: name for name, idx in PHASE_TO_INDEX.items()}
@@ -82,8 +83,13 @@ def main():
     # Config.DASHBOARD_ENABLED = False to run without it.
     if Config.DASHBOARD_ENABLED:
         try:
+            # extra_router: this is the one dashboard instance allowed
+            # to launch/stop a performance evaluation from a button -
+            # see services/control_routes.py's module docstring for why
+            # this lives outside dashboard_server.py itself.
             start_dashboard_server(
-                LIVE_STATE, Config.DASHBOARD_HOST, Config.DASHBOARD_PORT
+                LIVE_STATE, Config.DASHBOARD_HOST, Config.DASHBOARD_PORT,
+                extra_router=build_control_router(LIVE_STATE),
             )
         except Exception:
             logger.exception("Dashboard failed to start (simulation continues)")
@@ -198,10 +204,12 @@ def main():
             if not is_first_tick and elapsed_since_last_decision < Config.DECISION_INTERVAL_SECONDS - 1e-6:
                 return
 
-            # PERFORMANCE: status logging runs only on decision ticks
-            # (1 Hz), never on every TraCI step - console I/O on Windows
-            # was a measurable drag when done at 20 Hz.
-            logger.info(
+            # Routine per-tick telemetry: DEBUG only. The dashboard (and
+            # decision_log/performance_log in SQLite) already show this
+            # live at the same 1 Hz cadence, so mirroring it to the
+            # console on every tick was pure noise once the dashboard
+            # existed - it was only ever useful before that.
+            logger.debug(
                 "Time=%.2f | Vehicles=%d | AvgSpeed=%.2f | AvgWait=%.2f | Stopped=%d",
                 features.simulation_time,
                 features.total_vehicle_count,
@@ -241,12 +249,22 @@ def main():
                 emergency_lanes=emergency_lanes,
             )
             signal_controller.apply_decision(decision, dt_seconds=elapsed_since_last_decision)
-            logger.info(
+            # A phase switch is a meaningful, infrequent event worth an
+            # INFO line; the same decision holding its current phase
+            # tick after tick is not - that case logs at DEBUG only.
+            (logger.info if decision.switched else logger.debug)(
                 "Decision: phase=%s mode=%s switched=%s | %s",
                 decision.active_phase, decision.decision_mode, decision.switched,
                 decision.reason_text,
             )
             last_decision_time[0] = features.simulation_time
+
+            # Computed once, shared by persistence below and the
+            # dashboard snapshot further down: sig_view is the ACTUAL
+            # TraCI-confirmed signal state, distinct from `decision`
+            # (the DESIRED state DecisionEngine just produced).
+            sig_view = _signal_view(state)
+            lane_states = dict(state.signal.lane_states)
 
             # ---- Persistence (1 Hz, insert-only, failure-tolerant) ----
             db_logger.log_decision(
@@ -255,6 +273,8 @@ def main():
                 duration=decision.green_duration_seconds,
                 mode=decision.decision_mode,
                 reason=decision.reason_text,
+                actual_phase=sig_view["phase"],
+                actual_is_yellow=sig_view["is_yellow"],
             )
             db_logger.log_performance(
                 time=features.simulation_time,
@@ -263,15 +283,43 @@ def main():
                 queue_length=features.stopped_vehicle_count,
                 stopped=features.stopped_vehicle_count,
             )
+            db_logger.log_lane_states(
+                time=features.simulation_time,
+                rows=[
+                    {
+                        "lane_id": lane_id,
+                        "vehicle_count": (
+                            features.lane_features[lane_id].vehicle_count
+                            if lane_id in features.lane_features else 0
+                        ),
+                        "avg_speed": (
+                            features.lane_features[lane_id].average_speed
+                            if lane_id in features.lane_features else 0.0
+                        ),
+                        "avg_waiting_time": (
+                            features.lane_features[lane_id].average_waiting_time
+                            if lane_id in features.lane_features else 0.0
+                        ),
+                        "stopped_count": (
+                            features.lane_features[lane_id].stopped_vehicle_count
+                            if lane_id in features.lane_features else 0
+                        ),
+                        # Reuses the exact per-lane urgency score
+                        # DecisionEngine already computed this tick -
+                        # never recomputed here, single source of truth.
+                        "congestion_score": decision.lane_scores.get(lane_id, 0.0),
+                        "signal_state": lane_states.get(lane_id, "r"),
+                    }
+                    for lane_id in ALL_APPROACH_LANES
+                ],
+            )
 
             # ---- Dashboard snapshot (read-only consumer) ----
-            sig_view = _signal_view(state)
             phase_history.append({
                 "time": features.simulation_time,
                 "phase": decision.active_phase,
                 "is_yellow": sig_view["is_yellow"],
             })
-            lane_states = dict(state.signal.lane_states)
             lanes_payload = [
                 {
                     "lane_id": lane_id,

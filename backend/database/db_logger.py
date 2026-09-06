@@ -1,12 +1,19 @@
 """
 db_logger.py
 ============
-Lightweight SQLite persistence for the three runtime log tables:
+Lightweight SQLite persistence for the runtime log tables:
 
-    decision_log     one row per DecisionEngine decision (1 Hz)
-    performance_log  one row per decision tick's network metrics
+    decision_log     one row per DecisionEngine decision (1 Hz),
+                     including the actual TraCI-confirmed phase/yellow
+                     status alongside the desired one (see
+                     _DECISION_LOG_MIGRATION_COLUMNS below)
+    performance_log  one row per decision tick's network-wide metrics
     prediction_log   one row per prediction, with the actual values
                      observed when its 15 s horizon elapsed
+    lane_state_log   one row PER LANE per decision tick (12 rows/tick):
+                     the per-direction congestion breakdown that
+                     performance_log's network-wide averages can't
+                     show. Feeds backend/analytics/congestion_analytics.py.
 
 DESIGN RULES
 ------------
@@ -55,10 +62,35 @@ CREATE TABLE IF NOT EXISTS prediction_log (
     actual_values    TEXT NOT NULL,
     confidence       REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS lane_state_log (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    time             REAL NOT NULL,
+    lane_id          TEXT NOT NULL,
+    vehicle_count    INTEGER NOT NULL,
+    avg_speed        REAL NOT NULL,
+    avg_waiting_time REAL NOT NULL,
+    stopped_count    INTEGER NOT NULL,
+    congestion_score REAL NOT NULL,
+    signal_state     TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_decision_time ON decision_log(time);
 CREATE INDEX IF NOT EXISTS idx_performance_time ON performance_log(time);
 CREATE INDEX IF NOT EXISTS idx_prediction_time ON prediction_log(time);
+CREATE INDEX IF NOT EXISTS idx_lane_state_time ON lane_state_log(time);
+CREATE INDEX IF NOT EXISTS idx_lane_state_lane ON lane_state_log(lane_id);
 """
+
+# decision_log started with only (time, phase, duration, mode, reason).
+# These two columns were added later to persist the Desired-vs-Actual
+# distinction durably (previously only visible live, via app.py's
+# _signal_view(), never in SQLite). CREATE TABLE IF NOT EXISTS does not
+# retrofit columns onto an already-existing table, so any database file
+# created before this change needs an explicit ALTER TABLE - handled by
+# _migrate_decision_log_columns() below, run once at startup.
+_DECISION_LOG_MIGRATION_COLUMNS = {
+    "actual_phase": "TEXT",
+    "actual_is_yellow": "INTEGER",
+}
 
 
 class DatabaseLogger:
@@ -79,6 +111,7 @@ class DatabaseLogger:
             self._conn.execute("PRAGMA journal_mode=WAL;")
             self._conn.executescript(_SCHEMA)
             self._conn.commit()
+            self._migrate_decision_log_columns()
             logger.info("Database ready at %s", db_path)
         except sqlite3.Error as exc:
             # A broken database degrades to logging-only; it must never
@@ -89,6 +122,30 @@ class DatabaseLogger:
     @property
     def is_enabled(self) -> bool:
         return self._conn is not None
+
+    def _migrate_decision_log_columns(self) -> None:
+        """
+        Adds any of _DECISION_LOG_MIGRATION_COLUMNS missing from an
+        already-existing decision_log table (older database files
+        created before this feature). A brand new database gets the
+        base table from _SCHEMA and then these columns added
+        immediately, so both paths converge on the same final shape.
+        """
+        if self._conn is None:
+            return
+        try:
+            existing = {row[1] for row in self._conn.execute("PRAGMA table_info(decision_log)")}
+            for column, sql_type in _DECISION_LOG_MIGRATION_COLUMNS.items():
+                if column not in existing:
+                    self._conn.execute(
+                        "ALTER TABLE decision_log ADD COLUMN {} {}".format(column, sql_type)
+                    )
+            self._conn.commit()
+        except sqlite3.Error as exc:
+            logger.error(
+                "decision_log column migration failed (%s) - actual-state "
+                "columns unavailable this run.", exc,
+            )
 
     def _execute(self, sql: str, params: tuple) -> None:
         if self._conn is None:
@@ -101,12 +158,23 @@ class DatabaseLogger:
             logger.error("Database write failed (%s) - row dropped.", exc)
 
     def log_decision(self, time: float, phase: str, duration: float,
-                     mode: str, reason: str) -> None:
-        """One row per DecisionEngine decision."""
+                     mode: str, reason: str, actual_phase: str = None,
+                     actual_is_yellow: bool = None) -> None:
+        """
+        One row per DecisionEngine decision. actual_phase/actual_is_yellow
+        are optional (default None) so existing callers keep working
+        unchanged; app.py passes them from its own _signal_view(state) -
+        the TraCI-confirmed reality, as opposed to `phase`/`mode`/`reason`
+        which describe what was DESIRED.
+        """
         self._execute(
-            "INSERT INTO decision_log (time, phase, duration, mode, reason) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (time, phase, duration, mode, reason),
+            "INSERT INTO decision_log "
+            "(time, phase, duration, mode, reason, actual_phase, actual_is_yellow) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                time, phase, duration, mode, reason, actual_phase,
+                None if actual_is_yellow is None else int(actual_is_yellow),
+            ),
         )
 
     def log_performance(self, time: float, avg_wait: float, avg_speed: float,
@@ -133,6 +201,38 @@ class DatabaseLogger:
                 float(confidence),
             ),
         )
+
+    def log_lane_states(self, time: float, rows) -> None:
+        """
+        One row PER LANE for one decision tick (12 rows/tick on this
+        network). `rows` is an iterable of dicts with keys: lane_id,
+        vehicle_count, avg_speed, avg_waiting_time, stopped_count,
+        congestion_score, signal_state. Batched into a single
+        transaction (executemany + one commit) so logging all 12 lanes
+        costs one round-trip, not twelve.
+        """
+        if self._conn is None:
+            return
+        try:
+            with self._lock:
+                self._conn.executemany(
+                    "INSERT INTO lane_state_log "
+                    "(time, lane_id, vehicle_count, avg_speed, avg_waiting_time, "
+                    "stopped_count, congestion_score, signal_state) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    [
+                        (
+                            time, r["lane_id"], int(r["vehicle_count"]),
+                            float(r["avg_speed"]), float(r["avg_waiting_time"]),
+                            int(r["stopped_count"]), float(r["congestion_score"]),
+                            r["signal_state"],
+                        )
+                        for r in rows
+                    ],
+                )
+                self._conn.commit()
+        except sqlite3.Error as exc:
+            logger.error("Database write failed (%s) - lane_state_log rows dropped.", exc)
 
     def close(self) -> None:
         """Safe to call unconditionally from a finally block."""

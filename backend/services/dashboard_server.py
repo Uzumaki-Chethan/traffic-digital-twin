@@ -49,12 +49,14 @@ import logging
 import os
 import sqlite3
 import threading
+from typing import Optional
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from analytics import average_wait_times, congestion_trend, detect_peak_periods
 from config import Config
 from services.live_state import LiveStateStore
 
@@ -104,12 +106,22 @@ def _read_only_connection() -> sqlite3.Connection:
     return sqlite3.connect(uri, uri=True)
 
 
-def create_app(store: LiveStateStore) -> FastAPI:
+def create_app(store: LiveStateStore, extra_router: Optional[APIRouter] = None) -> FastAPI:
     """
     Build the dashboard FastAPI application bound to one live-state
     store.
+
+    extra_router is an escape hatch for exactly one caller: app.py
+    mounts services.control_routes.build_control_router() through it so
+    ITS dashboard gains the ability to launch/stop a performance
+    evaluation. Passing None (every other caller, including
+    performance/evaluator.py's own --dashboard) leaves this file's own
+    "pure viewer, no POST, no control socket" rule completely intact -
+    this function still defines zero control endpoints of its own.
     """
     app = FastAPI(title="Traffic Digital Twin Dashboard")
+    if extra_router is not None:
+        app.include_router(extra_router)
 
     @app.get("/api/latest")
     async def latest():
@@ -196,6 +208,41 @@ def create_app(store: LiveStateStore) -> FastAPI:
         finally:
             conn.close()
         return rows
+
+    @app.get("/api/analytics/wait-times")
+    async def analytics_wait_times(
+        group_by: str = "network", start_time: float = None, end_time: float = None
+    ):
+        # Thin wrapper: all the actual query/aggregation logic lives in
+        # analytics/congestion_analytics.py, which takes a plain db_path
+        # and has no FastAPI dependency of its own (independently
+        # testable, importable from a script or test with no server
+        # running).
+        if group_by not in ("network", "lane"):
+            return JSONResponse(
+                {"error": "group_by must be 'network' or 'lane'"}, status_code=400
+            )
+        return average_wait_times(
+            Config.DB_PATH, group_by=group_by, start_time=start_time, end_time=end_time
+        )
+
+    @app.get("/api/analytics/congestion-trend")
+    async def analytics_congestion_trend(bucket_seconds: float = 60.0, group_by: str = "network"):
+        if group_by not in ("network", "lane"):
+            return JSONResponse(
+                {"error": "group_by must be 'network' or 'lane'"}, status_code=400
+            )
+        if bucket_seconds <= 0:
+            return JSONResponse({"error": "bucket_seconds must be positive"}, status_code=400)
+        return congestion_trend(Config.DB_PATH, bucket_seconds=bucket_seconds, group_by=group_by)
+
+    @app.get("/api/analytics/peak-periods")
+    async def analytics_peak_periods(top_n: int = 3, window_seconds: float = 60.0):
+        if top_n <= 0 or window_seconds <= 0:
+            return JSONResponse(
+                {"error": "top_n and window_seconds must both be positive"}, status_code=400
+            )
+        return detect_peak_periods(Config.DB_PATH, top_n=top_n, window_seconds=window_seconds)
 
     @app.get("/api/results")
     async def saved_results():
@@ -284,6 +331,7 @@ def start_dashboard_server(
     store: LiveStateStore,
     host: str = Config.DASHBOARD_HOST,
     port: int = Config.DASHBOARD_PORT,
+    extra_router: Optional[APIRouter] = None,
 ) -> threading.Thread:
     """
     Start the dashboard server in a daemon thread and return the thread
@@ -291,7 +339,7 @@ def start_dashboard_server(
     simulation process - no shutdown plumbing needed in app.py's finally
     block.
     """
-    app = create_app(store)
+    app = create_app(store, extra_router=extra_router)
     config = uvicorn.Config(
         app, host=host, port=port, log_level="warning", lifespan="off"
     )

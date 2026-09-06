@@ -104,6 +104,7 @@ class FixedTimerController:
                 decision_mode=self.decision_mode,
                 reason_text=reason,
                 phase_scores={},
+                lane_scores={},
             )
 
         return Decision(
@@ -117,6 +118,7 @@ class FixedTimerController:
                 FIXED_TIMER_GREEN_SECONDS[self._current_phase],
             ),
             phase_scores={},
+            lane_scores={},
         )
 
 
@@ -186,6 +188,7 @@ class VehicleActuatedController:
                     )
                 ),
                 phase_scores={},
+                lane_scores={},
             )
 
         current_demand = self._exclusive_demand(self._current_phase, features)
@@ -206,6 +209,7 @@ class VehicleActuatedController:
                     )
                 ),
                 phase_scores={},
+                lane_scores={},
             )
 
         # Choose the competing phase with the most queued demand;
@@ -244,4 +248,5 @@ class VehicleActuatedController:
             decision_mode="vac_" + trigger,
             reason_text=reason,
             phase_scores={},
+            lane_scores={},
         )

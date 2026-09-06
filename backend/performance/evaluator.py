@@ -10,10 +10,22 @@ compares how each one's signal control serves that identical demand:
                             TrafficAdapter -> DigitalTwin ->
                             FeatureEngineer -> MLPredictor ->
                             DecisionEngine -> SignalController.
-  Simulation B ("baseline") TrafficAdapter + MetricsCollector ONLY.
-                            NO DecisionEngine, NO SignalController - the
-                            frozen network's own static tlLogic program
-                            runs untouched. This is the "before" picture.
+  Simulation B ("baseline") Selectable via --baseline (see
+                            performance.baseline_controllers):
+                              fixed_timer (default) - TrafficAdapter +
+                                MetricsCollector ONLY. NO controller of
+                                any kind - the frozen network's own
+                                static tlLogic program runs untouched.
+                                This is the "before" picture the guide's
+                                Section 10.7.1 explicitly argues is too
+                                weak a baseline on its own.
+                              vac - TrafficAdapter + FeatureEngineer +
+                                VehicleActuatedController + its OWN
+                                SignalController (bound to the baseline
+                                connection). A real demand-responsive
+                                controller, not a strawman - beating it
+                                is a materially stronger claim. Still
+                                NEVER the ML DecisionEngine.
 
 WHY TWO SEPARATE SUMO INSTANCES (a hard design rule): merging both into
 one instance is impossible without breaking the comparison - one traffic
@@ -35,13 +47,16 @@ FAIRNESS GUARANTEES (each maps to a concrete mechanism):
     same decision cadence    -> AI decisions throttle to 1 Hz with the
                                 exact float-epsilon guard app.py uses.
     no cross-talk            -> adapters bind to their own manager's
-                                connection; SignalController receives
-                                the AI connection explicitly; the
-                                baseline connection NEVER receives any
-                                trafficlight command.
+                                connection; each SignalController is
+                                bound to exactly one connection; the
+                                baseline connection never receives an
+                                AI-decided command, and (under
+                                --baseline vac) the AI connection never
+                                receives a VAC-decided one.
 
 Usage (from backend/):
     python -m performance.evaluator --scenario heavy_seed1
+    python -m performance.evaluator --scenario heavy_seed1 --baseline vac
     python -m performance.evaluator --scenario rush_hour_seed1 --gui
 
 Outputs:
@@ -66,8 +81,9 @@ from ml import MLPredictor
 from decision_engine.decision_engine import DecisionEngine
 from signal_controller.signal_controller import SignalController
 
+from performance.baseline_controllers import VehicleActuatedController
 from performance.metrics_collector import MetricsCollector
-from services.live_state import DEFAULT_STORE as LIVE_STATE
+from services.live_state import DEFAULT_STORE as LIVE_STATE, RemoteLiveStatePublisher
 from services.dashboard_server import start_dashboard_server
 
 logger = logging.getLogger(__name__)
@@ -93,6 +109,8 @@ CSV_FIELDS = (
     "metric", "ai", "baseline", "improvement_pct",
 )
 
+BASELINE_CONTROLLERS = ("fixed_timer", "vac")
+
 
 class _SimConfig:
     """
@@ -116,9 +134,23 @@ class PerformanceEvaluator:
     Runs one AI-vs-baseline comparison for one scenario.
     """
 
-    def __init__(self, scenario_name: str, use_gui: bool = False):
+    def __init__(
+        self, scenario_name: str, use_gui: bool = False, baseline: str = "fixed_timer",
+        decision_config=None,
+    ):
+        # decision_config: optional DecisionConfig override for the AI side,
+        # None (default) uses DecisionEngine's own normal defaults/calibration
+        # loading unchanged. Exists for controlled tuning experiments (e.g.
+        # "does disabling prediction influence change light-traffic results")
+        # without needing a second copy of this whole run() method.
+        self._decision_config = decision_config
+        if baseline not in BASELINE_CONTROLLERS:
+            raise ValueError(
+                "baseline must be one of {}, got {!r}".format(BASELINE_CONTROLLERS, baseline)
+            )
         self._scenario_name = scenario_name
         self._use_gui = use_gui
+        self._baseline = baseline
         sumocfg_path = os.path.join(
             SCENARIO_DIR, "{}.sumocfg".format(scenario_name)
         )
@@ -192,7 +224,9 @@ class PerformanceEvaluator:
             # ---- Simulation A: the full AI pipeline ----
             twin = DigitalTwin()
             feature_engineer = FeatureEngineer(twin)
-            decision_engine = DecisionEngine(initial_phase="NS_straight_left")
+            decision_engine = DecisionEngine(
+                initial_phase="NS_straight_left", config=self._decision_config,
+            )
             # Explicitly bound to the AI connection: with two parallel
             # instances the module-level default connection is ambiguous,
             # and a stray signal command landing on the baseline would
@@ -202,13 +236,37 @@ class PerformanceEvaluator:
             )
             collector_ai = MetricsCollector()
 
-            # ---- Simulation B: measurement only, zero control ----
+            # ---- Simulation B: fixed_timer (zero control, the frozen
+            # network's own static tlLogic runs untouched) or vac (a
+            # real demand-responsive controller - see module docstring
+            # and performance.baseline_controllers.VehicleActuatedController).
             collector_base = MetricsCollector()
+            twin_base = None
+            feature_engineer_base = None
+            baseline_controller = None
+            signal_controller_base = None
+            if self._baseline == "vac":
+                twin_base = DigitalTwin()
+                feature_engineer_base = FeatureEngineer(twin_base)
+                baseline_controller = VehicleActuatedController(initial_phase="NS_straight_left")
+                # Bound explicitly to the BASELINE connection - the same
+                # cross-talk guard as the AI's own SignalController above,
+                # just on the other side.
+                signal_controller_base = SignalController(
+                    Config.TLS_ID, traci_connection=manager_base.connection
+                )
 
             conn_ai = manager_ai.connection
             conn_base = manager_base.connection
 
             last_decision_time = [None]
+            last_decision_time_base = [None]
+            # Total phase switches each side actually committed over the
+            # whole run - concrete, measurable evidence for the
+            # anti-flicker goal (see DecisionConfig.switch_confirmation_seconds
+            # and DecisionEngine's gap-out logic), not just an assumption
+            # that fewer switches happened.
+            switch_counts = {"ai": 0, "baseline": 0}
 
             def record(collector, adapter):
                 state = adapter.get_current_state()
@@ -254,14 +312,44 @@ class PerformanceEvaluator:
                         signal_controller.apply_decision(
                             decision, dt_seconds=elapsed
                         )
+                        if decision.switched:
+                            switch_counts["ai"] += 1
                         last_decision_time[0] = features.simulation_time
 
                 if base_pending:
                     conn_base.simulationStep()
-                    # Measurement only. No twin, no features, no
-                    # decisions, no signal commands ever touch this
-                    # connection - SUMO's own static tlLogic controls it.
-                    record(collector_base, adapter_base)
+                    state_base = record(collector_base, adapter_base)
+
+                    if baseline_controller is not None:
+                        twin_base.update(state_base)
+                        features_base = feature_engineer_base.generate_features()
+
+                        # Identical 1 Hz throttling to the AI side, own
+                        # independent clock - the two controllers must
+                        # not share decision timing state.
+                        is_first_tick_base = last_decision_time_base[0] is None
+                        elapsed_base = (
+                            Config.DECISION_INTERVAL_SECONDS if is_first_tick_base
+                            else features_base.simulation_time - last_decision_time_base[0]
+                        )
+                        if is_first_tick_base or elapsed_base >= Config.DECISION_INTERVAL_SECONDS - 1e-6:
+                            # VAC never uses a prediction - its decide()
+                            # accepts the parameter only to match the
+                            # same interface DecisionEngine uses.
+                            decision_base = baseline_controller.decide(
+                                features_base, None, dt_seconds=elapsed_base,
+                                emergency_lanes=frozenset(),
+                            )
+                            signal_controller_base.apply_decision(
+                                decision_base, dt_seconds=elapsed_base
+                            )
+                            if decision_base.switched:
+                                switch_counts["baseline"] += 1
+                            last_decision_time_base[0] = features_base.simulation_time
+                    # else (fixed_timer): measurement only. No twin, no
+                    # features, no decisions, no signal commands ever
+                    # touch this connection - SUMO's own static tlLogic
+                    # controls it untouched.
 
                 # Live AI-vs-baseline feed for the dashboard (~1 Hz).
                 # summary() is a pure function over accumulated
@@ -288,6 +376,7 @@ class PerformanceEvaluator:
                             "prediction": None, "phase_history": [],
                             "comparison": {
                                 "rows": self._comparison_rows(ai_mid, base_mid),
+                                "baseline_controller": self._baseline,
                             },
                         })
                         last_live_publish[0] = now
@@ -308,9 +397,11 @@ class PerformanceEvaluator:
 
         return {
             "scenario": self._scenario_name,
+            "baseline_controller": self._baseline,
             "ai": ai_summary,
             "baseline": base_summary,
             "improvement_pct": improvement,
+            "switch_counts": switch_counts,
         }
 
     @staticmethod
@@ -325,8 +416,12 @@ class PerformanceEvaluator:
         base = result["baseline"]
         imp = result["improvement_pct"]
 
+        baseline_label = (
+            "Vehicle Actuated Control (VAC)"
+            if result.get("baseline_controller") == "vac" else "Fixed-Timer"
+        )
         print()
-        print("=== AI vs Baseline - {} ===".format(result["scenario"]))
+        print("=== AI vs {} - {} ===".format(baseline_label, result["scenario"]))
         header = "{:<28} {:>12} {:>12} {:>16}".format(
             "Metric", "AI", "Baseline", "Change"
         )
@@ -337,6 +432,12 @@ class PerformanceEvaluator:
             verdict = "IMPROVED" if imp[key] >= 0 else "REGRESSED"
             print("{:<28} {:>12.2f} {:>12.2f} {:>7} {:>6.1f}% {}".format(
                 label, ai[key], base[key], arrow, abs(imp[key]), verdict,
+            ))
+        switches = result.get("switch_counts")
+        if switches is not None:
+            print("-" * len(header))
+            print("{:<28} {:>12} {:>12}".format(
+                "Phase switches (informational)", switches["ai"], switches["baseline"],
             ))
         print()
 
@@ -379,6 +480,14 @@ def main():
         help="Run both simulations in sumo-gui windows (demo mode).",
     )
     parser.add_argument(
+        "--baseline", choices=BASELINE_CONTROLLERS, default="fixed_timer",
+        help="Baseline controller for simulation B: 'fixed_timer' (the "
+             "frozen network's own static program, untouched - the "
+             "default) or 'vac' (Vehicle Actuated Control, a real "
+             "demand-responsive baseline - see performance."
+             "baseline_controllers.VehicleActuatedController).",
+    )
+    parser.add_argument(
         "--dashboard", action="store_true",
         help="Serve the live dashboard (http://127.0.0.1:8000) with a "
              "real-time AI-vs-baseline comparison panel.",
@@ -387,12 +496,21 @@ def main():
 
     logging.basicConfig(level=logging.WARNING)
 
+    # PUSH_TO_CONTROL_URL means a control layer (app.py's dashboard, via
+    # services/control_routes.py) launched this process and already owns
+    # the dashboard port - publish to it over HTTP instead of trying to
+    # self-host a second server on the same port. Unset (the normal
+    # direct-terminal case): --dashboard behaves exactly as it always
+    # has, self-hosting its own dashboard.
+    control_url = os.environ.get("PUSH_TO_CONTROL_URL")
     live_store = None
-    if args.dashboard:
+    if control_url:
+        live_store = RemoteLiveStatePublisher(control_url)
+    elif args.dashboard:
         live_store = LIVE_STATE
         start_dashboard_server(LIVE_STATE)
 
-    evaluator = PerformanceEvaluator(args.scenario, use_gui=args.gui)
+    evaluator = PerformanceEvaluator(args.scenario, use_gui=args.gui, baseline=args.baseline)
     result = evaluator.run(live_store=live_store)
     PerformanceEvaluator.print_panel(result)
     csv_path = PerformanceEvaluator.save_csv(result)

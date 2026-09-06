@@ -5,6 +5,7 @@
     <input>
         <net-file value="../network/intersection.net.xml"/>
         <route-files value="../routes/intersection.rou.xml"/>
+        <additional-files value="../vehicles/vehicle_types.add.xml"/>
     </input>
 
     <time>

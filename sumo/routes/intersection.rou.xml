@@ -2,22 +2,33 @@
 <!--
     intersection.rou.xml
     =====================
-    Vehicle type, routes, and flows. Edge IDs are unchanged from the
-    network design above, so every route below uses the same origin and
+    Routes and flows for the frozen production network (the one
+    python app.py actually runs). Edge IDs are unchanged from the
+    network design, so every route below uses the same origin and
     destination edges. With three dedicated lanes per approach and no
     shared movements, a vehicle following a given route will lane change
     into the single correct lane well before the stop line, using the
     250m approach distance for that manoeuvre.
 
-    Flow rates are the same modest, balanced values used previously,
-    kept unchanged here since this revision only concerns the network
-    layer, not traffic demand.
+    Vehicle types: previously a single generic inline <vType id="car">
+    for every flow - the only place in the project still like that
+    (every ML-training scenario route file under sumo/routes/scenarios/
+    and every hand-authored demo scenario under sumo/scenarios/demo/
+    already reference the realistic multi-type mix in
+    sumo/vehicles/vehicle_types.add.xml). Fixed to match: each route's
+    total vehsPerHour is now split across the SAME _VTYPE_MIX proportions
+    used by backend/ml/training/generate_scenario_files.py (car 55%,
+    motorcycle 30%, auto_rickshaw 8%, bus 4%, truck 3%), referencing
+    vehicle_types.add.xml's vType/vTypeDistribution ids directly rather
+    than redefining anything here - one authoritative source, as
+    everywhere else. This does not affect the trained ML model or any
+    dataset: training reads from sumo/routes/scenarios/, never this
+    file.
+
+    Flow rates (240/120/120 per approach) are unchanged from before -
+    only the vehicle-type split is new.
 -->
 <routes>
-    <!-- Generic passenger car -->
-    <vType id="car" accel="2.6" decel="4.5" sigma="0.5" length="5.0"
-           minGap="2.5" maxSpeed="13.89" guiShape="passenger"/>
-
     <!-- Routes from the NORTH -->
     <route id="route_N_S" edges="N_in C_out_S"/>
     <route id="route_N_E" edges="N_in C_out_E"/>
@@ -38,20 +49,83 @@
     <route id="route_W_N" edges="W_in C_out_N"/>
     <route id="route_W_S" edges="W_in C_out_S"/>
 
-    <!-- Flows: vehicles generated 0s to 600s -->
-    <flow id="flow_N_S" type="car" route="route_N_S" begin="0" end="600" vehsPerHour="240"/>
-    <flow id="flow_N_E" type="car" route="route_N_E" begin="0" end="600" vehsPerHour="120"/>
-    <flow id="flow_N_W" type="car" route="route_N_W" begin="0" end="600" vehsPerHour="120"/>
+    <!-- Flows: vehicles generated 0s to 600s. Each route's total rate
+         (240 or 120 vph) is split car/motorcycle/auto_rickshaw/bus/truck
+         at 55/30/8/4/3 percent - see file header. -->
 
-    <flow id="flow_S_N" type="car" route="route_S_N" begin="0" end="600" vehsPerHour="240"/>
-    <flow id="flow_S_E" type="car" route="route_S_E" begin="0" end="600" vehsPerHour="120"/>
-    <flow id="flow_S_W" type="car" route="route_S_W" begin="0" end="600" vehsPerHour="120"/>
+    <!-- NORTH: 240 / 120 / 120 -->
+    <flow id="flow_N_S_car" type="car" route="route_N_S" begin="0" end="600" vehsPerHour="132.000"/>
+    <flow id="flow_N_S_motorcycle" type="motorcycle" route="route_N_S" begin="0" end="600" vehsPerHour="72.000"/>
+    <flow id="flow_N_S_auto_rickshaw" type="auto_rickshaw" route="route_N_S" begin="0" end="600" vehsPerHour="19.200"/>
+    <flow id="flow_N_S_bus" type="bus" route="route_N_S" begin="0" end="600" vehsPerHour="9.600"/>
+    <flow id="flow_N_S_truck" type="truck" route="route_N_S" begin="0" end="600" vehsPerHour="7.200"/>
 
-    <flow id="flow_E_W" type="car" route="route_E_W" begin="0" end="600" vehsPerHour="240"/>
-    <flow id="flow_E_N" type="car" route="route_E_N" begin="0" end="600" vehsPerHour="120"/>
-    <flow id="flow_E_S" type="car" route="route_E_S" begin="0" end="600" vehsPerHour="120"/>
+    <flow id="flow_N_E_car" type="car" route="route_N_E" begin="0" end="600" vehsPerHour="66.000"/>
+    <flow id="flow_N_E_motorcycle" type="motorcycle" route="route_N_E" begin="0" end="600" vehsPerHour="36.000"/>
+    <flow id="flow_N_E_auto_rickshaw" type="auto_rickshaw" route="route_N_E" begin="0" end="600" vehsPerHour="9.600"/>
+    <flow id="flow_N_E_bus" type="bus" route="route_N_E" begin="0" end="600" vehsPerHour="4.800"/>
+    <flow id="flow_N_E_truck" type="truck" route="route_N_E" begin="0" end="600" vehsPerHour="3.600"/>
 
-    <flow id="flow_W_E" type="car" route="route_W_E" begin="0" end="600" vehsPerHour="240"/>
-    <flow id="flow_W_N" type="car" route="route_W_N" begin="0" end="600" vehsPerHour="120"/>
-    <flow id="flow_W_S" type="car" route="route_W_S" begin="0" end="600" vehsPerHour="120"/>
+    <flow id="flow_N_W_car" type="car" route="route_N_W" begin="0" end="600" vehsPerHour="66.000"/>
+    <flow id="flow_N_W_motorcycle" type="motorcycle" route="route_N_W" begin="0" end="600" vehsPerHour="36.000"/>
+    <flow id="flow_N_W_auto_rickshaw" type="auto_rickshaw" route="route_N_W" begin="0" end="600" vehsPerHour="9.600"/>
+    <flow id="flow_N_W_bus" type="bus" route="route_N_W" begin="0" end="600" vehsPerHour="4.800"/>
+    <flow id="flow_N_W_truck" type="truck" route="route_N_W" begin="0" end="600" vehsPerHour="3.600"/>
+
+    <!-- SOUTH: 240 / 120 / 120 -->
+    <flow id="flow_S_N_car" type="car" route="route_S_N" begin="0" end="600" vehsPerHour="132.000"/>
+    <flow id="flow_S_N_motorcycle" type="motorcycle" route="route_S_N" begin="0" end="600" vehsPerHour="72.000"/>
+    <flow id="flow_S_N_auto_rickshaw" type="auto_rickshaw" route="route_S_N" begin="0" end="600" vehsPerHour="19.200"/>
+    <flow id="flow_S_N_bus" type="bus" route="route_S_N" begin="0" end="600" vehsPerHour="9.600"/>
+    <flow id="flow_S_N_truck" type="truck" route="route_S_N" begin="0" end="600" vehsPerHour="7.200"/>
+
+    <flow id="flow_S_E_car" type="car" route="route_S_E" begin="0" end="600" vehsPerHour="66.000"/>
+    <flow id="flow_S_E_motorcycle" type="motorcycle" route="route_S_E" begin="0" end="600" vehsPerHour="36.000"/>
+    <flow id="flow_S_E_auto_rickshaw" type="auto_rickshaw" route="route_S_E" begin="0" end="600" vehsPerHour="9.600"/>
+    <flow id="flow_S_E_bus" type="bus" route="route_S_E" begin="0" end="600" vehsPerHour="4.800"/>
+    <flow id="flow_S_E_truck" type="truck" route="route_S_E" begin="0" end="600" vehsPerHour="3.600"/>
+
+    <flow id="flow_S_W_car" type="car" route="route_S_W" begin="0" end="600" vehsPerHour="66.000"/>
+    <flow id="flow_S_W_motorcycle" type="motorcycle" route="route_S_W" begin="0" end="600" vehsPerHour="36.000"/>
+    <flow id="flow_S_W_auto_rickshaw" type="auto_rickshaw" route="route_S_W" begin="0" end="600" vehsPerHour="9.600"/>
+    <flow id="flow_S_W_bus" type="bus" route="route_S_W" begin="0" end="600" vehsPerHour="4.800"/>
+    <flow id="flow_S_W_truck" type="truck" route="route_S_W" begin="0" end="600" vehsPerHour="3.600"/>
+
+    <!-- EAST: 240 / 120 / 120 -->
+    <flow id="flow_E_W_car" type="car" route="route_E_W" begin="0" end="600" vehsPerHour="132.000"/>
+    <flow id="flow_E_W_motorcycle" type="motorcycle" route="route_E_W" begin="0" end="600" vehsPerHour="72.000"/>
+    <flow id="flow_E_W_auto_rickshaw" type="auto_rickshaw" route="route_E_W" begin="0" end="600" vehsPerHour="19.200"/>
+    <flow id="flow_E_W_bus" type="bus" route="route_E_W" begin="0" end="600" vehsPerHour="9.600"/>
+    <flow id="flow_E_W_truck" type="truck" route="route_E_W" begin="0" end="600" vehsPerHour="7.200"/>
+
+    <flow id="flow_E_N_car" type="car" route="route_E_N" begin="0" end="600" vehsPerHour="66.000"/>
+    <flow id="flow_E_N_motorcycle" type="motorcycle" route="route_E_N" begin="0" end="600" vehsPerHour="36.000"/>
+    <flow id="flow_E_N_auto_rickshaw" type="auto_rickshaw" route="route_E_N" begin="0" end="600" vehsPerHour="9.600"/>
+    <flow id="flow_E_N_bus" type="bus" route="route_E_N" begin="0" end="600" vehsPerHour="4.800"/>
+    <flow id="flow_E_N_truck" type="truck" route="route_E_N" begin="0" end="600" vehsPerHour="3.600"/>
+
+    <flow id="flow_E_S_car" type="car" route="route_E_S" begin="0" end="600" vehsPerHour="66.000"/>
+    <flow id="flow_E_S_motorcycle" type="motorcycle" route="route_E_S" begin="0" end="600" vehsPerHour="36.000"/>
+    <flow id="flow_E_S_auto_rickshaw" type="auto_rickshaw" route="route_E_S" begin="0" end="600" vehsPerHour="9.600"/>
+    <flow id="flow_E_S_bus" type="bus" route="route_E_S" begin="0" end="600" vehsPerHour="4.800"/>
+    <flow id="flow_E_S_truck" type="truck" route="route_E_S" begin="0" end="600" vehsPerHour="3.600"/>
+
+    <!-- WEST: 240 / 120 / 120 -->
+    <flow id="flow_W_E_car" type="car" route="route_W_E" begin="0" end="600" vehsPerHour="132.000"/>
+    <flow id="flow_W_E_motorcycle" type="motorcycle" route="route_W_E" begin="0" end="600" vehsPerHour="72.000"/>
+    <flow id="flow_W_E_auto_rickshaw" type="auto_rickshaw" route="route_W_E" begin="0" end="600" vehsPerHour="19.200"/>
+    <flow id="flow_W_E_bus" type="bus" route="route_W_E" begin="0" end="600" vehsPerHour="9.600"/>
+    <flow id="flow_W_E_truck" type="truck" route="route_W_E" begin="0" end="600" vehsPerHour="7.200"/>
+
+    <flow id="flow_W_N_car" type="car" route="route_W_N" begin="0" end="600" vehsPerHour="66.000"/>
+    <flow id="flow_W_N_motorcycle" type="motorcycle" route="route_W_N" begin="0" end="600" vehsPerHour="36.000"/>
+    <flow id="flow_W_N_auto_rickshaw" type="auto_rickshaw" route="route_W_N" begin="0" end="600" vehsPerHour="9.600"/>
+    <flow id="flow_W_N_bus" type="bus" route="route_W_N" begin="0" end="600" vehsPerHour="4.800"/>
+    <flow id="flow_W_N_truck" type="truck" route="route_W_N" begin="0" end="600" vehsPerHour="3.600"/>
+
+    <flow id="flow_W_S_car" type="car" route="route_W_S" begin="0" end="600" vehsPerHour="66.000"/>
+    <flow id="flow_W_S_motorcycle" type="motorcycle" route="route_W_S" begin="0" end="600" vehsPerHour="36.000"/>
+    <flow id="flow_W_S_auto_rickshaw" type="auto_rickshaw" route="route_W_S" begin="0" end="600" vehsPerHour="9.600"/>
+    <flow id="flow_W_S_bus" type="bus" route="route_W_S" begin="0" end="600" vehsPerHour="4.800"/>
+    <flow id="flow_W_S_truck" type="truck" route="route_W_S" begin="0" end="600" vehsPerHour="3.600"/>
 </routes>
