@@ -72,7 +72,11 @@ Requirements: Python 3.10+, SUMO installed with `SUMO_HOME` set and on `PYTHONPA
 `requirements.txt`, UTF-16 encoded — the single dependency source; a stale, unreferenced
 `backend/requirements.txt` that incorrectly listed Flask was removed 2026-09-05).
 
-### Frontend (`frontend/` — React + Vite + TypeScript + Tailwind)
+### Frontend (`frontend/` — currently empty, awaiting a from-scratch rebuild; see "Known deviations")
+
+Once a new frontend exists, the commands below are expected to still apply (the
+backend's static-serving contract in `dashboard_server.py` — `frontend/dist`, `npm run build`
+— is unchanged):
 
 ```bash
 npm run dev        # dev server, proxies /api and /ws to the FastAPI backend
@@ -80,8 +84,10 @@ npm run build       # tsc -b && vite build -> frontend/dist, served by dashboard
 npm run lint        # oxlint
 ```
 
-The dashboard server serves `frontend/dist` if built, falling back to the legacy
-`frontend/dashboard.html` if not.
+The dashboard server serves `frontend/dist` if built, falling back to a plain
+"no frontend build found" placeholder if not (the legacy single-file
+`frontend/dashboard.html` this used to fall back to was removed when the React
+frontend replaced it; the dead fallback code path was cleaned up 2026-09-06).
 
 ## Key subsystems
 
@@ -184,9 +190,14 @@ unprompted, but do keep this section current if that changes:
   `traffic_adapter.py`, `scenario_manifest.py`, and `decision_engine.py` all independently
   hardcode the single-junction ("C") assumption. Confirmed to be a genuine cross-cutting
   redesign, not a bolt-on — the user has decided not to pursue it.
-- **Frontend is mid-rebuild and disliked.** The current React/Vite/Tailwind dashboard
-  (`frontend/`) is a placeholder the user wants scrapped and redesigned properly with real
-  design effort — don't invest in polishing the current UI without checking first.
+- **Frontend has been wiped, on purpose, awaiting a from-scratch rebuild.** After several
+  rejected design directions (a vanilla-JS dashboard, a first React rebuild, a neon-glow HUD
+  concept, a restrained Stripe/Linear/Vercel-inspired version, and a literal "drafting sheet"
+  design system — none satisfied the user), the user had `frontend/` emptied entirely
+  (2026-09-08) rather than iterate further on top of a direction they weren't happy with.
+  Only an empty `frontend/` directory (plus a `.gitkeep`) remains. The user will supply new
+  design direction before the next rebuild starts — don't scaffold a new frontend
+  unprompted.
 - No ESP32/physical hardware integration exists (the `firmware/` directory is empty) —
   the project is SUMO-simulation-only.
 - Database has 4 tables (see above), not the guide's originally-envisioned 8.

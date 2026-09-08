@@ -2,26 +2,7 @@
 dashboard_server.py
 ===================
 Read-only real-time dashboard backend: a FastAPI app that serves the
-single-page dashboard (frontend/dashboard.html) and pushes the latest
-LiveStateStore snapshot to every connected WebSocket client once per
-second.
-
-ARCHITECTURE RULE: this server is a pure VIEWER. It exposes no
-endpoints that could influence the simulation - there is no POST, no
-control socket, nothing. The only data source is LiveStateStore.latest(),
-written exclusively by the simulation side.
-
-RUNNING: never launched directly as a script. app.py (and optionally
-PerformanceEvaluator) call start_dashboard_server(), which runs uvicorn
-in a daemon thread inside the simulation process. One process, one
-store, zero IPC complexity.
-"""
-
-"""
-dashboard_server.py
-===================
-Read-only real-time dashboard backend: a FastAPI app that serves the
-dashboard frontend (frontend-v2's built static files) and pushes the
+dashboard frontend (frontend's built static files) and pushes the
 latest LiveStateStore snapshot to every connected WebSocket client once
 per second. It also exposes a handful of read-only history endpoints so
 the frontend's Logs & Insights and Performance pages can show data that
@@ -62,17 +43,12 @@ from services.live_state import LiveStateStore
 
 logger = logging.getLogger(__name__)
 
-# The new React dashboard's production build (frontend-v2/dist, built with
+# The React dashboard's production build (frontend/dist, built with
 # `npm run build`). During frontend development, run `npm run dev`
 # instead (it proxies /api and /ws to this server - see
-# frontend-v2/vite.config.ts) rather than relying on this static serve.
-_FRONTEND_DIST = os.path.join(Config.PROJECT_ROOT, "frontend-v2", "dist")
+# frontend/vite.config.ts) rather than relying on this static serve.
+_FRONTEND_DIST = os.path.join(Config.PROJECT_ROOT, "frontend", "dist")
 _FRONTEND_INDEX = os.path.join(_FRONTEND_DIST, "index.html")
-
-# Legacy single-file dashboard, kept only as a fallback so this module
-# still serves *something* human-readable if the React build hasn't
-# been produced yet in a given checkout.
-_LEGACY_FRONTEND_PATH = os.path.join(Config.PROJECT_ROOT, "frontend", "dashboard.html")
 
 # Push cadence for WebSocket clients. The store updates at 1 Hz; polling
 # slightly faster than that is harmless and keeps the countdown smooth.
@@ -315,12 +291,9 @@ def create_app(store: LiveStateStore, extra_router: Optional[APIRouter] = None) 
         if os.path.isfile(_FRONTEND_INDEX):
             with open(_FRONTEND_INDEX, "r", encoding="utf-8") as fh:
                 return HTMLResponse(fh.read())
-        if os.path.isfile(_LEGACY_FRONTEND_PATH):
-            with open(_LEGACY_FRONTEND_PATH, "r", encoding="utf-8") as fh:
-                return HTMLResponse(fh.read())
         return HTMLResponse(
             "<p>No frontend build found. Run <code>npm run build</code> "
-            "in frontend-v2/, or <code>npm run dev</code> for development "
+            "in frontend/, or <code>npm run dev</code> for development "
             "(it proxies to this server).</p>"
         )
 
