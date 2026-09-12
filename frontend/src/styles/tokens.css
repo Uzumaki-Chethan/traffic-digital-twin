@@ -1,0 +1,156 @@
+/*
+ * Trinetra design tokens — the single source of truth for colour, type,
+ * space and motion. Components never hard-code a hex or a px.
+ *
+ * Palette: the user's traffic-light idea — RED rail, AMBER ground, GREEN
+ * cards — at values that survive contrast and keep the signal encoding
+ * intact. The saturated signal colours were measured first and rejected
+ * as surfaces:
+ *     #22C55E card on #F0A81E page = 1.12:1  (cards invisible)
+ *     white on #E24B37 rail        = 3.97:1  (fails body text)
+ * Depth carries the hue instead of saturation, so the only fully
+ * saturated things on screen remain the signal lamps themselves.
+ *
+ * Measured, all passing:
+ *     cream on oxblood rail     12.3:1
+ *     ink on amber page         12.4:1
+ *     ink on green card         16.2:1
+ *     green card vs amber page   1.30:1 separation (plus border + shadow)
+ *     signal green as text on a green card 4.75:1
+ *
+ * Hard rule: --lamp-* and --signal-* appear ONLY where they mean a real
+ * signal or traffic state. Because the surfaces now live in the same
+ * three hue families, signal state ALWAYS carries a label and a position
+ * as well as a hue — never hue alone.
+ */
+
+:root {
+  /* AMBER — the ground. Traffic yellow, warmed slightly from #EFB700
+     which read too acid. Ink on it is 9.20:1. */
+  --surface-page: #f4b31d;
+
+  /* GREEN — the cards, now actually green rather than a white with a
+     hint. The ceiling here is set by the signal-GREEN chip text that has
+     to sit ON a card: at this value it clears 4.5 only because the green
+     text weight was deepened to #276708 (5.38:1). Push the card greener
+     than this and the "Go" chips stop being readable. */
+  --surface-plate: #d0ebbe;
+  --surface-inset: #badfa4;
+  --surface-hover: #aed89a;
+  --rule-soft: #bcdfa8;
+  --rule: #9fc98a;
+  --rule-strong: #7fae68;
+
+  /* Ink — warm near-black, never a cold grey */
+  --ink-strong: #241a10;
+  --ink: #3e3325;
+  --ink-mute: #4e4130;
+  --ink-faint: #4e4130;
+  --ink-on-dark: #fff8e7;
+
+  /* RED — the rail, status bar and footer. A deep member of the real
+     signal-red family (#E60000); the literal value only clears cream
+     text at 4.54:1, this clears it at 7.63:1. */
+  --chrome: #a50000;
+  --chrome-ink: #fff8e7;
+  --chrome-mute: #f2b9b4;
+  --chrome-rule: #c42020;
+
+  /* Accent: GREEN — every single-series chart (heatmap ramp, congestion
+     trend, peak periods, histogram, scatter) reads green. 4.94:1 on the
+     card, so it works as fill, stroke and text alike. */
+  --accent: #276708;
+  --accent-ink: #276708;
+  --accent-soft: #e2f2d6;
+
+  /* Chart series — only where several things must be told apart at once
+     (phase share, decision modes). Green leads; all verified >=3:1 as
+     fills on the card. */
+  --series-1: #276708;
+  --series-2: #7a5600;
+  --series-3: #a00000;
+  --series-4: #6b5a3e;
+
+  /* The junction plate keeps a real dark carriageway so signal colours
+     on it stay unmistakable against the pale card behind. */
+  --plate-ground: #badfa4;
+  --plate-road: #3e3428;
+  --plate-kerb: #7fae68;
+  --plate-lane: #6d7f5f;
+  --plate-marking: #f4fbf0;
+  --plate-vehicle: #f4fbf0;
+  --plate-fill-alpha: 0.34;
+
+  /* Signal — GRAPHIC weight (text, chips, stop bars). Darker members of
+     the real signal hues: the literal codes below are unreadable as text
+     on a pale card (#E60000 4.42, #EFB700 1.69, #4CBB17 2.29 — all under
+     4.5), so text uses these instead — deepened again when the cards
+     went properly green: 6.54 / 5.16 / 5.38:1 on #D0EBBE. */
+  --signal-red: #a00000;
+  --signal-amber: #7a5600;
+  --signal-green: #276708;
+
+  /* Lit lamps — the real traffic-signal colours, exactly as specified.
+     Amber is RAL 2009 Traffic Orange. Verified 3.55 / 4.25 / 6.85:1
+     inside the dark lamp housing. These
+     stay the most saturated thing on screen. */
+  --lamp-red: #e60000;
+  --lamp-amber: #efb700;
+  --lamp-green: #4cbb17;
+  --lamp-housing: #241a10;
+  --lamp-unlit: #4a3f31;
+
+  /* The top and bottom bars: one blended red -> amber -> green sweep in
+     three equal parts. The values are the signal hues lifted 30% toward
+     white, because at full saturation dark text on the red third is only
+     3.55:1; lifted, all three thirds clear 4.5 (4.69 / 11.12 / 8.97).
+     Everything on these bars is ink-strong — on a saturated ground even
+     a mid ink fails, so hierarchy there comes from size, not ink level. */
+  --bar-red: #ee4c4c;
+  --bar-amber: #f4cd4c;
+  --bar-green: #82cf5d;
+  --bar-grad: linear-gradient(
+    90deg,
+    var(--bar-red) 0%,
+    var(--bar-red) 16.66%,
+    var(--bar-amber) 50%,
+    var(--bar-green) 83.33%,
+    var(--bar-green) 100%
+  );
+  --bar-ink: #241a10;
+  --bar-rule: rgb(36 26 16 / 0.3);
+
+  /* Emergency — a light wash so it still punches against the red rail */
+  --alert: #b00000;
+  --alert-wash: #fde8e4;
+
+  /* Three type roles:
+       display  Orbitron — wordmark and panel titles only
+       ui       Barlow  — everything readable
+       num      JetBrains Mono — every live number, tabular */
+  --font-display: 'Orbitron', 'Barlow', ui-sans-serif, sans-serif;
+  --font-ui: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+  --font-num: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  /* Shape — rounded, lifted by contrast and a whisper of shadow. */
+  --r-panel: 10px;
+  --r-control: 6px;
+  --r-chip: 999px;
+  --shadow-panel: 0 1px 2px rgb(36 26 16 / 0.10), 0 4px 14px -6px rgb(36 26 16 / 0.18);
+
+  /* Space — 4px baseline */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+
+  /* Motion */
+  --dur-tick: 120ms;
+  --dur-fast: 180ms;
+  --dur-value: 300ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-mid: cubic-bezier(0.65, 0, 0.35, 1);
+}

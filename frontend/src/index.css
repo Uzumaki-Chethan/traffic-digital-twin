@@ -1,0 +1,187 @@
+@import 'tailwindcss';
+@import './styles/tokens.css';
+@import '@fontsource/orbitron/500.css';
+@import '@fontsource/orbitron/600.css';
+@import '@fontsource/orbitron/700.css';
+@import '@fontsource/barlow/400.css';
+@import '@fontsource/barlow/500.css';
+@import '@fontsource/barlow/600.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/600.css';
+
+/* Expose the runtime-switchable CSS variables to Tailwind utilities.
+   `@theme inline` keeps the var() reference instead of baking the value,
+   so `text-ink` follows data-theme at runtime. */
+@theme inline {
+  --color-page: var(--surface-page);
+  --color-plate: var(--surface-plate);
+  --color-inset: var(--surface-inset);
+  --color-hover: var(--surface-hover);
+  --color-rule-soft: var(--rule-soft);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-ink-strong: var(--ink-strong);
+  --color-ink: var(--ink);
+  --color-ink-mute: var(--ink-mute);
+  --color-ink-faint: var(--ink-faint);
+  --color-ink-on-dark: var(--ink-on-dark);
+  --color-chrome: var(--chrome);
+  --color-chrome-ink: var(--chrome-ink);
+  --color-chrome-mute: var(--chrome-mute);
+  --color-chrome-rule: var(--chrome-rule);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-series-3: var(--series-3);
+  --color-series-4: var(--series-4);
+  --color-signal-green: var(--signal-green);
+  --color-signal-amber: var(--signal-amber);
+  --color-signal-red: var(--signal-red);
+  --color-lamp-green: var(--lamp-green);
+  --color-lamp-amber: var(--lamp-amber);
+  --color-lamp-red: var(--lamp-red);
+  --color-lamp-housing: var(--lamp-housing);
+  --color-lamp-unlit: var(--lamp-unlit);
+  --color-alert: var(--alert);
+  --color-alert-wash: var(--alert-wash);
+
+  --font-ui: var(--font-ui);
+  --font-num: var(--font-num);
+  --font-display: var(--font-display);
+
+  --radius-panel: var(--r-panel);
+  --radius-control: var(--r-control);
+
+  --radius-none: 0px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--surface-page);
+  color: var(--ink-strong);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+/* Nothing on screen goes below 12px — it is read from across a room. */
+small {
+  font-size: 12px;
+}
+
+* {
+  border-color: var(--rule);
+  box-sizing: border-box;
+}
+
+/* Every live number: tabular, so digits never jitter on update. */
+.num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* Display face — wordmark and titles only. Orbitron is wide and geometric;
+   it needs weight, not tracking. */
+.display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Panel title. Titles are the only place caps appear. */
+.panel-title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.hatch-alert {
+  background-image: repeating-linear-gradient(45deg, var(--alert) 0 2px, transparent 2px 8px);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--rule);
+}
+
+/* The top and bottom bars, alive: the three colour stops drift back and
+   forth so the sweep breathes without ever changing composition — it
+   stays red -> amber -> green, and because all three values are the
+   lifted ones, near-black text clears 4.5:1 at every point in the drift.
+   `alternate` makes it seamless with no snap back. */
+@property --bar-shift {
+  syntax: '<percentage>';
+  initial-value: 0%;
+  inherits: false;
+}
+@keyframes bar-drift {
+  from {
+    --bar-shift: -11%;
+  }
+  to {
+    --bar-shift: 11%;
+  }
+}
+.bar-flow {
+  background-image: linear-gradient(
+    90deg,
+    var(--bar-red) calc(0% + var(--bar-shift)),
+    var(--bar-red) calc(16.66% + var(--bar-shift)),
+    var(--bar-amber) calc(50% + var(--bar-shift)),
+    var(--bar-green) calc(83.33% + var(--bar-shift)),
+    var(--bar-green) calc(100% + var(--bar-shift))
+  );
+  animation: bar-drift 15s linear infinite alternate;
+}
+
+/* The amber lamp is the only thing allowed to pulse. */
+@keyframes amber-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.62;
+  }
+}
+.amber-breathe {
+  animation: amber-breathe 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .amber-breathe,
+  .bar-flow {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.001ms !important;
+  }
+}

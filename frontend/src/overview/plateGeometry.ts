@@ -1,0 +1,96 @@
+/**
+ * Junction plate geometry — verified against the compiled network
+ * (sumo/network/intersection.net.xml, lefthand="true"):
+ *
+ *   N_in lanes x = 201.6 / 204.8 / 208.0  -> east of centre, kerb (N_in_0) easternmost
+ *   S_in lanes x = 192.0 / 195.2 / 198.4  -> west of centre,  kerb (S_in_0) westernmost
+ *   W_in lanes y = 201.6 / 204.8 / 208.0  -> north of centre, kerb (W_in_0) northernmost
+ *   E_in lanes y = 192.0 / 195.2 / 198.4  -> south of centre, kerb (E_in_0) southernmost
+ *
+ * i.e. every inbound carriageway sits on the driver's LEFT (keep-left),
+ * lane 0 = kerb = left turn, lane 1 = straight, lane 2 = median = right
+ * turn (intersection.con.xml). SUMO's y axis points north; the SVG's
+ * points down, so N is the top of the drawing.
+ *
+ * Canvas 920×540, centre (460,270). 6 lanes × 36 = 216 wide corridors.
+ */
+
+export const W = 920
+export const H = 540
+export const CX = 460
+export const CY = 270
+export const LANE = 36
+export const HALF = 108 // corridor half-width
+export const BOX = { x: CX - HALF, y: CY - HALF, w: 2 * HALF, h: 2 * HALF } // 352,162 216×216
+export const KERB_R = 28
+
+export type Axis = 'v' | 'h'
+export interface LaneGeom {
+  id: string
+  approach: 'N' | 'S' | 'E' | 'W'
+  axis: Axis
+  /** perpendicular extent of the lane */
+  lo: number
+  hi: number
+  /** along-axis: arm outer edge -> stop bar */
+  outer: number
+  stop: number
+  /** direction of travel along the axis: +1 toward increasing coord */
+  dir: 1 | -1
+}
+
+// Stop bars sit at the outer edge of an 8-unit pedestrian crossing that
+// hugs the junction box (crossing band: 144–152 N, 388–396 S, 334–342 W,
+// 578–586 E).
+const STOP_N = BOX.y - 18 // 144
+const STOP_S = BOX.y + BOX.h + 18 // 396
+const STOP_W = BOX.x - 18 // 334
+const STOP_E = BOX.x + BOX.w + 18 // 586
+export const CROSSING = 8
+
+export const LANES: LaneGeom[] = [
+  // North approach, inbound southbound, east of median (x 460–568)
+  { id: 'N_in_2', approach: 'N', axis: 'v', lo: 460, hi: 496, outer: 0, stop: STOP_N, dir: 1 },
+  { id: 'N_in_1', approach: 'N', axis: 'v', lo: 496, hi: 532, outer: 0, stop: STOP_N, dir: 1 },
+  { id: 'N_in_0', approach: 'N', axis: 'v', lo: 532, hi: 568, outer: 0, stop: STOP_N, dir: 1 },
+  // South approach, inbound northbound, west of median (x 352–460)
+  { id: 'S_in_0', approach: 'S', axis: 'v', lo: 352, hi: 388, outer: H, stop: STOP_S, dir: -1 },
+  { id: 'S_in_1', approach: 'S', axis: 'v', lo: 388, hi: 424, outer: H, stop: STOP_S, dir: -1 },
+  { id: 'S_in_2', approach: 'S', axis: 'v', lo: 424, hi: 460, outer: H, stop: STOP_S, dir: -1 },
+  // West approach, inbound eastbound, north of median (y 162–270)
+  { id: 'W_in_0', approach: 'W', axis: 'h', lo: 162, hi: 198, outer: 0, stop: STOP_W, dir: 1 },
+  { id: 'W_in_1', approach: 'W', axis: 'h', lo: 198, hi: 234, outer: 0, stop: STOP_W, dir: 1 },
+  { id: 'W_in_2', approach: 'W', axis: 'h', lo: 234, hi: 270, outer: 0, stop: STOP_W, dir: 1 },
+  // East approach, inbound westbound, south of median (y 270–378)
+  { id: 'E_in_2', approach: 'E', axis: 'h', lo: 270, hi: 306, outer: W, stop: STOP_E, dir: -1 },
+  { id: 'E_in_1', approach: 'E', axis: 'h', lo: 306, hi: 342, outer: W, stop: STOP_E, dir: -1 },
+  { id: 'E_in_0', approach: 'E', axis: 'h', lo: 342, hi: 378, outer: W, stop: STOP_E, dir: -1 },
+]
+
+export const LANE_BY_ID: Record<string, LaneGeom> = Object.fromEntries(LANES.map((l) => [l.id, l]))
+
+/** Pavement movement arrows, keep-left (ported from the verified export).
+ * Each is a path in canvas coords ending in an arrowhead marker. */
+export const ARROWS: Record<string, string> = {
+  N_in_0: 'M 550 60 L 550 48 Q 550 40 542 40 L 536 40',
+  N_in_1: 'M 514 60 L 514 36',
+  N_in_2: 'M 478 60 L 478 48 Q 478 40 486 40 L 492 40',
+  S_in_0: 'M 370 480 L 370 492 Q 370 500 378 500 L 384 500',
+  S_in_1: 'M 406 480 L 406 504',
+  S_in_2: 'M 442 480 L 442 492 Q 442 500 434 500 L 428 500',
+  W_in_0: 'M 120 180 L 132 180 Q 140 180 140 172 L 140 166',
+  W_in_1: 'M 120 216 L 144 216',
+  W_in_2: 'M 120 252 L 132 252 Q 140 252 140 260 L 140 266',
+  E_in_2: 'M 800 288 L 788 288 Q 780 288 780 280 L 780 274',
+  E_in_1: 'M 800 324 L 776 324',
+  E_in_0: 'M 800 360 L 788 360 Q 780 360 780 368 L 780 374',
+}
+
+/** Where the lane-ID label sits, near the outer end of each lane. */
+export function labelPos(l: LaneGeom): { x: number; y: number; rotate: number } {
+  const mid = (l.lo + l.hi) / 2
+  if (l.axis === 'v') {
+    return { x: mid, y: l.approach === 'N' ? 14 : H - 8, rotate: 0 }
+  }
+  return { x: l.approach === 'W' ? 6 : W - 6, y: mid + 3, rotate: 0 }
+}
