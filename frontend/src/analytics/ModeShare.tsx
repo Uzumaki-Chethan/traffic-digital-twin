@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
-import type { DecisionLogRow } from '@/data/api'
+import type { DecisionSample } from './series'
 import { DECISION_MODES } from '@/data/types'
 import { Panel } from '@/ui/Panel'
+import { motion } from 'framer-motion'
 import { modeMeta } from '@/utils/signal'
 
 /**
@@ -38,7 +39,7 @@ function colourFor(mode: string): string {
   }
 }
 
-export function ModeShare({ rows }: { rows: DecisionLogRow[] }) {
+export function ModeShare({ rows }: { rows: DecisionSample[] }) {
   // counts and arc geometry in one memo, before any early return, so the
   // hook order is unconditional and the running offset never escapes it.
   const { counts, total, arcs } = useMemo(() => {
@@ -61,7 +62,7 @@ export function ModeShare({ rows }: { rows: DecisionLogRow[] }) {
   if (total === 0) {
     return (
       <Panel title="Decision modes">
-        <div className="py-6 text-center text-[13px] text-ink-mute">No decisions recorded yet.</div>
+        <div className="py-6 text-center text-[13px] text-ink-mute">Waiting for the first decision.</div>
       </Panel>
     )
   }
@@ -72,7 +73,7 @@ export function ModeShare({ rows }: { rows: DecisionLogRow[] }) {
         <svg width="128" height="128" viewBox="0 0 128 128" className="shrink-0" role="img" aria-label="Share of decisions by mode">
           <circle cx="64" cy="64" r={R} fill="none" stroke="var(--surface-inset)" strokeWidth={STROKE} />
           {arcs.map((a) => (
-            <circle
+            <motion.circle
               key={a.mode}
               cx="64"
               cy="64"
@@ -80,12 +81,14 @@ export function ModeShare({ rows }: { rows: DecisionLogRow[] }) {
               fill="none"
               stroke={colourFor(a.mode)}
               strokeWidth={STROKE}
-              strokeDasharray={`${a.dash} ${C - a.dash}`}
               strokeDashoffset={-a.offset}
               transform="rotate(-90 64 64)"
+              initial={{ strokeDasharray: `0 ${C}` }}
+              animate={{ strokeDasharray: `${a.dash} ${C - a.dash}` }}
+              transition={{ duration: 0.7, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
             >
               <title>{`${modeMeta(a.mode).label}: ${counts[a.mode]} (${Math.round(a.frac * 100)}%)`}</title>
-            </circle>
+            </motion.circle>
           ))}
         </svg>
 

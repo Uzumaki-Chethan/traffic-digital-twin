@@ -182,7 +182,7 @@ class FeatureEngineer:
             for lane_id, char in signal.lane_states.items()
         }
         return SignalFeatures(
-            seconds_until_next_switch=signal.seconds_until_next_switch,
+            seconds_in_current_phase=signal.seconds_in_current_phase,
             lane_signal_states=MappingProxyType(lane_signal_states),
         )
 

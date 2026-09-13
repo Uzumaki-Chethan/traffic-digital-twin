@@ -40,18 +40,48 @@
     compensate for losing their permissive supplement.
 
     Cycle length: 30+3+12+3+30+3+12+3 = 96 seconds.
+
+    LEFT-TURN POLICY (changed 2026-09-13, deliberately)
+    ----------------------------------------------------
+    All four left turns previously ran in BOTH main phases, which the
+    network's own conflict matrix permits: every left turn really does
+    have an empty foe list and yields to nothing (verified by decoding
+    the <request> block, not by trusting this comment).
+
+    That permission rests entirely on PERFECT LANE DISCIPLINE. Each of
+    the twelve movements is channelized into its own dedicated outbound
+    lane - N-left lands in C_out_E lane 0 while W-straight lands in
+    C_out_E lane 1 - so on paper they never touch. Real traffic of the
+    kind this project models does not hold lane that precisely, and a
+    left-turner crossing in front of a moving through-stream on the
+    strength of a lane marking is exactly the conflict that assumption
+    hides.
+
+    So each left turn is now protected, running only in its own
+    approach's phase. This costs left-turn capacity (roughly 60s of
+    green per 96s cycle down to 30s) and is a deliberate trade of
+    throughput for a safety margin that does not depend on discipline.
+
+    Anything downstream that encoded the old shared-left structure was
+    updated with it: decision_engine._PHASE_EXCLUSIVE_LANES, the
+    left-turn scoring bonus, and emergency phase selection.
+
+    NOTE: this file is a netconvert SOURCE and is NOT loaded at run
+    time - intersection.sumocfg loads the compiled
+    intersection.net.xml, which carries its own copy of this
+    program. Both were changed together; change both or neither.
 -->
 <additional>
     <tlLogic id="C" type="static" programID="0" offset="0">
 
         <!-- Phase 1: North plus South, straight and left, protected.
-             Green set: S-left, S-straight, E-left, N-left, N-straight,
-             W-left. Verified conflict-free above, all four lefts have no
-             foes, and neither S-straight nor N-straight lists any other
-             member of this set as a foe. -->
-        <phase duration="30" state="GGrGrrGGrGrr"/>
+             Green set: S-left, S-straight, N-left, N-straight.
+             CHANGED 2026-09-13, see the LEFT-TURN POLICY note at the top
+             of this file: E-left and W-left used to run here too and no
+             longer do. -->
+        <phase duration="30" state="GGrrrrGGrrrr"/>
         <!-- Phase 1 yellow clearance -->
-        <phase duration="3"  state="yyryrryyryrr"/>
+        <phase duration="3"  state="yyrrrryyrrrr"/>
 
         <!-- Phase 3: North and South right turns only, fully protected.
              Green set: S-right, N-right. Verified conflict-free above,
@@ -61,12 +91,12 @@
         <phase duration="3"  state="rryrrrrryrrr"/>
 
         <!-- Phase 5: East plus West, straight and left, protected.
-             Green set: E-left, E-straight, N-left, W-left, W-straight,
-             S-left. Verified conflict-free above by the same reasoning
-             as Phase 1, mirrored. -->
-        <phase duration="30" state="GrrGGrGrrGGr"/>
+             Green set: E-left, E-straight, W-left, W-straight.
+             CHANGED 2026-09-13 as Phase 1 above, mirrored: S-left and
+             N-left used to run here too and no longer do. -->
+        <phase duration="30" state="rrrGGrrrrGGr"/>
         <!-- Phase 5 yellow clearance -->
-        <phase duration="3"  state="yrryyryrryyr"/>
+        <phase duration="3"  state="rrryyrrrryyr"/>
 
         <!-- Phase 7: East and West right turns only, fully protected.
              Green set: E-right, W-right. Verified conflict-free above,

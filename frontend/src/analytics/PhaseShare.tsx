@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
-import type { DecisionLogRow } from '@/data/api'
+import type { DecisionSample } from './series'
 import { PHASE_NAMES } from '@/data/types'
 import { Panel } from '@/ui/Panel'
+import { motion } from 'framer-motion'
 import { phaseLabel } from '@/utils/signal'
 
 const SERIES = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)']
@@ -11,7 +12,7 @@ const SERIES = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--
  * — a share-of-whole read that a donut would make harder to compare
  * across four near-equal parts.
  */
-export function PhaseShare({ rows }: { rows: DecisionLogRow[] }) {
+export function PhaseShare({ rows }: { rows: DecisionSample[] }) {
   const { counts, total } = useMemo(() => {
     const c: Record<string, number> = {}
     for (const p of PHASE_NAMES) c[p] = 0
@@ -22,7 +23,7 @@ export function PhaseShare({ rows }: { rows: DecisionLogRow[] }) {
   if (total === 0) {
     return (
       <Panel title="Phase share">
-        <div className="py-6 text-center text-[13px] text-ink-mute">No decisions recorded yet.</div>
+        <div className="py-6 text-center text-[13px] text-ink-mute">Waiting for the first decision.</div>
       </Panel>
     )
   }
@@ -34,14 +35,17 @@ export function PhaseShare({ rows }: { rows: DecisionLogRow[] }) {
           const pct = (counts[p] / total) * 100
           if (pct === 0) return null
           return (
-            <div
+            <motion.div
               key={p}
-              className="flex items-center justify-center"
-              style={{ width: `${pct}%`, background: SERIES[i] }}
+              className="flex items-center justify-center overflow-hidden"
+              style={{ background: SERIES[i] }}
+              initial={{ width: 0 }}
+              animate={{ width: `${pct}%` }}
+              transition={{ duration: 0.6, delay: 0.3 + i * 0.08, ease: [0.16, 1, 0.3, 1] }}
               title={`${phaseLabel(p)}: ${counts[p]} (${pct.toFixed(1)}%)`}
             >
               {pct > 12 && <span className="num text-[12px] text-ink-strong">{pct.toFixed(0)}%</span>}
-            </div>
+            </motion.div>
           )
         })}
       </div>

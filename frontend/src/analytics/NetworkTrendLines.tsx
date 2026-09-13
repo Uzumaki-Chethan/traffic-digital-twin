@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { PerformanceLogRow } from '@/data/api'
+import type { NetworkSample } from './series'
 import { Panel } from '@/ui/Panel'
 import { f1 } from '@/utils/format'
 
@@ -30,14 +30,15 @@ const SERIES: Series[] = [
   { label: 'Queue length', unit: 'veh', key: 'queue_length', colour: 'var(--series-1)' },
 ]
 
-export function NetworkTrendLines({ rows }: { rows: PerformanceLogRow[] }) {
-  // The endpoint returns newest-first; a time plot needs oldest-first.
+export function NetworkTrendLines({ rows }: { rows: NetworkSample[] }) {
+  // Already in tick order off the live stream, but sorted defensively:
+  // a time plot drawn out of order is a scribble, not a wrong number.
   const data = useMemo(() => [...rows].toSorted((a, b) => a.time - b.time), [rows])
 
   if (data.length < 2) {
     return (
       <Panel title="Network over time">
-        <div className="py-6 text-center text-[13px] text-ink-mute">Not enough recorded samples yet.</div>
+        <div className="py-6 text-center text-[13px] text-ink-mute">Waiting for a second tick.</div>
       </Panel>
     )
   }
@@ -47,7 +48,7 @@ export function NetworkTrendLines({ rows }: { rows: PerformanceLogRow[] }) {
   const tSpan = Math.max(1e-6, t1 - t0)
 
   return (
-    <Panel title="Network over time" meta={`${data.length.toLocaleString()} samples · ${Math.round(tSpan)}s`}>
+    <Panel title="Network over time" meta={`${data.length.toLocaleString()} points · ${Math.round(tSpan)}s`}>
       {SERIES.map((s) => {
         const vals = data.map((r) => r[s.key])
         const max = Math.max(...vals, 0)

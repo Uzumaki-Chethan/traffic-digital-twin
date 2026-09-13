@@ -80,6 +80,9 @@ class TraCIManager:
         """
         sumo_binary = self._config.get_sumo_binary()
         sumo_cmd = [sumo_binary, "-c", self._config.SUMOCFG_PATH]
+        # Still "no path or binary name constructed here" - these come
+        # from Config too (empty by default); see Config.SUMO_EXTRA_ARGS.
+        sumo_cmd.extend(getattr(self._config, "SUMO_EXTRA_ARGS", None) or [])
 
         logger.info("Starting SUMO...")
         # numRetries is raised above traci's default (10): on Windows the
@@ -101,7 +104,7 @@ class TraCIManager:
         self._connected = True
         logger.info("Connected to TraCI (label=%s)", effective_label)
 
-    def run(self, callback=None):
+    def run(self, callback=None, control=None):
         """
         Step the simulation until completion. Optionally invoke a callback
         after every simulation step.
@@ -110,6 +113,10 @@ class TraCIManager:
         ----------
         callback : Callable | None
             Function executed after each successful simulation step.
+        control : services.run_control.RunControl | None
+            Optional pause/stop/speed state, checked once per step. Omitted
+            (the default) the loop behaves exactly as it always has, so the
+            evaluator's own lockstep runs are untouched by this.
         """
         if not self._connected:
             raise RuntimeError(
@@ -123,12 +130,53 @@ class TraCIManager:
         # connection for the classic single-simulation app.py path.
         conn = self._connection if self._connection is not None else traci
 
+        # Asked once, before the loop, purely so control.pace() can budget
+        # a step without a TraCI round trip of its own every 0.05s.
+        step_seconds = None
+        if control is not None:
+            try:
+                step_seconds = conn.simulation.getDeltaT()
+            except Exception:
+                # Pacing is a comfort feature; a SUMO build that will not
+                # report its step length must not stop the run.
+                logger.debug("Could not read the simulation step length; "
+                             "running unpaced.", exc_info=True)
+
         try:
             while conn.simulation.getMinExpectedNumber() > 0:
+                if control is not None:
+                    # Park here while paused; returns at once when running.
+                    control.wait_if_paused()
+                    if control.handover_requested:
+                        # Save where we are so the very same simulation can
+                        # be reopened in sumo-gui. If the save fails there
+                        # is nothing to reopen, so cancel and carry on
+                        # headless rather than ending the run for nothing.
+                        try:
+                            conn.simulation.saveState(control.handover_path)
+                        except Exception:
+                            logger.exception(
+                                "Could not save simulation state; continuing headless."
+                            )
+                            control.cancel_handover()
+                        else:
+                            logger.info("Saved state for GUI handover: %s",
+                                        control.handover_path)
+                            break
+                    if control.stop_requested:
+                        logger.info("Stop requested from the dashboard. Ending run.")
+                        break
+
                 conn.simulationStep()
 
                 if callback:
                     callback()
+
+                # After the callback, so the decision tick's own cost is
+                # spent out of this step's real-time budget rather than
+                # added on top of it.
+                if step_seconds:
+                    control.pace(step_seconds)
 
             logger.info("Simulation finished")
 

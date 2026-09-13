@@ -274,6 +274,8 @@ class PerformanceEvaluator:
                     state,
                     departed_vehicle_ids=adapter.get_departed_vehicle_ids(),
                     arrived_vehicle_ids=adapter.get_arrived_vehicle_ids(),
+                    stop_starting_vehicle_ids=adapter.get_stop_starting_vehicle_ids(),
+                    stop_ending_vehicle_ids=adapter.get_stop_ending_vehicle_ids(),
                 )
                 return state
 

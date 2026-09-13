@@ -1,12 +1,16 @@
 import { Route, Routes } from 'react-router-dom'
 import { Shell } from '@/layout/Shell'
 import { useSocket } from '@/data/useSocket'
+import { useRunStatePoll } from '@/data/runState'
 import { OverviewPage } from '@/pages/OverviewPage'
 import { AnalyticsPage } from '@/pages/AnalyticsPage'
 import { NotBuiltPage } from '@/pages/NotBuiltPage'
 
 export default function App() {
   useSocket()
+  // One poll for the whole app: the top bar and the Analytics empty
+  // state both need to know what this backend will let them do.
+  useRunStatePoll()
   return (
     <Shell>
       <Routes>

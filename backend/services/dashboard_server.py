@@ -16,10 +16,21 @@ from the SQLite log tables db_logger.py already writes, or from CSV
 files performance/evaluator.py already writes to results/. Nothing here
 opens a write connection to the database or spawns a process.
 
-RUNNING: never launched directly as a script. app.py (and optionally
-PerformanceEvaluator) call start_dashboard_server(), which runs uvicorn
-in a daemon thread inside the simulation process. One process, one
-store, zero IPC complexity.
+RUNNING: never launched directly as a script - this module has no main()
+and takes no view on process lifetime. Two callers build it:
+
+  app.py / PerformanceEvaluator  start_dashboard_server(), which runs
+    uvicorn in a daemon thread inside the simulation process. One
+    process, one store, zero IPC complexity; the server dies with the
+    run, which is why every page went 502 when SUMO closed.
+  server.py                      create_app() directly, served in the
+    foreground by a process that OUTLIVES any simulation and can start
+    one on request (services/sim_supervisor.py).
+
+Both get the identical read-only app. The control endpoints are not
+here in either case; they are injected as `extra_router` and live in
+services/control_routes.py, so the rule above stays a property of this
+file rather than a promise about it.
 """
 
 import asyncio

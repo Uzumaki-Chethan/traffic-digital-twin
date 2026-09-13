@@ -5,6 +5,8 @@ import { useLiveClock } from '@/data/useLiveClock'
 import { clock } from '@/utils/format'
 import { APPROACH_NAME, modeMeta } from '@/utils/signal'
 import { approachOf } from '@/data/types'
+import { useRunStore } from '@/data/runState'
+import { RunControls } from './RunControls'
 
 /**
  * Persistent status bar, drawn as one blended red -> amber -> green sweep
@@ -22,10 +24,18 @@ export function StatusBar() {
   const lastLive = useSim((s) => s.lastLive)
   const link = useSim((s) => s.link)
   const { simTime, staleSeconds, tickAge, rate } = useLiveClock()
+  const run = useRunStore((s) => s.state)
 
   const live = isLive(latest) ? latest : lastLive
   const linkLost = link !== 'open' || staleSeconds > 3
-  const paused = !linkLost && live !== null && tickAge > 3
+  // The backend knows whether it is paused; ask it. The tick-age
+  // heuristic is only the fallback for a backend with no control layer
+  // (the evaluator's own dashboard), where nothing can answer.
+  const paused =
+    run?.available === true
+      ? run.paused
+      : !linkLost && live !== null && tickAge > 3
+  const ended = run?.available === true && !run.running
   const emergency = live?.emergency_lanes ?? []
   const mode = modeMeta(live?.decision.mode)
 
@@ -37,9 +47,7 @@ export function StatusBar() {
       <div className="flex items-center gap-3">
         <div>
           <div className="display text-[15px]">Adaptive signal control</div>
-          <div className="text-[12px]">
-            Single 4-way intersection · <span className="num">SUMO node C</span> · keep-left
-          </div>
+          <div className="text-[12px]">Four approaches · three lanes each · one signalised junction</div>
         </div>
         {live && mode.loud && (
           <>
@@ -61,11 +69,15 @@ export function StatusBar() {
           </div>
         )}
 
+        <RunControls />
+
         <div className="text-right">
           {live === null ? (
-            <div className="text-[13px]">Waiting for simulation</div>
+            <div className="text-[13px]">{ended ? 'No simulation running' : 'Waiting for simulation'}</div>
           ) : paused ? (
             <div className="text-[14px] font-semibold">Simulation paused</div>
+          ) : ended ? (
+            <div className="text-[14px] font-semibold">Run ended</div>
           ) : (
             <>
               <div className="num text-[16px] font-semibold leading-none">{simTime == null ? '--:--:--' : clock(simTime)}</div>
@@ -88,7 +100,11 @@ export function StatusBar() {
           <span
             className={clsx(
               'h-2.5 w-2.5 rounded-full ring-1 ring-[var(--bar-rule)]',
-              link === 'open' && !linkLost && !paused ? 'bg-lamp-green' : paused ? 'bg-lamp-amber' : 'bg-[var(--bar-ink)]',
+              link === 'open' && !linkLost && !paused && !ended
+                ? 'bg-lamp-green'
+                : paused || ended
+                  ? 'bg-lamp-amber'
+                  : 'bg-[var(--bar-ink)]',
             )}
           />
           <span>
@@ -96,11 +112,13 @@ export function StatusBar() {
               ? 'Connecting'
               : link === 'closed'
                 ? `Link lost — last update ${Math.round(staleSeconds)} s ago`
-                : linkLost
-                  ? `No data for ${Math.round(staleSeconds)} s`
-                  : paused
-                    ? 'Paused'
-                    : 'Live'}
+                : ended
+                  ? 'Idle'
+                  : linkLost
+                    ? `No data for ${Math.round(staleSeconds)} s`
+                    : paused
+                      ? 'Paused'
+                      : 'Live'}
           </span>
         </div>
       </div>

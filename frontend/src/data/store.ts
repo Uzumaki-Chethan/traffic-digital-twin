@@ -22,6 +22,14 @@ interface SimState {
   /** sim_time and wall time of the last frame where sim_time changed. */
   tickSim: number
   tickAt: number
+  /**
+   * Wall milliseconds between the last two real sim ticks. Vehicle
+   * positions only arrive once per tick, so anything animating them has
+   * to stretch the move across exactly this long — otherwise it jumps
+   * and then sits still, which is what "laggy, frame by frame" looks
+   * like. Clamped to keep a stalled sim from producing an absurd value.
+   */
+  tickInterval: number
   /** Lane under the pointer, on the plate or in the table — cross-highlight. */
   hoverLane: string | null
   setLink: (l: LinkState) => void
@@ -37,6 +45,7 @@ export const useSim = create<SimState>((set) => ({
   rate: null,
   tickSim: 0,
   tickAt: 0,
+  tickInterval: 1000,
   hoverLane: null,
   setLink: (link) => set({ link }),
   setHoverLane: (hoverLane) => set({ hoverLane }),
@@ -45,17 +54,20 @@ export const useSim = create<SimState>((set) => ({
       const now = performance.now()
       if (!isLive(snapshot)) return { latest: snapshot, receivedAt: now }
 
-      let { rate, tickSim, tickAt } = prev
+      let { rate, tickSim, tickAt, tickInterval } = prev
       if (snapshot.sim_time !== tickSim) {
-        const dWall = (now - tickAt) / 1000
+        const dWallMs = now - tickAt
+        const dWall = dWallMs / 1000
         const dSim = snapshot.sim_time - tickSim
         if (tickAt > 0 && dWall > 0.05 && dSim > 0 && dSim < 60) {
           const r = dSim / dWall
           rate = rate == null ? r : rate * 0.7 + r * 0.3
+          // Smoothed, and clamped to a sane animation window.
+          tickInterval = Math.max(120, Math.min(2000, tickInterval * 0.6 + dWallMs * 0.4))
         }
         tickSim = snapshot.sim_time
         tickAt = now
       }
-      return { latest: snapshot, receivedAt: now, lastLive: snapshot, rate, tickSim, tickAt }
+      return { latest: snapshot, receivedAt: now, lastLive: snapshot, rate, tickSim, tickAt, tickInterval }
     }),
 }))

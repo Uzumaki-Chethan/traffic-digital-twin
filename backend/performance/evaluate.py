@@ -150,6 +150,8 @@ def run_single(scenario_name: str, controller_name: str, predictor) -> dict:
                 state,
                 departed_vehicle_ids=adapter.get_departed_vehicle_ids(),
                 arrived_vehicle_ids=adapter.get_arrived_vehicle_ids(),
+                stop_starting_vehicle_ids=adapter.get_stop_starting_vehicle_ids(),
+                stop_ending_vehicle_ids=adapter.get_stop_ending_vehicle_ids(),
             )
 
             is_first_tick = last_decision_time[0] is None

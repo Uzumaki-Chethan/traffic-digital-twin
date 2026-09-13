@@ -1,19 +1,20 @@
 import { useMemo } from 'react'
-import type { CongestionBucket } from '@/data/api'
+import type { Bucket } from './series'
 import { Panel } from '@/ui/Panel'
+import { GrowBar } from '@/ui/Reveal'
 
 /**
- * Network congestion by simulated-time bucket, drawn as a column plot
- * against one shared scale. Hand-rolled SVG — no chart library for
- * eleven columns.
+ * Network congestion by simulated-time bucket for this run, drawn as a
+ * column plot against one shared scale. Hand-rolled SVG — no chart
+ * library for a dozen columns.
  */
-export function CongestionTrend({ buckets }: { buckets: CongestionBucket[] }) {
+export function CongestionTrend({ buckets }: { buckets: Bucket[] }) {
   const max = useMemo(() => buckets.reduce((m, b) => Math.max(m, b.avg_congestion_score), 0), [buckets])
 
   if (buckets.length === 0) {
     return (
       <Panel title="Congestion trend">
-        <div className="py-6 text-center text-[13px] text-ink-mute">No recorded history yet.</div>
+        <div className="py-6 text-center text-[13px] text-ink-mute">Waiting for the first tick.</div>
       </Panel>
     )
   }
@@ -31,9 +32,12 @@ export function CongestionTrend({ buckets }: { buckets: CongestionBucket[] }) {
               className="group flex h-full flex-1 flex-col justify-end"
               title={`${b.bucket_start}–${b.bucket_end}s · congestion ${b.avg_congestion_score.toFixed(4)} · ${b.sample_count.toLocaleString()} samples`}
             >
-              <div
-                className="w-full rounded-t-[3px] bg-accent transition-[height]"
-                style={{ height: `${Math.max(2, h)}%`, opacity: 0.85 }}
+              <GrowBar
+                vertical
+                fraction={Math.max(0.02, h / 100)}
+                delay={0.25}
+                className="w-full rounded-t-[3px] bg-accent"
+                style={{ opacity: 0.85 }}
               />
             </div>
           )

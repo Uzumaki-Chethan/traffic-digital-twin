@@ -129,10 +129,15 @@ class SignalFeatures:
 
     Attributes
     ----------
-    seconds_until_next_switch : float
-        Seconds remaining until the signal's current phase ends. A
-        network-wide quantity, this junction has a single shared
-        tlLogic clock, not an independent one per lane.
+    seconds_in_current_phase : float
+        Seconds the current phase has been showing. A network-wide
+        quantity, this junction has a single shared tlLogic clock, not
+        an independent one per lane. Replaced seconds_until_next_switch
+        on 2026-09-13: a countdown is only meaningful under a fixed
+        program, whereas elapsed time in the phase means the same thing
+        under the static program the training data is recorded with and
+        under the adaptive controller the model serves at run time. See
+        ml/feature_schema.NETWORK_FEATURE_NAMES.
     lane_signal_states : Mapping[str, int]
         Per-lane current signal color, keyed by lane_id, as an ordinal:
         0 = red, 1 = yellow, 2 = green. An ordinal rather than three
@@ -142,7 +147,7 @@ class SignalFeatures:
         read-only mapping (backed by types.MappingProxyType).
     """
 
-    seconds_until_next_switch: float
+    seconds_in_current_phase: float
     lane_signal_states: Mapping[str, int]
 
 

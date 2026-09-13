@@ -77,6 +77,7 @@ prediction.
 """
 
 import logging
+import json
 import os
 from types import MappingProxyType
 from typing import Any
@@ -88,7 +89,10 @@ from ml.feature_schema import (
     EXPECTED_LANE_IDS,
     FEATURE_VECTOR_LENGTH,
     PREDICTION_HORIZON_SECONDS,
+    TARGET_MODE_ABSOLUTE,
+    TARGET_MODE_RESIDUAL,
     TARGET_VECTOR_LENGTH,
+    current_values_as_target_vector,
     features_to_vector,
     lane_output_index,
 )
@@ -107,7 +111,13 @@ class MLPredictor:
     validates a model from disk, the normal production path.
     """
 
-    def __init__(self, model: Any, confidence_calibrators: Any = None, target_weights: Any = None):
+    def __init__(
+        self,
+        model: Any,
+        confidence_calibrators: Any = None,
+        target_weights: Any = None,
+        target_mode: str = TARGET_MODE_ABSOLUTE,
+    ):
         """
         Parameters
         ----------
@@ -148,12 +158,33 @@ class MLPredictor:
             would dilute the informative one for no reason. Falls back
             to an equal 50/50 split (the original, pre-calibration
             behaviour) when not provided.
+        target_mode : str
+            feature_schema.TARGET_MODE_ABSOLUTE (the model's output IS
+            the prediction) or TARGET_MODE_RESIDUAL (the model's output
+            is the CHANGE over the horizon; this class adds the current
+            value of the same field on the same lane back and clips at
+            zero). from_path() reads this from the model's own metadata
+            file so a model and its interpretation travel together; the
+            default here is absolute only so that a model with no
+            metadata (or a fake model in a test) behaves as it always
+            did. See the TARGET_MODE_* note in ml/feature_schema.py.
         """
+        if target_mode not in (TARGET_MODE_ABSOLUTE, TARGET_MODE_RESIDUAL):
+            raise ValueError(
+                "Unknown target_mode {!r}; expected {!r} or {!r}.".format(
+                    target_mode, TARGET_MODE_ABSOLUTE, TARGET_MODE_RESIDUAL
+                )
+            )
         self._validate_model(model)
         self._model = model
         self._confidence_calibrators = confidence_calibrators or {}
         self._target_weights = target_weights or {}
+        self._target_mode = target_mode
         self._verify_fast_path()
+
+    @property
+    def target_mode(self) -> str:
+        return self._target_mode
 
     @classmethod
     def from_path(cls, model_path: str) -> "MLPredictor":
@@ -219,10 +250,27 @@ class MLPredictor:
                 confidence_calibrators = {}
                 target_weights = {}
 
+        # The metadata file train.py writes next to the model says how
+        # its output is to be read. A model without one predates the
+        # residual change and is absolute.
+        target_mode = TARGET_MODE_ABSOLUTE
+        metadata_path = os.path.splitext(model_path)[0] + ".metadata.json"
+        if os.path.isfile(metadata_path):
+            try:
+                with open(metadata_path, "r", encoding="utf-8") as fh:
+                    target_mode = json.load(fh).get("target_mode", TARGET_MODE_ABSOLUTE)
+            except Exception:
+                logger.warning(
+                    "Found %s but could not read it; assuming an absolute-"
+                    "target model.", metadata_path,
+                )
+        logger.info("MLPredictor target mode: %s", target_mode)
+
         return cls(
             model,
             confidence_calibrators=confidence_calibrators,
             target_weights=target_weights,
+            target_mode=target_mode,
         )
 
     @staticmethod
@@ -326,6 +374,16 @@ class MLPredictor:
         mean_prediction = tree_predictions.mean(axis=0)
         std_per_output = tree_predictions.std(axis=0)
 
+        if self._target_mode == TARGET_MODE_RESIDUAL:
+            # The forest predicted the change; the prediction the rest
+            # of the system consumes is current + change, floored at
+            # zero. The spread across trees is unchanged by adding the
+            # same constant to every tree, so confidence is computed
+            # from the same std either way - only the level it is
+            # reported against moves.
+            base = np.asarray(current_values_as_target_vector(features), dtype=np.float64)
+            mean_prediction = np.maximum(mean_prediction + base, 0.0)
+
         lane_predictions = {
             lane_id: self._build_lane_prediction(
                 lane_id, mean_prediction, std_per_output
@@ -405,21 +463,31 @@ class MLPredictor:
             confidence=confidence,
         )
 
-    @staticmethod
-    def _confidence(mean_value: float, std_value: float) -> float:
+    def _confidence(self, mean_value: float, std_value: float) -> float:
         """
         Convert a Random Forest tree-spread standard deviation into a 0
-        to 100 confidence score. Lower spread relative to the mean
-        prediction yields higher confidence. The denominator is floored
-        at 1.0 to avoid a near-zero mean prediction producing an
-        artificially extreme confidence value.
+        to 100 raw confidence score, before calibration.
 
-        This is the raw score, unchanged since it was first written.
-        See _calibrated_confidence() for the optional post-hoc
-        remapping added in the second training milestone - this method
-        itself is not being replaced, only optionally adjusted after
-        the fact.
+        Absolute mode (the original formula, unchanged): lower spread
+        RELATIVE to the mean prediction yields higher confidence, the
+        denominator floored at 1.0 so a near-zero mean cannot produce an
+        artificially extreme value.
+
+        Residual mode: the spread alone, 100 / (1 + std). The level a
+        residual-mode prediction lands at is mostly the persistence
+        base, which the trees never voted on, so dividing their spread
+        by it says nothing about how sure they were - measured on the
+        first residual model, the relative formula's correlation with
+        real error was -0.003 for vehicle_count and +0.16 (the WRONG
+        sign) for waiting time, while the spread alone reached -0.43
+        for both. The isotonic calibrators fitted by
+        ml/training/fit_confidence_calibration.py then map this raw
+        score onto its real error percentile as before. Both formulas
+        are reproduced in evaluate_calibration._confidence_from_spread,
+        which must stay numerically identical to this.
         """
+        if self._target_mode == TARGET_MODE_RESIDUAL:
+            return float(100.0 / (1.0 + max(0.0, std_value)))
         denominator = max(abs(mean_value), 1.0)
         return float(max(0.0, 100.0 - (std_value / denominator) * 100.0))
 

@@ -1,16 +1,17 @@
-import type { PeakPeriod } from '@/data/api'
+import type { Peak } from './series'
 import { Panel } from '@/ui/Panel'
+import { GrowBar } from '@/ui/Reveal'
 
 /**
  * The busiest recorded windows, detected statistically from congestion
  * history rather than assumed from a clock — simulated time has no real
  * hour of day.
  */
-export function PeakPeriods({ peaks }: { peaks: PeakPeriod[] }) {
+export function PeakPeriods({ peaks }: { peaks: Peak[] }) {
   if (peaks.length === 0) {
     return (
       <Panel title="Peak periods">
-        <div className="py-6 text-center text-[13px] text-ink-mute">No recorded history yet.</div>
+        <div className="py-6 text-center text-[13px] text-ink-mute">Waiting for the first tick.</div>
       </Panel>
     )
   }
@@ -25,9 +26,11 @@ export function PeakPeriods({ peaks }: { peaks: PeakPeriod[] }) {
               {p.start_time}–{p.end_time}s
             </span>
             <div className="h-4 flex-1 overflow-hidden rounded-[3px] bg-inset">
-              <div
+              <GrowBar
+                fraction={max === 0 ? 0 : p.peak_congestion_score / max}
+                delay={0.3 + i * 0.05}
                 className="h-full rounded-[3px] bg-accent"
-                style={{ width: `${max === 0 ? 0 : (p.peak_congestion_score / max) * 100}%`, opacity: 0.85 }}
+                style={{ opacity: 0.85 }}
               />
             </div>
             <span className="num w-[54px] shrink-0 text-right text-[12.5px] text-ink-strong">
@@ -37,8 +40,8 @@ export function PeakPeriods({ peaks }: { peaks: PeakPeriod[] }) {
         ))}
       </div>
       <div className="mt-2 border-t border-rule-soft pt-2 text-[12px] text-ink-mute">
-        Windows are ranked by mean congestion across recorded runs. The backend does not record which
-        named scenario produced a run, so peaks are not attributed to one.
+        Detected statistically, by ranking this run&rsquo;s own time windows on mean congestion — not
+        assumed from a clock, because simulated time has no hour of day.
       </div>
     </Panel>
   )

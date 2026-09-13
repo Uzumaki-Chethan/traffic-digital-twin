@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { PerformanceLogRow } from '@/data/api'
+import type { NetworkSample } from './series'
 import { Panel } from '@/ui/Panel'
 import { f1 } from '@/utils/format'
 
@@ -11,12 +11,12 @@ const PAD_T = 8
 const PAD_B = 26
 
 /**
- * Every recorded sample as one mark: network speed against network
+ * Every tick of this run as one mark: network speed against network
  * waiting time. A scatter rather than another time series, because the
  * question here is the relationship between the two — not when each
  * happened — and the shape of the cloud answers it directly.
  */
-export function SpeedWaitScatter({ rows }: { rows: PerformanceLogRow[] }) {
+export function SpeedWaitScatter({ rows }: { rows: NetworkSample[] }) {
   const { pts, maxSpeed, maxWait, corr } = useMemo(() => {
     const p = rows.map((r) => ({ x: r.avg_speed, y: r.avg_wait }))
     const ms = Math.max(1e-6, ...p.map((d) => d.x))
@@ -41,7 +41,7 @@ export function SpeedWaitScatter({ rows }: { rows: PerformanceLogRow[] }) {
   if (pts.length === 0) {
     return (
       <Panel title="Speed against waiting time">
-        <div className="py-6 text-center text-[13px] text-ink-mute">No recorded samples yet.</div>
+        <div className="py-6 text-center text-[13px] text-ink-mute">Waiting for the first tick.</div>
       </Panel>
     )
   }
@@ -50,7 +50,7 @@ export function SpeedWaitScatter({ rows }: { rows: PerformanceLogRow[] }) {
   const sy = (v: number) => H - PAD_B - (v / maxWait) * (H - PAD_T - PAD_B)
 
   return (
-    <Panel title="Speed against waiting time" meta={`${pts.length.toLocaleString()} samples`}>
+    <Panel title="Speed against waiting time" meta={`${pts.length.toLocaleString()} ticks`}>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Network average speed plotted against average waiting time">
         <line x1={PAD_L} y1={PAD_T} x2={PAD_L} y2={H - PAD_B} stroke="var(--rule)" strokeWidth="1" />
         <line x1={PAD_L} y1={H - PAD_B} x2={W - PAD_R} y2={H - PAD_B} stroke="var(--rule)" strokeWidth="1" />

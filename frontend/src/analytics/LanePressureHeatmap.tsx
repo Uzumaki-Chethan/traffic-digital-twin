@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import clsx from 'clsx'
-import type { CongestionLaneBucket } from '@/data/api'
+import type { LaneBucket } from './series'
 import { LANE_IDS } from '@/data/types'
 import { useSim } from '@/data/store'
 import { Panel } from '@/ui/Panel'
@@ -13,44 +13,37 @@ import { movementOf } from '@/utils/signal'
  * ramp with the real numeric range in the legend; signal red/amber/green
  * are never spent on it.
  *
- * The time axis is SIMULATED seconds from the start of a run, and the
- * database accumulates every run that has ever been recorded — so a
- * bucket is the mean across all recorded runs at that offset, not one
- * run. Labelled as such; it is a different time basis from the Overview.
+ * The time axis is SIMULATED seconds since THIS run started — one
+ * column per bucket, growing to the right as the run goes on, and the
+ * bucket width widens with it so the axis never turns into a hundred
+ * hairlines. It is a different time basis from the Overview, which shows
+ * only the current instant.
  */
-export function LanePressureHeatmap({ buckets }: { buckets: CongestionLaneBucket[] }) {
+export function LanePressureHeatmap({ buckets, width }: { buckets: LaneBucket[]; width: number }) {
   const hoverLane = useSim((s) => s.hoverLane)
   const setHoverLane = useSim((s) => s.setHoverLane)
 
-  const { starts, byLane, max, runs } = useMemo(() => {
+  const { starts, byLane, max } = useMemo(() => {
     const startSet = new Set<number>()
     const map: Record<string, Record<number, number>> = {}
     let hi = 0
-    let maxSamples = 0
     for (const b of buckets) {
       startSet.add(b.bucket_start)
       ;(map[b.lane_id] ??= {})[b.bucket_start] = b.avg_congestion_score
       if (b.avg_congestion_score > hi) hi = b.avg_congestion_score
-      if (b.sample_count > maxSamples) maxSamples = b.sample_count
     }
-    const sorted = [...startSet].toSorted((a, b) => a - b)
-    // Each lane contributes ~1 sample per decision tick (~1 s), so samples
-    // per 60 s bucket ÷ 60 estimates how many runs are folded together.
-    const bucketSpan = sorted.length > 1 ? sorted[1] - sorted[0] : 60
-    return { starts: sorted, byLane: map, max: hi, runs: Math.max(1, Math.round(maxSamples / bucketSpan)) }
+    return { starts: [...startSet].toSorted((a, b) => a - b), byLane: map, max: hi }
   }, [buckets])
 
   if (buckets.length === 0) {
     return (
       <Panel title="Lane pressure over time">
-        <div className="py-6 text-center text-[13px] text-ink-mute">
-          No recorded lane history yet. Run the simulation once and it will appear here.
-        </div>
+        <div className="py-6 text-center text-[13px] text-ink-mute">Waiting for the first tick.</div>
       </Panel>
     )
   }
 
-  const span = starts.length > 1 ? starts[1] - starts[0] : 60
+  const span = width
 
   return (
     <Panel
@@ -58,8 +51,8 @@ export function LanePressureHeatmap({ buckets }: { buckets: CongestionLaneBucket
       meta={`${LANE_IDS.length} lanes · ${starts.length} × ${span}s buckets`}
     >
       <div className="mb-2 text-[12px] text-ink-mute">
-        Mean congestion score per lane, by simulated time from the start of a run — averaged across
-        the {runs} recorded run{runs === 1 ? '' : 's'} in the database, not the live simulation.
+        Mean congestion score per lane, by simulated time since this run started. This is the same 0–1
+        urgency score the Decision Engine itself scores lanes with, straight off the live stream.
       </div>
 
       <div className="overflow-x-auto">

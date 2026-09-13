@@ -21,9 +21,37 @@ from typing import Dict
 
 
 def _default_min_green() -> Dict[str, float]:
+    # The floor below which NOTHING ends a phase (gap-out included).
+    # NOTE the phase timer starts at the switch DECISION, so the 3 s
+    # amber clearance counts toward this: 10 means ~7 s of actual
+    # green. Shared with the VAC baseline (performance.
+    # baseline_controllers imports MIN_GREEN_SECONDS from
+    # decision_engine), so both controllers get the same floor and the
+    # comparison stays fair. Kept short on purpose: a phase whose own
+    # lanes have emptied SHOULD be released quickly - that is what
+    # actuated control means. The realistic-green guarantee lives in
+    # min_green_before_preemption_seconds instead (see below).
     return {
         "NS_straight_left": 10.0, "EW_straight_left": 10.0,
         "NS_right": 8.0, "EW_right": 8.0,
+    }
+
+
+def _default_min_green_before_preemption() -> Dict[str, float]:
+    # Added 2026-09-13 (Section 26.4b). A phase that is STILL SERVING
+    # traffic may not be taken away by the scored-preference switch
+    # before this many seconds (amber included, as above - 20 means
+    # ~17 s of actual green). Gap-out, max-green, hard starvation and
+    # emergency are unaffected: they end a phase for a physical reason,
+    # this only restrains the one path that ends it on a score. Before
+    # this, a heavy approach's green was being preempted after 12-17 s
+    # whenever a waiting phase out-scored it - the "green for ten
+    # seconds, then amber" behaviour the user rejected as unrealistic.
+    # A restriction the AI places on itself: VAC never preempts, so the
+    # comparison stays fair.
+    return {
+        "NS_straight_left": 20.0, "EW_straight_left": 20.0,
+        "NS_right": 12.0, "EW_right": 12.0,
     }
 
 
@@ -45,9 +73,35 @@ class DecisionConfig:
     # decision_engine.PHASE_NAMES.
     min_green_seconds: Dict[str, float] = field(default_factory=_default_min_green)
     max_green_seconds: Dict[str, float] = field(default_factory=_default_max_green)
+    min_green_before_preemption_seconds: Dict[str, float] = field(
+        default_factory=_default_min_green_before_preemption
+    )
+    # The preemption floor above only binds while the current phase is
+    # still serving SUBSTANTIAL demand by the engine's own measure: its
+    # phase score (the same 0-1 urgency every other decision uses) must
+    # be at least this. Why a score and not a count or a flow rate
+    # (Section 26.4b, all measured on light_seed1 by logging every tick
+    # the floor bound): vehicles PRESENT could not tell "four cars just
+    # inserted 150 m up the approach" from a heavy stream; vehicles
+    # STANDING never bound at all in heavy traffic (the standing queue is
+    # gone by the time the stream gets cut); the DEPARTURE RATE is
+    # backward-looking and kept holding phases that had just FINISHED
+    # discharging (one car left, seven recently gone) while a rival had a
+    # car actually waiting. In every one of those light-traffic moments
+    # the current phase scored 0.03-0.10 against a rival at 0.20-0.53 -
+    # the engine already knew there was nothing left worth protecting.
+    # A heavy approach mid-stream scores 0.3 and up. 0.0 = always binds.
+    preemption_floor_min_phase_score: float = 0.12
 
-    # How much a main phase's score is influenced by left-turn demand,
-    # relative to its own exclusive straight-lane demand.
+    # NO LONGER USED (2026-09-13). Left turns used to run in both main
+    # phases, so their demand was shared and had to be folded into each
+    # main phase's score at partial weight. They are protected now - each
+    # left runs only in its own approach's phase - so that demand is
+    # counted directly by the phase that serves it and this multiplier
+    # would double-count it. Kept as a field so existing constructions of
+    # DecisionConfig (tests, calibration scripts, saved experiments) keep
+    # working rather than raising TypeError; setting it has no effect.
+    # See decision_engine.py's LEFT TURNS ARE PROTECTED note.
     left_turn_influence: float = 0.3
 
     # Normalization ceilings turning a raw vehicle_count / waiting_time
@@ -137,6 +191,15 @@ class DecisionConfig:
     # (Section 20's balanced_seed1 root-cause analysis, mechanism A3).
     # The hard guarantee itself (_most_starved_phase_over_hard_limit) is
     # a separate, unconditional check and is NOT affected by this cap.
+    #
+    # Tested at 0.10 on 2026-09-13 (Section 26.4b) because in a four-phase
+    # rotation every rival has always been unserved >= 20 s, so every
+    # rival permanently carries +0.20 and the 0.35 margin is really
+    # 0.15 - that cut heavy-approach greens to 12-17 s. 0.10 fixed heavy
+    # but lost light traffic (where that same pressure is what lets a
+    # car waiting 30 s preempt a phase serving one moving car). Kept at
+    # 0.20; the heavy-traffic impatience is handled where it belongs,
+    # by min_green_before_preemption_seconds.
     starvation_pressure_cap: float = 0.20
 
     # Hard starvation ceiling: force-serve regardless of score once a
@@ -152,6 +215,41 @@ class DecisionConfig:
     # Ceiling on how much of the predicted component's weight is used,
     # reached only at 100% prediction confidence.
     max_predicted_weight: float = 0.35
+
+    # When the current phase gaps out (its own lanes are empty), choose
+    # the NEXT phase by present demand only - lane scores computed with
+    # no prediction blended in - rather than by the blended scores the
+    # scored-preemption path uses. Added 2026-09-13 (Section 26.4 of the
+    # architecture report). Gap-out is a "who is actually waiting right
+    # now" question, and VAC - which the gap-out was written to mirror -
+    # answers it with raw counts. With the prediction blended in, a
+    # phase with nobody at the line but a forecast arrival could outrank
+    # a phase with a vehicle already stopped, and in light traffic that
+    # is exactly the vehicle whose wait then grows. Measured on
+    # light_seed1 with the retrained model: prediction on, blended
+    # choice 3/7 vs VAC; the same run choosing by present demand 6/7 -
+    # with the SAME 64 switches either way, so this changes which phase
+    # is served, never how often the signal changes. The predicted
+    # component still shapes every hold-or-preempt decision; it only no
+    # longer speaks for lanes with nobody on them at the moment of a
+    # gap-out. Kept as a flag so the A/B stays reproducible.
+    gap_out_uses_present_demand: bool = True
+
+    # Starvation - both the soft pressure term in the phase score and
+    # the hard override at hard_starvation_limit_seconds - only counts
+    # for a phase that has at least one vehicle on its lanes. Added
+    # 2026-09-13 (Section 26.4). "Starved" means unserved DEMAND; a phase
+    # nobody is waiting for cannot be starved, and serving it anyway
+    # costs a minimum green spent on an empty road plus an extra switch
+    # the anti-flicker work exists to avoid. Before this, a right-turn
+    # phase that saw no traffic for 150 s in light demand was force-
+    # served regardless, and a phase 20 s unserved with zero vehicles
+    # (pressure 0.20) outranked a phase with one vehicle actually
+    # waiting 10 s (score ~0.10) at gap-out. The unserved timer itself
+    # keeps running while a phase is empty, so a vehicle arriving on a
+    # long-unserved phase is still served promptly - the credit is kept,
+    # it is just not spent on nobody.
+    starvation_requires_demand: bool = False
 
     @classmethod
     def from_calibration_dict(cls, data: dict) -> "DecisionConfig":

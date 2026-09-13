@@ -112,13 +112,20 @@
         <lane id="W_in_2" index="2" speed="13.89" length="178.40" shape="0.00,201.60 178.40,201.60"/>
     </edge>
 
+    <!-- HAND-EDITED 2026-09-13, and it must stay in step with
+         intersection.tll.xml, which carries the full reasoning under
+         LEFT-TURN POLICY. This compiled net is what the sumocfg
+         actually loads - the .tll.xml is a netconvert SOURCE file and
+         is not referenced at run time, so editing that one alone
+         changes nothing. Only the four left-turn characters changed;
+         no geometry, connection or request was touched. -->
     <tlLogic id="C" type="static" programID="0" offset="0">
-        <phase duration="30" state="GGrGrrGGrGrr"/>
-        <phase duration="3"  state="yyryrryyryrr"/>
+        <phase duration="30" state="GGrrrrGGrrrr"/>
+        <phase duration="3"  state="yyrrrryyrrrr"/>
         <phase duration="12" state="rrGrrrrrGrrr"/>
         <phase duration="3"  state="rryrrrrryrrr"/>
-        <phase duration="30" state="GrrGGrGrrGGr"/>
-        <phase duration="3"  state="yrryyryrryyr"/>
+        <phase duration="30" state="rrrGGrrrrGGr"/>
+        <phase duration="3"  state="rrryyrrrryyr"/>
         <phase duration="12" state="rrrrrGrrrrrG"/>
         <phase duration="3"  state="rrrrryrrrrry"/>
     </tlLogic>

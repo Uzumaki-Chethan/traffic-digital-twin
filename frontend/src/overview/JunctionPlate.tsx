@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { LaneView } from '@/data/types'
+import type { LaneView, VehicleView } from '@/data/types'
 import { useSim } from '@/data/store'
 import { lampOf, lampLit, lampColor, isPermissive } from '@/utils/signal'
 import {
@@ -15,6 +15,8 @@ import {
   labelPos,
   type LaneGeom,
 } from './plateGeometry'
+import { placeVehicles, type Placed } from './vehiclePlacement'
+import { plateSize, shapeOf } from './vehicleTypes'
 
 const MAX_TICKS = 8
 const TICK_LEN = 22 // along the lane
@@ -24,8 +26,14 @@ const TICK_GAP = 5
 interface Props {
   lanes: LaneView[]
   emergencyLanes: string[]
-  /** Unpowered: heads dark, no queues — the pre-simulation state. */
+  /** Real vehicles from the snapshot. When present they replace the
+   * synthetic queue ticks entirely — actual traffic beats an inference
+   * drawn from a per-lane count. */
+  vehicles?: VehicleView[]
+  /** Unpowered: heads dark, no traffic — the pre-simulation state. */
   powered: boolean
+  /** Pan/zoom window, from TwinViewport. Defaults to the whole plate. */
+  viewBox?: string
 }
 
 /**
@@ -36,15 +44,24 @@ interface Props {
  * lane's own live SUMO signal; tick count = that lane's vehicle count.
  * One channel per variable.
  */
-export function JunctionPlate({ lanes, emergencyLanes, powered }: Props) {
+export function JunctionPlate({ lanes, emergencyLanes, vehicles, powered, viewBox }: Props) {
+  const placed: Placed[] = useMemo(
+    () => (powered && vehicles ? placeVehicles(vehicles) : []),
+    [vehicles, powered],
+  )
+  const realTraffic = placed.length > 0
   const hoverLane = useSim((s) => s.hoverLane)
   const setHoverLane = useSim((s) => s.setHoverLane)
+  // Vehicle positions arrive once per sim tick, so each move is stretched
+  // across exactly that interval, linearly. A fixed 300ms transition made
+  // cars jump and then freeze for the rest of the tick.
+  const tickInterval = useSim((s) => s.tickInterval)
   const byId = useMemo(() => Object.fromEntries(lanes.map((l) => [l.lane_id, l])), [lanes])
   const emergency = useMemo(() => new Set(emergencyLanes), [emergencyLanes])
 
   return (
     <svg
-      viewBox={`0 0 ${W} ${H}`}
+      viewBox={viewBox ?? `0 0 ${W} ${H}`}
       className="h-full w-full select-none"
       role="img"
       aria-label={plateSummary(lanes, powered)}
@@ -130,8 +147,38 @@ export function JunctionPlate({ lanes, emergencyLanes, powered }: Props) {
           hovered={hoverLane === g.id}
           dimmed={hoverLane !== null && hoverLane !== g.id}
           onHover={setHoverLane}
+          showTicks={!realTraffic}
         />
       ))}
+
+      {/* Real vehicles, from traci.vehicle.getPosition(). Position and
+          heading move together in one transform, linearly over exactly
+          one tick, so a car turning through the junction sweeps round
+          instead of snapping. Size carries the vehicle type; colour is
+          left alone because on this plate colour already means signal
+          state. */}
+      {placed.map((p) => {
+        const size = plateSize(shapeOf(p.type))
+        return (
+          <g
+            key={p.id}
+            style={{
+              transform: `translate(${p.x}px, ${p.y}px) rotate(${p.angle}deg)`,
+              transition: `transform ${tickInterval}ms linear`,
+            }}
+          >
+            <rect
+              x={-size.length / 2}
+              y={-size.width / 2}
+              width={size.length}
+              height={size.width}
+              rx={2}
+              fill="var(--plate-vehicle)"
+              opacity={p.moving ? 0.95 : 0.7}
+            />
+          </g>
+        )
+      })}
 
       {/* painted arrows + labels, above the fills so they stay legible */}
       <g fill="none" stroke="var(--plate-marking)" strokeWidth="2" opacity="0.9" markerEnd="url(#arrowhead)">
@@ -171,6 +218,7 @@ function Lane({
   hovered,
   dimmed,
   onHover,
+  showTicks,
 }: {
   g: LaneGeom
   lane: LaneView | undefined
@@ -179,10 +227,11 @@ function Lane({
   hovered: boolean
   dimmed: boolean
   onHover: (id: string | null) => void
+  showTicks: boolean
 }) {
   const lamp = powered && lane ? lampOf(lane.signal) : 'off'
   const permissive = !!lane && isPermissive(lane.signal)
-  const count = powered && lane ? Math.max(0, Math.round(lane.vehicles)) : 0
+  const count = showTicks && powered && lane ? Math.max(0, Math.round(lane.vehicles)) : 0
   const ticks = Math.min(MAX_TICKS, count)
   const overflow = count - ticks
 

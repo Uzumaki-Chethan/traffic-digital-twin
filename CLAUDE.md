@@ -29,29 +29,41 @@ DigitalTwin             ← current state + rolling history
    ↓
 FeatureEngineer         ← 125 engineered features
    ↓
-MLPredictor             ← RandomForest, 24 targets, 15s horizon, calibrated confidence
+MLPredictor             ← RandomForest, 24 targets, 15s horizon, RESIDUAL targets
+                          (predicts the change, adds the current value back), calibrated
+                          confidence from tree spread
    ↓
 DecisionEngine          ← phase scoring, hysteresis, starvation, emergency override,
                           confidence-aware prediction blending — writes Desired State only
 SignalController        ← Decision → TraCI commands; yellow-clearance safety; execution only
 ```
 
-Every module has exactly one job and one owner of the state it writes; `backend/app.py`
-only orchestrates startup/run/shutdown plus three read-only side-channels (SQLite logging,
-dashboard publishing, emergency-lane detection) that can never influence control. When
-adding anything, preserve this: a module should read what it needs and write only the
+Every module has exactly one job and one owner of the state it writes;
+`backend/simulation_runner.py` only orchestrates startup/run/shutdown plus three read-only
+side-channels (SQLite logging, dashboard publishing, emergency-lane detection) that can
+never influence control. The one thing that CAN influence a run is `RunControl`
+(pause/resume/stop/speed), deliberately a separate single-purpose object. `backend/app.py`
+and `backend/server.py` are the two entry points, and both just call `run_simulation()`.
+When adding anything, preserve this: a module should read what it needs and write only the
 state it owns, never call into another module's internals.
 
 The traffic light ID (`"C"`) and its 12 lanes are a single hardcoded topology, verified
 against `sumo/network/intersection.tll.xml` — this is deliberate (see "Known deviations"),
 not an oversight.
 
+**Editing the signal program:** `intersection.tll.xml` is a netconvert SOURCE and is NOT
+loaded at run time. `intersection.sumocfg` loads the compiled `intersection.net.xml`, which
+carries its own copy of the `<tlLogic>`. Change BOTH or the change does nothing — and the
+phase/lane structure is also encoded a third time in `decision_engine._PHASE_EXCLUSIVE_LANES`,
+which `baseline_controllers.py` imports.
+
 ## Commands
 
 ### Backend (Python — run from `backend/`)
 
 ```bash
-python app.py                                              # live AI-controlled sim (sumo-gui)
+python server.py                                           # console: serves the UI, starts/stops runs from the browser
+python app.py                                              # live AI-controlled sim (sumo-gui), one run, dashboard dies with it
 python -m performance.evaluator --scenario heavy_seed1     # headless AI-vs-fixed-timer + CSV
 python -m performance.evaluator --scenario heavy_seed1 --baseline vac  # AI-vs-VAC instead
 python -m performance.evaluator --scenario rush_hour_seed1 --gui       # dual-GUI demo
@@ -61,7 +73,7 @@ python -m performance.evaluate --controllers ai --scenarios heavy_seed1
 python -m decision_engine.calibrate_normalization            # derive normalization ceilings from real data
 python -m ml.training.generate_scenario_files                # regenerate SUMO scenario route/config files
 python -m ml.training.dataset_generator                      # run scenarios, write raw training CSVs
-python -m ml.training.train                                  # fit + evaluate the Random Forest model
+python -m ml.training.train                                  # fit + evaluate the Random Forest model (residual targets)
 python -m ml.training.fit_confidence_calibration              # isotonic-calibrate prediction confidence
 pytest ../tests/ -v                                           # full test suite (offline, no SUMO needed)
 pytest ../tests/test_decision_engine.py -v                    # Decision Engine unit tests only
@@ -72,7 +84,7 @@ Requirements: Python 3.10+, SUMO installed with `SUMO_HOME` set and on `PYTHONPA
 `requirements.txt`, UTF-16 encoded — the single dependency source; a stale, unreferenced
 `backend/requirements.txt` that incorrectly listed Flask was removed 2026-09-05).
 
-### Frontend (`frontend/` — React + Vite + TypeScript + Tailwind v4, iteration 1; see "Known deviations")
+### Frontend (`frontend/` — React + Vite + TypeScript + Tailwind v4; see "Known deviations")
 
 ```bash
 npm run dev        # dev server, proxies /api and /ws to the FastAPI backend
@@ -111,9 +123,26 @@ frontend replaced it; the dead fallback code path was cleaned up 2026-09-06).
   now resets the incoming phase's timer too, not just the outgoing one's). Lane urgency also
   factors in `max_waiting_time` (a lane's single longest-waiting vehicle), not just the mean
   — `average_waiting_time_influence`/`max_waiting_time_influence` (0.25/0.15) split what was
-  one 0.4 weight, targeting worst-case travel time specifically. See
-  PROJECT_ARCHITECTURE_REPORT.md Sections 19-22 for why these exist, the A/B evidence, and
-  the full scenario-library validation table.
+  one 0.4 weight, targeting worst-case travel time specifically. **Gap-out's choice of NEXT
+  phase is count-first** (`gap_out_uses_present_demand`, on since 2026-09-13): it ranks the
+  alternatives by present vehicle count — VAC's own rule — with the wait-aware score only
+  breaking ties, and never with the prediction blended in. That was the whole light-traffic
+  loss: with blended scores, a phase with nobody waiting but a forecast arrival could
+  outrank a phase with a vehicle actually stopped. `starvation_requires_demand` (starvation
+  pressure/override only for phases with vehicles) looked right and lost on every light seed
+  — kept in code, default off, like the light-traffic mode. **A realistic-green floor
+  (`min_green_before_preemption_seconds`, 20 s main / 12 s right, gated on
+  `preemption_floor_min_phase_score` = 0.12)**: a phase still serving substantial demand
+  cannot be taken away by a mere score before that — the user rejected 10-15 s greens as
+  unrealistic. Gap-out, max-green, starvation and emergency are NOT gated by it; the shared
+  `min_green_seconds` (10/8, amber included, so 7/5 s of real green) stays the floor for
+  those. The gate is the phase's own score — vehicles present, vehicles standing, and
+  departure rate were all tried and all failed to separate "heavy stream being cut" from
+  "four cars 150 m away" (Section 26.4b has the table). Performance metrics: travel time
+  now excludes a vehicle's *scheduled* `<stop>` time (SUMO's own convention), because the
+  accident scenario's worst-travel metric was the scripted 550 s stall under both
+  controllers. See PROJECT_ARCHITECTURE_REPORT.md Sections 19-22 and 26.4 for why these
+  exist, the A/B evidence, and the full scenario-library validation table.
 - **Database** (`backend/database/db_logger.py`, SQLite, WAL mode, insert-only,
   failure-tolerant): `decision_log` (includes persisted `actual_phase`/`actual_is_yellow` —
   the TraCI-confirmed Actual State, alongside the Decision Engine's Desired State),
@@ -127,12 +156,35 @@ frontend replaced it; the dead fallback code path was cleaned up 2026-09-06).
 - **Dashboard** (`backend/services/dashboard_server.py`): FastAPI, strictly read-only in
   itself — zero endpoints of its own that can send a command into the simulation; sourced
   from `LiveStateStore` (in-process, live) or the SQLite/CSV files the simulation already
-  wrote. Runs as a daemon thread inside the simulation process (`start_dashboard_server()`),
-  never launched standalone.
+  wrote. Two hosts build the identical app: `app.py` via `start_dashboard_server()` (daemon
+  thread inside the simulation process — dies with the run, which is why every page used to
+  502 when SUMO closed), and `server.py` via `create_app()` in the foreground of a process
+  that outlives any run. Never launched directly as a script; it has no `main()`.
+- **Console** (`backend/server.py` + `backend/services/sim_supervisor.py`): the always-on
+  entry point — `python server.py`, then drive everything from the browser. The supervisor
+  runs one live simulation at a time on a worker thread in the console process (a thread,
+  not a subprocess, because a live run publishes into the very `LiveStateStore` this server
+  reads and shares its `RunControl` object with the pause endpoints — see
+  PROJECT_ARCHITECTURE_REPORT.md Section 23.2). The run itself is
+  `backend/simulation_runner.py`'s `run_simulation()`, extracted verbatim from `app.py`'s
+  `main()` so both entry points run identical code; `app.py` is now a thin CLI wrapper over
+  it and is behaviourally unchanged.
+- **Run pacing** (`backend/services/run_control.py`): `RunControl` carries pause/stop AND
+  speed. `pace(step_seconds)` is called once per step by `TraCIManager.run()` and sleeps to
+  hold simulated time at `speed` x wall-clock time (default 1.0; `None` = unthrottled, the
+  old behaviour). Required, not decorative: headless `sumo` steps at ~100x real time, which
+  no live view can follow. Anchor-based rather than fixed-sleep so error cannot accumulate;
+  the anchor is dropped on resume so a paused run never sprints to catch up.
 - **Control layer** (`backend/services/control_routes.py`): the ONE place a web request can
   affect what's running, deliberately kept out of `dashboard_server.py` so that file's own
-  "pure viewer" claim stays true. Mounted only by `app.py` (via `create_app`'s/
-  `start_dashboard_server`'s `extra_router` param) — `POST /api/control/start-evaluator`
+  "pure viewer" claim stays true. Mounted only by `app.py` and `server.py` (via
+  `create_app`'s/`start_dashboard_server`'s `extra_router` param). What each host can do is
+  discovered by the frontend from `GET /api/control/run-state`, never assumed:
+  `POST /api/control/{pause,resume,stop,speed}` wherever a `RunControl` is attached (both
+  entry points); `POST /api/control/{start-simulation,stop-simulation}` only where a
+  `supervisor` was passed (`server.py` — `app.py` IS the run and cannot host a second one,
+  so it reports `can_start: false` rather than offering a button that cannot work).
+  Evaluator control is available from either — `POST /api/control/start-evaluator`
   `{scenario_name, baseline, gui}` launches `performance.evaluator` as a real child process
   (input validated against real scenario files / a fixed baseline whitelist before it ever
   reaches `subprocess.Popen`), `POST /api/control/stop-evaluator` stops it gracefully
@@ -142,7 +194,7 @@ frontend replaced it; the dead fallback code path was cleaned up 2026-09-06).
   `LiveStateStore` (it's a genuinely separate OS process — `services/live_state.py`'s
   `RemoteLiveStatePublisher`, non-blocking/threaded so a slow network call can never stall
   the simulation loop). This exists specifically so a demo needs no terminal command beyond
-  `python app.py` itself.
+  `python server.py` itself — which since 2026-09-12 includes starting the live simulation.
 - **Performance Evaluation** (`backend/performance/`): `evaluator.py` runs two PARALLEL,
   lockstep-synchronized SUMO instances (separate TraCI connections, labeled `"ai"`/
   `"baseline"`) of the identical scenario for a fair comparison; `baseline_controllers.py`
@@ -181,6 +233,26 @@ unprompted, but do keep this section current if that changes:
   still using 100% generic cars — fixed to use the same mix. No retraining implications
   (confirmed the trained model already postdates the scenario-file mix, and training never
   reads the production route file at all).
+- **Left turns are PROTECTED (changed 2026-09-13, at the user's request).** They used to run
+  in both main phases, which the network's conflict matrix permits — all four left turns
+  genuinely have an empty foe list, verified by decoding the `<request>` block. That
+  permission depends on perfect lane discipline, though (every movement is channelized into
+  its own dedicated outbound lane), and the user's judgement was that real traffic of the
+  kind this models will not hold lane that precisely. Each left now runs only in its own
+  approach's phase; verified 0 left/cross-through overlaps over two full cycles.
+  `left_turn_influence` in `DecisionConfig` is now dead and documented as such. See
+  PROJECT_ARCHITECTURE_REPORT.md Section 25. **Both consequences were closed on
+  2026-09-13 (Section 26):** all 38 training runs were regenerated under the new program,
+  the model retrained, and the 13-scenario VAC sweep re-run — the numbers in README.md are
+  current again. Doing that surfaced two things that had been wrong since long before the
+  program change, both now fixed: the model predicted absolute levels (worse than plain
+  persistence on vehicle counts), and its #1 feature `seconds_until_next_signal_switch` was
+  a train/serve deviation (a real countdown in training data, a re-armed 60 s ceiling at
+  run time). The model now predicts RESIDUALS (`target_mode` in its metadata — a model
+  without metadata is read as absolute), the feature is `seconds_in_current_phase` (a phase
+  clock the adapter keeps), and confidence in residual mode is spread-only. If you ever
+  touch `SignalController`'s provisional hold or the feature vector, re-read Section 26.2
+  first — that is exactly the kind of change that silently skews the model.
 - **Multi-junction coordination is out of scope, permanently** (the user has decided
   against ever pursuing it, not merely deferred it). `feature_schema.py`,
   `traffic_adapter.py`, `scenario_manifest.py`, and `decision_engine.py` all independently
@@ -190,15 +262,21 @@ unprompted, but do keep this section current if that changes:
   directions were rejected (a vanilla-JS dashboard, a first React rebuild, a neon-glow HUD, a
   restrained Stripe/Linear/Vercel version, a literal "drafting sheet" system) and `frontend/`
   was emptied on 2026-09-08. On 2026-09-11 the user supplied a Stitch (Google) export whose
-  **layout** they approved (colours not); iteration 1 ports that layout — Overview page only —
-  wired to real data, with three candidate palettes behind a dev switcher. The design
-  contract is `docs/design/TRINETRA_UI_DESIGN_BRIEF.md` (its reference-kit process was
-  dropped by the user; its data rules, banned-defaults list and page plan still apply).
-  Iterate on the Overview until approved before building the other three pages. Do NOT
-  reintroduce neon/glassmorphism/3D — a Gemini prompt proposing exactly that was reviewed
-  and rejected on 2026-09-11 (it also assumed a Flask/Socket.IO backend that doesn't exist).
-  See `frontend/README.md` for what's verified vs. still open (logo asset lost, no visual
-  verification in the build environment).
+  **layout** they approved (colours not) and the palette has since been iterated to the
+  user's own choices: red rail, traffic-yellow ground (`#F4B31D`), pale-green cards, real
+  signal-colour lamps, Orbitron/Barlow/JetBrains Mono. Overview and Analytics are built;
+  Performance and Decisions are still honest placeholders. The design contract is
+  `docs/design/TRINETRA_UI_DESIGN_BRIEF.md` (its reference-kit process was dropped by the
+  user; its data rules, banned-defaults list and page plan still apply). Two standing rules
+  from the user: **never show prediction confidence anywhere in the UI**, and do NOT
+  reintroduce neon/glassmorphism (a Gemini prompt proposing exactly that was reviewed and
+  rejected on 2026-09-11 — it also assumed a Flask/Socket.IO backend that doesn't exist).
+  A 3D miniature of the junction DOES exist now, at the user's explicit request
+  (`overview/Junction3D.tsx`) — three.js, true network scale, sumo-gui's own look; that is
+  not the rejected neon "3D cyberpunk" direction. Analytics reads the LIVE stream only, by
+  explicit instruction — see PROJECT_ARCHITECTURE_REPORT.md Section 23.4 before pointing it
+  back at the database. See `frontend/README.md` for what's verified vs. still open (logo
+  asset lost, no visual verification in the build environment).
 - No ESP32/physical hardware integration exists (the `firmware/` directory is empty) —
   the project is SUMO-simulation-only.
 - Database has 4 tables (see above), not the guide's originally-envisioned 8.

@@ -65,9 +65,10 @@ _EXPECTED_TOTAL_COLUMNS = len(_IDENTITY_COLUMNS) + _N_FEATURE_COLUMNS + _N_TARGE
 #   - current_signal_state: FeatureEngineer encodes this as an ordinal
 #     0/1/2 (see the architecture handoff notes), never a raw phase
 #     index.
-#   - seconds_until_next_signal_switch: bounded by the longest cycle
-#     documented for intersection.tll.xml, ~96-110s; 200s is a
-#     generous ceiling that would still catch a unit error.
+#   - seconds_in_current_phase: under the static program the training
+#     data is recorded with, no phase lasts longer than 30s; 200s is a
+#     generous ceiling that would still catch a unit error or a phase
+#     clock that failed to reset on a phase change.
 _RANGE_CHECKS = {
     "vehicle_count": (0, 200),
     "total_vehicle_count": (0, 400),
@@ -80,7 +81,7 @@ _RANGE_CHECKS = {
     "arrival_rate": (0.0, 50.0),
     "departure_rate": (0.0, 50.0),
     "current_signal_state": (0, 2),
-    "seconds_until_next_signal_switch": (0.0, 200.0),
+    "seconds_in_current_phase": (0.0, 200.0),
 }
 
 

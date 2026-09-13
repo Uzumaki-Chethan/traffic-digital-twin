@@ -50,6 +50,7 @@ def _make_state(sim_time: float, vehicle_count: int = 1) -> SimulationState:
         current_phase_index=0,
         seconds_until_next_switch=10.0,
         lane_states={"N_in_0": "G"},
+        seconds_in_current_phase=20.0,
     )
     return SimulationState(simulation_time=sim_time, vehicles=vehicles, signal=signal)
 

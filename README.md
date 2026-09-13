@@ -18,8 +18,9 @@ DigitalTwin             ← current state + rolling history
    ↓
 FeatureEngineer         ← 125 engineered features
    ↓
-MLPredictor             ← RandomForest, 24 targets, 15s horizon,
-   ↓                       isotonic-calibrated confidence
+MLPredictor             ← RandomForest, 24 residual targets (predicts the
+   ↓                       change over 15s, adds the current value back),
+                           isotonic-calibrated confidence
 DecisionEngine          ← phase scoring, min/max green, hysteresis,
    ↓                       starvation handling, emergency override,
                           confidence-aware prediction blending
@@ -28,15 +29,17 @@ SignalController        ← Decision → TraCI commands; yellow-clearance
 ```
 
 This separation is intentional and graded. Every module has one job;
-`app.py` only orchestrates startup / run / shutdown.
+`simulation_runner.py` only orchestrates startup / run / shutdown, and the
+two entry points (`app.py` for one terminal run, `server.py` for the
+always-on console) both just call it.
 
 ## Project status
 
 | Stage | Status |
 |---|---|
 | Traffic simulation (multi-scenario, multi-seed) | ✔ done |
-| Dataset + training (Test MAE ≈ 1.63, held-out ≈ 1.99, extreme ≈ 2.87) | ✔ done |
-| ML predictor (125 features → 24 targets, calibrated confidence) | ✔ done |
+| Dataset + training (Test MAE ≈ 1.44, held-out ≈ 1.49, extreme ≈ 1.73; persistence 2.72 / 4.31) | ✔ done |
+| ML predictor (125 features → 24 residual targets, calibrated confidence) | ✔ done |
 | Decision Engine (core intelligence) | ✔ done |
 | Signal Controller | ✔ done |
 | Closed-loop integration (`app.py`) | ✔ done |
@@ -47,7 +50,8 @@ This separation is intentional and graded. Every module has one job;
 | Final optimization + demo polish | ⬜ |
 
 Full engineering context and history: see `PROJECT_ARCHITECTURE_REPORT.md`
-(Section 15 = current state).
+(read the highest-numbered `SECTION N ... (CURRENT STATE)` first — Section 26
+as of 2026-09-13).
 
 ---
 
@@ -56,7 +60,30 @@ Full engineering context and history: see `PROJECT_ARCHITECTURE_REPORT.md`
 Requirements: Python 3.10+, SUMO installed with `SUMO_HOME` set,
 `pip install -r requirements.txt`.
 
-### Run the live AI-controlled simulation (GUI)
+### Run everything from the browser (recommended)
+
+```bash
+cd backend
+python server.py          # then open http://127.0.0.1:8000
+```
+
+The console stays up and you drive it from the web UI: **Start** launches
+a simulation (headless by default — the page draws the junction itself,
+in plan view and in 3D, with the real vehicles), **Start with SUMO
+window** opens sumo-gui alongside it, and Pause / Play / Stop sit in the
+top bar. The speed control cycles on click or slides on hover, from
+0.25x real time to unthrottled.
+
+A headless run can be moved into a SUMO window at any point with **Open
+window**: the run saves its state and resumes from it, so the same
+vehicles, signal and clock carry across — it is the same run continuing,
+not a restart. Stopping leaves the console up, so you can start another
+without touching the terminal.
+
+During frontend development run `npm run dev` in `frontend/` as well and
+use http://localhost:5173 instead — it proxies `/api` and `/ws` here.
+
+### Run one simulation from the terminal (GUI)
 
 ```bash
 cd backend
@@ -65,7 +92,9 @@ python app.py
 
 Opens a sumo-gui window; the AI decides at 1 Hz, logs status once per
 second, and controls the junction through safe yellow-clearance
-transitions.
+transitions. The dashboard runs inside this process, so it can pause and
+stop the run but cannot start another — and when this run ends, the
+dashboard ends with it. That is what `server.py` above exists to fix.
 
 ### Run the Performance Evaluation (AI vs Baseline)
 
@@ -105,76 +134,95 @@ Saved: results/comparison_light_seed1.csv
 
 Improvement percentages are signed — regressions are reported honestly.
 
-**Result against `--baseline vac`** (verified 2026-09-06 — see PROJECT_ARCHITECTURE_REPORT.md
-Sections 20-22 for the complete tuning history, an independent Opus-driven root-cause
-analysis, and every per-metric number):
+**Result against `--baseline vac`** (measured 2026-09-13 on the current configuration:
+protected left turns, the retrained residual model, and the final Decision Engine — see
+PROJECT_ARCHITECTURE_REPORT.md Section 26 for the complete story and every intermediate
+number):
 
-**All 13 scenario types are clean 7/7 sweeps against VAC** (every scenario's seed 1 —
-light, balanced, heavy, extreme, north/south/east/west_heavy, accident, emergency_response,
-normal_traffic, rain, and rush_hour). This took four rounds of work, each grounded in real
-A/B evidence against VAC, never guesses:
+| scenario (seed 1) | wins | wait | travel | worst travel | avg queue | max queue | speed | throughput |
+|---|---|---|---|---|---|---|---|---|
+| `light` | **7/7** | +7.8 % | +0.2 % | +7.4 % | +0.7 % | +0.0 % | +1.6 % | +0.0 % |
+| `balanced` | **7/7** | +18.5 % | +1.1 % | +1.9 % | +4.0 % | +0.0 % | +1.6 % | +0.0 % |
+| `normal_traffic` | **7/7** | +86.5 % | +34.7 % | +70.3 % | +65.7 % | +61.4 % | +47.3 % | +0.0 % |
+| `heavy` | **7/7** | +66.9 % | +20.5 % | +40.0 % | +46.2 % | +37.1 % | +24.5 % | +0.0 % |
+| `extreme` | **7/7** | +64.3 % | +37.4 % | +57.4 % | +51.5 % | +50.6 % | +45.5 % | +0.0 % |
+| `rush_hour` | **7/7** | +58.5 % | +10.8 % | +43.9 % | +26.0 % | +33.7 % | +11.0 % | +0.0 % |
+| `north_heavy` | **7/7** | +57.6 % | +10.7 % | +43.8 % | +29.9 % | +11.4 % | +9.3 % | +0.0 % |
+| `south_heavy` | **7/7** | +62.2 % | +8.8 % | +42.1 % | +26.9 % | +7.5 % | +9.7 % | +0.0 % |
+| `east_heavy` | **7/7** | +62.5 % | +15.4 % | +41.1 % | +37.2 % | +6.2 % | +18.5 % | +0.0 % |
+| `west_heavy` | **7/7** | +63.9 % | +13.8 % | +42.9 % | +36.5 % | +13.2 % | +14.8 % | +0.0 % |
+| `accident` | **7/7** | +84.1 % | +34.1 % | +70.2 % | +62.8 % | +54.7 % | +41.2 % | +0.0 % |
+| `emergency_response` | **7/7** | +86.2 % | +32.0 % | +70.3 % | +62.2 % | +56.8 % | +42.5 % | +0.0 % |
+| `rain` | **7/7** | +85.9 % | +35.7 % | +66.2 % | +67.7 % | +64.5 % | +46.2 % | +0.0 % |
 
-1. **Gap-out** (Section 19): the AI had no equivalent of VAC's own gap-out — VAC releases a
-   phase the instant its lanes go empty; the AI would hold an already-empty phase open until
-   max-green or a rival's score climbed enough, wasting exactly the time VAC recovers. Fixed
-   by adding the same check VAC uses, gated identically for a fair comparison.
-2. **Switch-confirmation debounce** (Section 19, the anti-flicker fix): an ordinary
-   preference-based switch now needs the same candidate to lead for `switch_confirmation_
-   seconds` (3s) of *consecutive* time before committing — a transient 2-3 vehicle blip can
-   no longer flip the signal.
-3. **A real bug fix, found by an independent Opus-driven deep-dive** (Section 21): the phase
-   just switched TO was keeping its OLD "seconds since last served" starvation credit for
-   its entire green (only the outgoing phase's timer was ever reset), silently blocking
-   legitimate mid-green preemption and causing clock-driven switches unrelated to real
-   traffic — worst on `balanced` (moderate, perfectly uniform demand), which went from the
-   single worst-performing scenario (2/7) to a clean 7/7 sweep once fixed.
-4. **Max-waiting-time added to lane scoring** (Section 22): the score previously only saw a
-   lane's *mean* wait, which can look fine while one specific vehicle has been stuck far
-   longer than everyone else — exactly what produces a bad worst-case travel time.
-   `LaneFeatures.max_waiting_time` was already being computed but never used; adding it
-   fixed `north_heavy` and `rush_hour`'s remaining gaps (`rush_hour` had been the hardest
-   holdout — a 3-phase demand ramp, the only non-flat scenario in the library).
+**13/13 clean sweeps — every scenario, every metric.** All thirteen `results/comparison_
+<scenario>_seed1.csv` files were written by this one run (evening of 2026-09-13). The AI
+switches less than VAC in every light seed (64 vs 74, 58 vs 67, 65 vs 75) and, under
+saturation, holds a phase serving a stream for at least ~17 s of real green before any
+score can end it. Throughput is tied by construction in every row; the two 0.0 max-queue
+entries (`light`, `balanced`) are exact ties, 31 vs 31 vehicles.
 
-Each of steps 3 and 4 shifted what the best `switch_hysteresis_margin` was — it moved
-0.08 → 0.25 → 0.30 → 0.35 over the course of this work, re-verified against real evaluator
-runs at every step, never assumed to transfer from the previous round.
+Multi-seed spot checks with this configuration: `light_seed2` 7/7, `light_seed3` 5/7
+(travel −0.1 %, speed −1.2 %), `east_heavy_seed2` 7/7, `east_heavy_seed3` 7/7. As in
+Section 22.3, a literal "every seed of every scenario" guarantee is not claimed.
 
-**On whether this generalizes beyond the seeds actually tested:** mostly, not perfectly, and
-that's reported honestly rather than oversold. Spot-checking additional seeds after locking
-in the final config found `balanced_seed2`, `heavy_seed2`, `light_seed2`, and
-`north_heavy_seed3` all clean 7/7 too — but `north_heavy_seed2` picked up a small miss
-(2 metrics, single-digit percent) it didn't have before. This is expected: `throughput` is
-tied by construction in every comparison, and `max_travel_time`/`max_queue_length` are
-single-sample/single-instant extremes, so *some* seed of a close-fought scenario will
-occasionally land a small miss no matter how the config is tuned — tuning further would just
-relocate which seed it lands on, not eliminate it. The specific runs the user asked to be
-fixed (`north_heavy_seed1`, `rush_hour_seed1`) are both now genuinely, verifiably clean.
+How it got here, in one paragraph each (Sections 19–22 and 26):
 
-### Run the Real-Time Dashboard
+1. **Gap-out, switch-confirmation debounce, a starvation-timer bug fix, max-wait scoring**
+   (Sections 19–22) — the original road to 13/13 under the old shared-left program.
+2. **Protected left turns** (Section 25) changed the signal program, which made the old
+   model out of distribution and the old sweep stale. Everything below was done to close
+   that.
+3. **The model now predicts residuals** — the *change* over 15 s, added to the current
+   value — instead of absolute levels, which the forest could not extrapolate (it was worse
+   than "assume nothing changes" on vehicle counts). Test MAE 1.44 / held-out 1.49, from
+   2.06 / 2.35 on the same data (Section 26.2–26.3).
+4. **`seconds_until_next_signal_switch` was a train/serve deviation** — a real countdown in
+   training data, a re-armed 60 s ceiling at run time — on the model's most important
+   feature. Replaced by `seconds_in_current_phase`, a phase clock the adapter keeps. This
+   alone was the light-traffic loss: with the model's influence switched off the AI won
+   6/7; with the skewed model, 3/7 (Section 26.4).
+5. **Gap-out chooses the next phase by present vehicle count** (VAC's own rule), never by a
+   forecast — a phase with nobody at the line but a predicted arrival could outrank a phase
+   with a vehicle actually stopped (Section 26.4a).
+6. **A realistic-green floor**: a phase still serving substantial demand holds ≥ 20 s (≈17 s
+   of real green) before a score can take it away. The user rejected 10–15 s greens as
+   unrealistic; this fixed `east_heavy` and made `extreme` markedly stronger (Section 26.4b).
+7. **Travel time excludes scheduled `<stop>` time** (SUMO's own convention for waiting
+   time): `accident`'s worst-travel metric was the scripted 550 s stall under both
+   controllers; it now measures the worst real journey — 169 s vs VAC's 514 s.
 
-The dashboard starts AUTOMATICALLY with the simulation:
+Every value in `DecisionConfig` was set by real A/B evaluator runs against VAC, never
+guessed, and every mechanism that was tried and lost (a lower starvation cap, a shared
+longer minimum green, starvation gated on demand, a light-traffic gate, a longer
+confirmation window, a round-robin tie-break) is recorded in Section 26.4b with its numbers.
 
-```bash
-cd backend
-python app.py
-# then open http://127.0.0.1:8000 in a browser
-```
 
-A professional multi-page **Traffic Command Center** UI with sidebar
-navigation (Overview / Digital Twin / Performance / Decisions):
+### The web console
 
-- **Overview** — large signal visualization with countdown, KPI cards,
-  emergency alert banner, AI-vs-baseline summary, 60 s phase timeline.
-- **Digital Twin** — lane density bars color-coded by signal state,
-  prediction-vs-actual table, model confidence visualization.
-- **Performance** — waiting-time and queue-length charts over time,
-  throughput comparison bars, signed improvement percentages.
-- **Decisions** — current phase, decision-mode badge
-  (NORMAL / STARVATION / EMERGENCY), full reason_text, phase history.
+`python server.py` serves the React UI and the read-only API on
+http://127.0.0.1:8000. `python app.py` serves the same UI from inside
+the simulation process.
 
-Dependency-free canvas charting (no CDN needed — works offline).
+Two pages are built:
 
-For the comparison panel during evaluation runs:
+- **Overview** — the junction itself, in a to-scale plan view or an
+  interactive 3D miniature (drag to orbit, scroll to zoom), both drawing
+  the real SUMO vehicles; active phase with its decision mode and reason;
+  the twelve lanes with live signal state; a 60 s phase-history band; and
+  the network metrics strip.
+- **Analytics** — the run happening right now, in detail: lane pressure
+  as a lane-by-time heatmap, the lane ledger, network waiting time and
+  queue length over simulated time, congestion by time bucket, the share
+  of decisions by mode and by phase, the spread of green durations, and
+  speed against waiting time as a scatter. Everything comes from the live
+  WebSocket stream, so this page needs a simulation running and says so
+  when there is not (with a Start button). The database is still being
+  written throughout; it is just not what this page reads.
+
+**Performance** and **Decisions** are honest placeholders for now.
+
+For the AI-vs-baseline comparison panel during evaluation runs:
 
 ```bash
 cd backend
@@ -185,17 +233,39 @@ python -m performance.evaluator --scenario heavy_seed1 --dashboard
 `services/dashboard_server.py` itself remains strictly READ-ONLY: it is
 fed by an in-process snapshot store (`services/live_state.py`) over
 WebSocket, and defines zero endpoints that can send a command into the
-simulation. `app.py`'s dashboard additionally mounts one narrowly-scoped
-control layer on top of it (see "Run a demo without touching a
-terminal", below) — that capability lives entirely in a separate
-module, `services/control_routes.py`, so `dashboard_server.py`'s own
-claim about itself stays true; a standalone `python -m
-performance.evaluator --dashboard` never gains it.
+simulation. Both hosts additionally mount one narrowly-scoped control
+layer on top of it — pause/resume/stop/speed everywhere, plus
+start/stop-simulation in `server.py`, which is the only one that outlives
+a run. That capability lives entirely in a separate module,
+`services/control_routes.py`, so `dashboard_server.py`'s own claim about
+itself stays true; a standalone `python -m performance.evaluator
+--dashboard` never gains it, and the UI discovers which controls are
+actually available from `GET /api/control/run-state` rather than assuming.
 
-### Run a demo without touching a terminal (beyond `python app.py`)
+### Start, pause and stop from HTTP
 
-Once `python app.py` is running, its dashboard can launch and stop a
-Performance Evaluation itself — no second terminal command needed:
+What the buttons in the top bar do, if you would rather script it:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/control/start-simulation \
+     -H "Content-Type: application/json" -d '{"gui": false}'
+
+curl -X POST http://127.0.0.1:8000/api/control/pause
+curl -X POST http://127.0.0.1:8000/api/control/resume
+curl -X POST http://127.0.0.1:8000/api/control/speed \
+     -H "Content-Type: application/json" -d '{"multiplier": 5}'
+curl -X POST http://127.0.0.1:8000/api/control/stop-simulation
+curl http://127.0.0.1:8000/api/control/run-state
+```
+
+`multiplier` is simulated seconds per wall-clock second; `null` means
+unthrottled. This matters for headless runs, which otherwise step at
+roughly a hundred times real time.
+
+### Run an evaluation without touching a terminal
+
+The dashboard can launch and stop a Performance Evaluation itself — no
+second terminal command needed:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/control/start-evaluator \

@@ -35,15 +35,27 @@ EXPECTED_LANE_IDS: Tuple[str, ...] = (
 
 # Network-wide feature names, in the order they appear at the start of
 # the feature vector. The first four are read directly off
-# TrafficFeatures, seconds_until_next_signal_switch is read off
+# TrafficFeatures, seconds_in_current_phase is read off
 # TrafficFeatures.signal, a network-wide quantity since this junction
 # has a single shared tlLogic clock, not an independent one per lane.
+#
+# seconds_in_current_phase REPLACED seconds_until_next_signal_switch on
+# 2026-09-13. The old feature was a train/serve deviation: training data
+# is recorded under SUMO's static program, where "seconds until the next
+# switch" is a real countdown (0.8-29.9 s), but at run time
+# SignalController re-arms every green to a 60 s provisional ceiling on
+# every tick, so the live model was fed ~60 on almost every tick - a
+# value it had never seen, on what was its single most important
+# feature. "How long has the current phase been showing" is truthful
+# under any controller, static or adaptive, and measured offline it
+# predicts slightly BETTER than the countdown did (Section 26 of the
+# architecture report has the numbers).
 NETWORK_FEATURE_NAMES: Tuple[str, ...] = (
     "total_vehicle_count",
     "average_speed",
     "average_waiting_time",
     "stopped_vehicle_count",
-    "seconds_until_next_signal_switch",
+    "seconds_in_current_phase",
 )
 
 # Per-lane feature names, in the order each lane's block appears in the
@@ -143,7 +155,7 @@ def features_to_vector(features: TrafficFeatures) -> List[float]:
         float(features.average_speed),
         float(features.average_waiting_time),
         float(features.stopped_vehicle_count),
-        float(features.signal.seconds_until_next_switch),
+        float(features.signal.seconds_in_current_phase),
     ]
 
     for lane_id in EXPECTED_LANE_IDS:
@@ -231,6 +243,58 @@ def targets_to_vector(future_features: TrafficFeatures) -> List[float]:
                 float(lane.average_waiting_time),
             ])
 
+    return vector
+
+
+# How the model's raw output relates to the target vector. Written into
+# the trained model's metadata by training/train.py and read back by
+# MLPredictor, so a model and the code interpreting it can never
+# silently disagree about what a number coming out of a tree means.
+#
+#   "absolute": the model outputs the target vector directly (the
+#               original design, and what a model with no metadata is
+#               assumed to be).
+#   "residual": the model outputs (target - current value of the same
+#               field on the same lane); the caller adds the current
+#               value back and clips at zero.
+#
+# Residual was adopted on 2026-09-13 after measuring the absolute model
+# against a persistence baseline ("nothing changes in 15 s"): on vehicle
+# counts the forest was WORSE than persistence on every lane, because a
+# tree can only ever output the mean of the training rows in a leaf, so
+# a queue longer than anything in training gets pulled back toward the
+# training range, and a large wait gets shrunk toward the 77% of rows
+# whose wait is exactly zero. Predicting the change instead makes the
+# forest's job "how much does this lane grow or drain in 15 s" - a
+# bounded quantity that transfers across traffic levels. Measured on the
+# same data: test MAE 2.06 -> 1.39, held-out 2.35 -> 1.46, vehicle-count
+# MAE 1.09 -> 0.43. The tree-spread confidence is unaffected: adding a
+# constant to every tree's output does not change their spread.
+TARGET_MODE_ABSOLUTE = "absolute"
+TARGET_MODE_RESIDUAL = "residual"
+
+
+def current_values_as_target_vector(features: TrafficFeatures) -> List[float]:
+    """
+    The CURRENT value of each target field, laid out exactly like a
+    target vector (lane_output_index() alignment), taken from the same
+    snapshot the feature vector is built from. This is the persistence
+    baseline for that snapshot, and the offset a residual-mode model's
+    output is added to.
+
+    A lane absent from features.lane_features contributes zeros, the
+    same convention targets_to_vector() uses for an absent lane.
+    """
+    vector: List[float] = []
+    for lane_id in EXPECTED_LANE_IDS:
+        lane = features.lane_features.get(lane_id)
+        if lane is None:
+            vector.extend([0.0] * len(TARGET_FEATURE_NAMES))
+        else:
+            vector.extend([
+                float(lane.vehicle_count),
+                float(lane.average_waiting_time),
+            ])
     return vector
 
 

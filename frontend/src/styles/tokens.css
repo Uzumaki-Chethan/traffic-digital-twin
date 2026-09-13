@@ -29,11 +29,9 @@
      which read too acid. Ink on it is 9.20:1. */
   --surface-page: #f4b31d;
 
-  /* GREEN — the cards, now actually green rather than a white with a
-     hint. The ceiling here is set by the signal-GREEN chip text that has
-     to sit ON a card: at this value it clears 4.5 only because the green
-     text weight was deepened to #276708 (5.38:1). Push the card greener
-     than this and the "Go" chips stop being readable. */
+  /* GREEN — the cards. Reverted to the pale mint after the saturated
+     #7ECB5A was rejected. The chips stayed as dark pills (ui/SignalChip)
+     because they read more clearly than coloured text either way. */
   --surface-plate: #d0ebbe;
   --surface-inset: #badfa4;
   --surface-hover: #aed89a;
@@ -94,7 +92,7 @@
      Amber is RAL 2009 Traffic Orange. Verified 3.55 / 4.25 / 6.85:1
      inside the dark lamp housing. These
      stay the most saturated thing on screen. */
-  --lamp-red: #e60000;
+  --lamp-red: #ff0505;
   --lamp-amber: #efb700;
   --lamp-green: #4cbb17;
   --lamp-housing: #241a10;

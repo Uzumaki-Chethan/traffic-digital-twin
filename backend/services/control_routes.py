@@ -5,11 +5,19 @@ The ONLY module in this project that lets a web request affect what
 process is running - deliberately kept separate from
 services/dashboard_server.py so that file's own "pure viewer, no POST,
 no control socket" claim about itself stays literally true.
-`build_control_router()` is called once, by app.py only, when it starts
-its dashboard server; performance/evaluator.py's own standalone
---dashboard run never mounts this, so a spawned evaluator's dashboard
-(if it even starts one - see below) can never itself spawn further
-evaluators.
+`build_control_router()` is called once, by app.py or server.py only,
+when it starts its dashboard server; performance/evaluator.py's own
+standalone --dashboard run never mounts this, so a spawned evaluator's
+dashboard (if it even starts one - see below) can never itself spawn
+further evaluators.
+
+WHAT CAN BE CONTROLLED, AND BY WHICH ENTRY POINT:
+  pause / resume / stop / speed   wherever a run loop is attached
+                                  (`run_control`) - app.py and server.py
+  start-simulation                server.py only (`supervisor`), because
+                                  app.py IS the run and cannot host a
+                                  second one
+  start-evaluator / stop-evaluator  either; a real child process
 
 WHAT THIS ACTUALLY LAUNCHES: `python -m performance.evaluator --scenario
 ... --baseline ... [--gui]`, as a genuinely separate OS process (its own
@@ -68,6 +76,23 @@ class StartEvaluatorRequest(BaseModel):
     gui: bool = False
 
 
+class StartSimulationRequest(BaseModel):
+    """
+    gui=False launches headless `sumo` - the console draws the junction
+    itself, so a SUMO window is optional rather than the only way to
+    watch. gui=True opens sumo-gui alongside it.
+    """
+    gui: bool = False
+
+
+class SpeedRequest(BaseModel):
+    """
+    Simulated seconds per wall-clock second. null means unthrottled -
+    run the scenario as fast as the machine manages.
+    """
+    multiplier: Optional[float] = None
+
+
 def _known_scenario_names() -> set:
     return {
         os.path.splitext(os.path.basename(path))[0]
@@ -111,14 +136,139 @@ class _TrackedRun:
         }
 
 
-def build_control_router(store: LiveStateStore) -> APIRouter:
+def build_control_router(store: LiveStateStore, run_control=None,
+                         supervisor=None) -> APIRouter:
     """
     Build the control API, bound to `store` - the SAME LiveStateStore
     the calling process's own simulation loop publishes into (app.py
-    passes its LIVE_STATE). Called once, from app.py only.
+    passes its LIVE_STATE). Called once, from app.py or server.py only.
+
+    `run_control` is the optional services.run_control.RunControl shared
+    with this process's own run loop. When given, the pause/resume/stop/
+    speed endpoints below are live; when omitted they report unavailable
+    rather than pretending, so a dashboard started by the evaluator
+    (which has no run loop of its own to pause) degrades honestly.
+
+    `supervisor` is the optional services.sim_supervisor.SimulationSupervisor
+    that can START a run. Only server.py passes one, because only server.py
+    outlives a simulation: app.py IS the run, so it has nothing to start.
+    Duck-typed on purpose - this module never imports the supervisor, which
+    keeps the whole SUMO pipeline out of the import graph of a dashboard
+    that may never launch anything.
     """
     router = APIRouter()
     tracked = _TrackedRun()
+
+    def _run_state_dict() -> dict:
+        if run_control is None:
+            return {"available": False, "managed": False, "running": False,
+                    "can_start": False, "paused": False, "stopping": False,
+                    "speed": None}
+        if supervisor is not None:
+            return {"available": True, **supervisor.status_dict()}
+        # A run loop with no supervisor is app.py: the process only exists
+        # because a simulation is already running, and it cannot start
+        # another - so "running, not startable" is the honest answer.
+        return {
+            "available": True, "managed": False,
+            "running": not run_control.stop_requested,
+            "can_start": False,
+            **run_control.status_dict(),
+        }
+
+    @router.get("/api/control/run-state")
+    async def run_state():
+        return _run_state_dict()
+
+    def _require_run_control(verb: str):
+        if run_control is None:
+            raise HTTPException(
+                status_code=409,
+                detail="This dashboard is not attached to a run loop it can "
+                       "{}.".format(verb),
+            )
+
+    @router.post("/api/control/pause")
+    async def pause_run():
+        _require_run_control("pause")
+        run_control.pause()
+        return _run_state_dict()
+
+    @router.post("/api/control/resume")
+    async def resume_run():
+        _require_run_control("resume")
+        run_control.resume()
+        return _run_state_dict()
+
+    @router.post("/api/control/stop")
+    async def stop_run():
+        """
+        Ask the simulation to finish after the current step. Deliberately
+        a request, not a kill: the runner's own finally block still runs,
+        so TraCI and the database close cleanly.
+        """
+        _require_run_control("stop")
+        run_control.request_stop()
+        return _run_state_dict()
+
+    @router.post("/api/control/speed")
+    async def set_speed(body: SpeedRequest):
+        """
+        How fast "playing" means: simulated seconds per wall-clock second.
+        Needed because a headless run has no Delay slider of its own and
+        would otherwise step at ~100x real time the moment it starts.
+        """
+        _require_run_control("re-pace")
+        run_control.set_speed(body.multiplier)
+        return _run_state_dict()
+
+    @router.post("/api/control/start-simulation")
+    async def start_simulation(body: StartSimulationRequest):
+        """
+        Start a live AI-controlled run. Available only where something
+        outlives the simulation to host it - i.e. server.py, which is
+        the entry point that passes a supervisor.
+        """
+        if supervisor is None:
+            raise HTTPException(
+                status_code=409,
+                detail="This dashboard cannot start a simulation: it is running "
+                       "inside one. Use server.py for a console that can.",
+            )
+        try:
+            return supervisor.start(gui=body.gui)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @router.post("/api/control/open-gui")
+    async def open_gui():
+        """
+        Continue the running simulation in a SUMO window. Not a restart:
+        the run saves its state and resumes from it, so the same vehicles
+        and the same signal carry across. See SimulationSupervisor.open_gui.
+        """
+        if supervisor is None:
+            raise HTTPException(
+                status_code=409,
+                detail="This dashboard does not own a simulation it could reopen.",
+            )
+        try:
+            return supervisor.open_gui()
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @router.post("/api/control/stop-simulation")
+    async def stop_simulation():
+        """
+        Same graceful stop as /api/control/stop, but reported through the
+        supervisor so the response says whether there was anything to stop.
+        """
+        if supervisor is None:
+            raise HTTPException(
+                status_code=409,
+                detail="This dashboard has no simulation of its own to stop.",
+            )
+        return supervisor.stop()
 
     @router.post("/api/control/start-evaluator")
     async def start_evaluator(body: StartEvaluatorRequest):

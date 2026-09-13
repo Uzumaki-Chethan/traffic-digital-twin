@@ -9,6 +9,13 @@ test set and the fully held-out scenario, and writes the trained model
 plus a metadata JSON file MLPredictor can eventually use to validate
 schema compatibility.
 
+The model is trained in RESIDUAL mode (feature_schema.TARGET_MODE_RESIDUAL):
+the label a tree fits is (target - the same field's current value on
+the same lane), and every evaluation here adds that current value back
+and clips at zero before computing MAE, so the numbers reported are for
+the prediction the Decision Engine actually receives. See the
+TARGET_MODE_* note in ml/feature_schema.py for the measured reason.
+
 The only module in this package that imports scikit-learn's training
 APIs and joblib for saving (as opposed to ml_predictor.py, which only
 ever loads).
@@ -32,6 +39,7 @@ from ml.feature_schema import (
     FEATURE_VECTOR_LENGTH,
     PREDICTION_HORIZON_SECONDS,
     TARGET_FEATURE_NAMES,
+    TARGET_MODE_RESIDUAL,
     TARGET_VECTOR_LENGTH,
     lane_output_index,
 )
@@ -41,11 +49,13 @@ from ml.training.scenario_manifest import SCENARIOS
 logger = logging.getLogger(__name__)
 
 
-def _load_dataset(path: str) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+def _load_dataset(path: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray, List[str]]:
     """
     Read a built dataset CSV and split it into an X matrix, a Y matrix,
-    and the list of scenario_name values per row (used for per-scenario
-    evaluation breakdowns).
+    a B matrix (the persistence base: each target field's CURRENT value
+    on the same lane, in target-vector order - what a residual-mode
+    model's output is added to), and the list of scenario_name values
+    per row (used for per-scenario evaluation breakdowns).
 
     Feature and target columns are located by the naming convention
     dataset_generator._row_header() writes them with, rather than by
@@ -86,10 +96,32 @@ def _load_dataset(path: str) -> Tuple[np.ndarray, np.ndarray, List[str]]:
     Y = np.array([[float(row[col]) for col in target_columns] for row in rows])
     scenario_names = [row["scenario_name"] for row in rows]
 
-    return X, Y, scenario_names
+    # The CSV column "<lane>__<field>" is the current value of the same
+    # field "<lane>__target__<field>" is the future value of. Same
+    # alignment feature_schema.current_values_as_target_vector() gives
+    # MLPredictor from a live TrafficFeatures snapshot.
+    base_columns = [
+        "{}__{}".format(lane_id, target_name)
+        for lane_id in EXPECTED_LANE_IDS
+        for target_name in TARGET_FEATURE_NAMES
+    ]
+    B = np.array([[float(row[col]) for col in base_columns] for row in rows])
+
+    return X, Y, B, scenario_names
 
 
-def _evaluate(model, X: np.ndarray, Y: np.ndarray) -> Dict[str, float]:
+def _predict_absolute(model, X: np.ndarray, B: np.ndarray) -> np.ndarray:
+    """
+    The prediction as the Decision Engine will see it: the model's
+    residual output plus the persistence base, clipped at zero (a lane
+    cannot hold a negative number of vehicles or a negative wait).
+    Every MAE in this module is computed on this, never on the raw
+    residual, so the reported numbers mean what they appear to mean.
+    """
+    return np.clip(model.predict(X) + B, 0.0, None)
+
+
+def _evaluate(model, X: np.ndarray, Y: np.ndarray, B: np.ndarray) -> Dict[str, float]:
     """
     Compute mean absolute error, overall and broken down per target type
     (vehicle count vs waiting time) across all lanes, and per lane. A
@@ -98,7 +130,7 @@ def _evaluate(model, X: np.ndarray, Y: np.ndarray) -> Dict[str, float]:
     therefore fewer training examples), reporting the breakdown makes
     that kind of failure visible instead of averaging it away.
     """
-    predictions = model.predict(X)
+    predictions = _predict_absolute(model, X, B)
 
     metrics: Dict[str, float] = {
         "overall_mae": float(mean_absolute_error(Y, predictions)),
@@ -124,7 +156,7 @@ def _evaluate(model, X: np.ndarray, Y: np.ndarray) -> Dict[str, float]:
     return metrics
 
 
-def _evaluate_per_scenario(model, X: np.ndarray, Y: np.ndarray, scenario_names: List[str]) -> Dict[str, float]:
+def _evaluate_per_scenario(model, X: np.ndarray, Y: np.ndarray, B: np.ndarray, scenario_names: List[str]) -> Dict[str, float]:
     """
     Overall MAE broken down per scenario present in the given dataset,
     so a model that performs well on average but poorly on, for example,
@@ -136,7 +168,7 @@ def _evaluate_per_scenario(model, X: np.ndarray, Y: np.ndarray, scenario_names: 
 
     for scenario_name in unique_scenarios:
         mask = scenario_array == scenario_name
-        predictions = model.predict(X[mask])
+        predictions = _predict_absolute(model, X[mask], B[mask])
         metrics["{}_mae".format(scenario_name)] = float(
             mean_absolute_error(Y[mask], predictions)
         )
@@ -200,7 +232,7 @@ def train_and_evaluate() -> None:
     TrainingConfig.ensure_output_directories()
 
     logger.info("Loading training dataset...")
-    X_train, Y_train, train_scenarios = _load_dataset(TrainingConfig.TRAIN_DATASET_PATH)
+    X_train, Y_train, B_train, train_scenarios = _load_dataset(TrainingConfig.TRAIN_DATASET_PATH)
     logger.info("Loaded %d training rows.", len(X_train))
 
     sample_weights, weight_by_scenario = _compute_sample_weights(train_scenarios)
@@ -209,11 +241,11 @@ def train_and_evaluate() -> None:
         logger.info("  %-22s weight=%.3f", name, weight)
 
     logger.info("Loading chronological test dataset...")
-    X_test, Y_test, test_scenarios = _load_dataset(TrainingConfig.TEST_DATASET_PATH)
+    X_test, Y_test, B_test, test_scenarios = _load_dataset(TrainingConfig.TEST_DATASET_PATH)
     logger.info("Loaded %d test rows.", len(X_test))
 
     logger.info("Loading held-out scenario dataset...")
-    X_held_out, Y_held_out, held_out_scenarios = _load_dataset(
+    X_held_out, Y_held_out, B_held_out, held_out_scenarios = _load_dataset(
         TrainingConfig.HELD_OUT_DATASET_PATH
     )
     logger.info("Loaded %d held-out rows.", len(X_held_out))
@@ -235,22 +267,36 @@ def train_and_evaluate() -> None:
         random_state=TrainingConfig.MODEL_RANDOM_STATE,
         n_jobs=-1,
     )
-    model.fit(X_train, Y_train, sample_weight=sample_weights)
+    # Residual labels: what changes over the horizon, not the level.
+    model.fit(X_train, Y_train - B_train, sample_weight=sample_weights)
 
     logger.info("Evaluating on chronological test set...")
-    test_metrics = _evaluate(model, X_test, Y_test)
-    test_metrics_per_scenario = _evaluate_per_scenario(model, X_test, Y_test, test_scenarios)
+    test_metrics = _evaluate(model, X_test, Y_test, B_test)
+    test_metrics_per_scenario = _evaluate_per_scenario(model, X_test, Y_test, B_test, test_scenarios)
 
     logger.info("Evaluating on held-out scenario...")
-    held_out_metrics = _evaluate(model, X_held_out, Y_held_out)
+    held_out_metrics = _evaluate(model, X_held_out, Y_held_out, B_held_out)
     held_out_metrics_per_scenario = _evaluate_per_scenario(
-        model, X_held_out, Y_held_out, held_out_scenarios
+        model, X_held_out, Y_held_out, B_held_out, held_out_scenarios
     )
+
+    # Reference point for the reader of the metadata: the MAE of doing
+    # nothing at all (persistence), on the same rows. A model that does
+    # not beat this is not predicting.
+    persistence_test_mae = float(mean_absolute_error(Y_test, B_test))
+    persistence_held_out_mae = float(mean_absolute_error(Y_held_out, B_held_out))
+    logger.info("Persistence baseline MAE: test %.4f, held-out %.4f",
+                persistence_test_mae, persistence_held_out_mae)
 
     logger.info("Test set overall MAE: %.4f", test_metrics["overall_mae"])
     logger.info("Held-out scenario overall MAE: %.4f", held_out_metrics["overall_mae"])
 
-    joblib.dump(model, TrainingConfig.MODEL_OUTPUT_PATH)
+    # compress=3: a 300-tree forest on ~28k rows is ~630 MB raw and
+    # ~250 MB compressed, with byte-identical predictions. The file is
+    # tracked through Git LFS (1 GB free storage / month, and every
+    # teammate's clone downloads it), so size is not cosmetic here.
+    # Load time is a one-off at startup; MLPredictor is unaffected.
+    joblib.dump(model, TrainingConfig.MODEL_OUTPUT_PATH, compress=3)
     logger.info("Model saved to %s", TrainingConfig.MODEL_OUTPUT_PATH)
 
     metadata = {
@@ -260,6 +306,7 @@ def train_and_evaluate() -> None:
         "model_type": type(model).__name__,
         "n_estimators": TrainingConfig.MODEL_N_ESTIMATORS,
         "random_state": TrainingConfig.MODEL_RANDOM_STATE,
+        "target_mode": TARGET_MODE_RESIDUAL,
         "prediction_horizon_seconds": PREDICTION_HORIZON_SECONDS,
         "sampling_interval_seconds": TrainingConfig.SAMPLING_INTERVAL_SECONDS,
         "feature_vector_length": FEATURE_VECTOR_LENGTH,
@@ -272,6 +319,10 @@ def train_and_evaluate() -> None:
         "held_out_row_count": len(X_held_out),
         "sample_weight_cap": _SAMPLE_WEIGHT_CAP,
         "sample_weight_by_scenario": weight_by_scenario,
+        "persistence_baseline": {
+            "test_mae": persistence_test_mae,
+            "held_out_mae": persistence_held_out_mae,
+        },
         "test_metrics": test_metrics,
         "test_metrics_per_scenario": test_metrics_per_scenario,
         "held_out_metrics": held_out_metrics,

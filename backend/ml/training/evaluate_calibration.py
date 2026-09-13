@@ -51,6 +51,7 @@ Usage
 
 import argparse
 import csv
+import json
 import logging
 import os
 from typing import Dict, List, Tuple
@@ -61,6 +62,9 @@ import numpy as np
 from ml.feature_schema import (
     EXPECTED_LANE_IDS,
     FEATURE_VECTOR_LENGTH,
+    TARGET_FEATURE_NAMES,
+    TARGET_MODE_ABSOLUTE,
+    TARGET_MODE_RESIDUAL,
     TARGET_VECTOR_LENGTH,
     lane_output_index,
 )
@@ -71,11 +75,16 @@ logger = logging.getLogger(__name__)
 _CONFIDENCE_BIN_EDGES = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
 
-def _load_dataset(path: str) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+def _load_dataset(path: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray, List[str]]:
     """Same column-discovery logic as train.py._load_dataset, kept
     independent (not imported) since this module intentionally has no
     dependency on train.py - it only needs a fitted model and a
-    dataset, not the training entry point itself."""
+    dataset, not the training entry point itself.
+
+    Returns X, Y, B, scenario_names - B being the persistence base
+    (each target field's current value, target-vector order), which a
+    residual-mode model's output must be added to before it means
+    anything. See _absolute_mean_prediction()."""
     with open(path, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     if not rows:
@@ -100,7 +109,35 @@ def _load_dataset(path: str) -> Tuple[np.ndarray, np.ndarray, List[str]]:
     X = np.array([[float(row[col]) for col in feature_columns] for row in rows])
     Y = np.array([[float(row[col]) for col in target_columns] for row in rows])
     scenario_names = [row["scenario_name"] for row in rows]
-    return X, Y, scenario_names
+    base_columns = [
+        "{}__{}".format(lane_id, target_name)
+        for lane_id in EXPECTED_LANE_IDS
+        for target_name in TARGET_FEATURE_NAMES
+    ]
+    B = np.array([[float(row[col]) for col in base_columns] for row in rows])
+    return X, Y, B, scenario_names
+
+
+def _model_target_mode() -> str:
+    """The target_mode train.py recorded for the model on disk; absolute
+    when there is no metadata (a model from before residual mode)."""
+    if os.path.isfile(TrainingConfig.MODEL_METADATA_PATH):
+        with open(TrainingConfig.MODEL_METADATA_PATH, "r", encoding="utf-8") as fh:
+            return json.load(fh).get("target_mode", TARGET_MODE_ABSOLUTE)
+    return TARGET_MODE_ABSOLUTE
+
+
+def _absolute_mean_prediction(tree_preds: np.ndarray, B: np.ndarray) -> np.ndarray:
+    """The mean prediction exactly as MLPredictor reports it: for a
+    residual-mode model, tree mean + persistence base, floored at zero.
+    Confidence must be computed against THIS level (it is the
+    denominator in _confidence_from_spread), and error against it too,
+    otherwise the calibrators would be fitted to a quantity the live
+    predictor never produces."""
+    mean_pred = tree_preds.mean(axis=0)
+    if _model_target_mode() == TARGET_MODE_RESIDUAL:
+        mean_pred = np.maximum(mean_pred + B, 0.0)
+    return mean_pred
 
 
 def _tree_predictions(model, X: np.ndarray) -> np.ndarray:
@@ -117,10 +154,14 @@ def _tree_predictions(model, X: np.ndarray) -> np.ndarray:
 
 def _confidence_from_spread(mean_value: np.ndarray, std_value: np.ndarray) -> np.ndarray:
     """
-    Exact reproduction of MLPredictor._confidence, vectorized. Kept
-    numerically identical on purpose - this must evaluate the real
-    formula the running system uses, not a stand-in for it.
+    Exact reproduction of MLPredictor._confidence, vectorized, for the
+    target mode of the model on disk. Kept numerically identical on
+    purpose - this must evaluate the real formula the running system
+    uses, not a stand-in for it. See MLPredictor._confidence for why
+    the two modes differ.
     """
+    if _model_target_mode() == TARGET_MODE_RESIDUAL:
+        return 100.0 / (1.0 + np.maximum(0.0, std_value))
     denominator = np.maximum(np.abs(mean_value), 1.0)
     return np.maximum(0.0, 100.0 - (std_value / denominator) * 100.0)
 
@@ -204,13 +245,13 @@ def evaluate_calibration(dataset_path: str) -> None:
         logger.info("No confidence_calibrators.joblib found - showing raw (uncalibrated) view only.")
 
     logger.info("Loading dataset from %s...", dataset_path)
-    X, Y, scenario_names = _load_dataset(dataset_path)
+    X, Y, B, scenario_names = _load_dataset(dataset_path)
     logger.info("Loaded %d rows across %d scenario(s).", len(X), len(set(scenario_names)))
 
     logger.info("Collecting per-tree predictions (n_estimators=%d)...", len(model.estimators_))
     tree_preds = _tree_predictions(model, X)  # (n_estimators, n_rows, n_outputs)
-    mean_pred = tree_preds.mean(axis=0)        # (n_rows, n_outputs)
-    std_pred = tree_preds.std(axis=0)          # (n_rows, n_outputs)
+    mean_pred = _absolute_mean_prediction(tree_preds, B)  # (n_rows, n_outputs)
+    std_pred = tree_preds.std(axis=0)                     # (n_rows, n_outputs)
 
     confidence_per_output = _confidence_from_spread(mean_pred, std_pred)  # (n_rows, n_outputs)
     error_per_output = np.abs(Y - mean_pred)                              # (n_rows, n_outputs)

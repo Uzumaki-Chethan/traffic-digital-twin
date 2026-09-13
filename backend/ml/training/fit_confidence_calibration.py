@@ -60,7 +60,12 @@ from sklearn.isotonic import IsotonicRegression
 
 from ml.feature_schema import EXPECTED_LANE_IDS, TARGET_FEATURE_NAMES, lane_output_index
 from ml.training.config import TrainingConfig
-from ml.training.evaluate_calibration import _confidence_from_spread, _load_dataset, _tree_predictions
+from ml.training.evaluate_calibration import (
+    _absolute_mean_prediction,
+    _confidence_from_spread,
+    _load_dataset,
+    _tree_predictions,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -94,12 +99,12 @@ def fit_calibration() -> None:
     model = joblib.load(TrainingConfig.MODEL_OUTPUT_PATH)
 
     logger.info("Loading TEST dataset (not held-out - keeping held-out untouched)...")
-    X, Y, _ = _load_dataset(TrainingConfig.TEST_DATASET_PATH)
+    X, Y, B, _ = _load_dataset(TrainingConfig.TEST_DATASET_PATH)
     logger.info("Loaded %d rows.", len(X))
 
     logger.info("Collecting per-tree predictions (n_estimators=%d)...", len(model.estimators_))
     tree_preds = _tree_predictions(model, X)
-    mean_pred = tree_preds.mean(axis=0)
+    mean_pred = _absolute_mean_prediction(tree_preds, B)
     std_pred = tree_preds.std(axis=0)
     raw_confidence = _confidence_from_spread(mean_pred, std_pred)  # (n_rows, n_outputs)
     error = np.abs(Y - mean_pred)

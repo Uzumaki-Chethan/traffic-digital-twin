@@ -69,15 +69,27 @@ export const LANES: LaneGeom[] = [
 
 export const LANE_BY_ID: Record<string, LaneGeom> = Object.fromEntries(LANES.map((l) => [l.id, l]))
 
-/** Pavement movement arrows, keep-left (ported from the verified export).
- * Each is a path in canvas coords ending in an arrowhead marker. */
+/**
+ * Pavement movement arrows, keep-left. Each is a path in canvas coords
+ * ending in an arrowhead marker, so it must be drawn IN THE DIRECTION OF
+ * TRAVEL — toward the junction for an inbound lane.
+ *
+ * The N and S sets were both inverted until 2026-09-13: they ran away
+ * from the junction and curved to the wrong side, so a left-turn lane
+ * was painted as a right turn pointing backwards. Travelling south (N
+ * approach) the driver's left is EAST; travelling north (S approach) it
+ * is WEST. Lane 0 is the kerb lane and turns left; lane 2 is the median
+ * lane and turns right. E and W were always correct and are unchanged.
+ */
 export const ARROWS: Record<string, string> = {
-  N_in_0: 'M 550 60 L 550 48 Q 550 40 542 40 L 536 40',
-  N_in_1: 'M 514 60 L 514 36',
-  N_in_2: 'M 478 60 L 478 48 Q 478 40 486 40 L 492 40',
-  S_in_0: 'M 370 480 L 370 492 Q 370 500 378 500 L 384 500',
-  S_in_1: 'M 406 480 L 406 504',
-  S_in_2: 'M 442 480 L 442 492 Q 442 500 434 500 L 428 500',
+  // N approach: travelling SOUTH (down the drawing). Left turn -> east.
+  N_in_0: 'M 550 36 L 550 52 Q 550 60 558 60 L 564 60',
+  N_in_1: 'M 514 36 L 514 64',
+  N_in_2: 'M 478 36 L 478 52 Q 478 60 470 60 L 464 60',
+  // S approach: travelling NORTH (up the drawing). Left turn -> west.
+  S_in_0: 'M 370 504 L 370 488 Q 370 480 362 480 L 356 480',
+  S_in_1: 'M 406 504 L 406 476',
+  S_in_2: 'M 442 504 L 442 488 Q 442 480 450 480 L 456 480',
   W_in_0: 'M 120 180 L 132 180 Q 140 180 140 172 L 140 166',
   W_in_1: 'M 120 216 L 144 216',
   W_in_2: 'M 120 252 L 132 252 Q 140 252 140 260 L 140 266',

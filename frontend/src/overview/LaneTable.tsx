@@ -3,7 +3,8 @@ import { LANE_IDS, type LaneView } from '@/data/types'
 import { useSim } from '@/data/store'
 import { Panel } from '@/ui/Panel'
 import { f1 } from '@/utils/format'
-import { lampColor, lampLabel, lampOf, movementOf } from '@/utils/signal'
+import { lampOf, movementOf } from '@/utils/signal'
+import { SignalChip } from '@/ui/SignalChip'
 
 /**
  * Twelve rows, fixed order, one per lane. Hover cross-highlights the lane
@@ -38,17 +39,16 @@ export function LaneTable({ lanes, powered }: { lanes: LaneView[]; powered: bool
                 key={id}
                 onMouseEnter={() => setHoverLane(id)}
                 onMouseLeave={() => setHoverLane(null)}
-                className={clsx('h-7 border-t border-rule-soft transition-colors', active && 'bg-hover')}
+                className={clsx(
+                  'h-7 border-t border-rule-soft transition-colors duration-150',
+                  active && 'bg-hover',
+                )}
+                style={active ? { boxShadow: 'inset 2px 0 0 var(--accent)' } : undefined}
               >
                 <td className="num px-2 font-medium text-ink-strong">{id}</td>
                 <td className="px-2 text-ink">{movementOf(id)}</td>
                 <td className="px-2">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full" style={{ background: lampColor(lamp) }} />
-                    <span className="num text-[12px] font-semibold" style={{ color: lampColor(lamp) }}>
-                      {lampLabel(lamp)}
-                    </span>
-                  </span>
+                  <SignalChip lamp={lamp} />
                 </td>
                 <td className="num px-2 text-right text-ink-strong">{powered && l ? l.vehicles : '—'}</td>
                 <td className="num px-2 text-right text-ink">{powered && l ? `${f1(l.avg_wait)} s` : '—'}</td>

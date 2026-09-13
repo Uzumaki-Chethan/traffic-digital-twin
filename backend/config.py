@@ -48,6 +48,15 @@ class Config:
     # the process was actually simulating invisibly at full speed.
     SUMO_BINARY_NAME = "sumo-gui"
 
+    # Extra command-line arguments appended to the SUMO launch, after
+    # "-c <sumocfg>". Empty here on purpose: a hand-started run keeps
+    # whatever settings the user has in sumo-gui. A run the browser
+    # launches overrides this (see simulation_runner.resolve_config) to
+    # switch sumo-gui's own Delay slider off, because in that case the
+    # pace is already being set by RunControl and two throttles in
+    # series would just multiply.
+    SUMO_EXTRA_ARGS = []
+
     # The traffic light ID in the frozen network, verified directly
     # against sumo/network/intersection.tll.xml (<tlLogic id="C">).
     # DecisionEngine and SignalController both operate on this one

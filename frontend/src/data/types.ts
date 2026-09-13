@@ -52,10 +52,39 @@ export interface MetricsView {
   stopped: number
 }
 
+/** One real vehicle, from app.py's snapshot. `x`/`y` are SUMO network
+ * metres (junction C sits at 200,200; the network is 400 m square) read
+ * from traci.vehicle.getPosition(). `lane` may be an inbound lane, an
+ * outbound C_out_* lane, or an internal ":C_*" junction lane. */
+export interface VehicleView {
+  id: string
+  lane: string
+  x: number
+  y: number
+  speed: number
+  /**
+   * SUMO's own type id — `car_normal`, `motorcycle_aggressive`,
+   * `auto_rickshaw`, `bus`, `truck`, `ambulance`, … Added to the backend
+   * contract 2026-09-13 so the views can draw a bus as a bus. The
+   * dimensions that go with each id are in overview/vehicleTypes.ts,
+   * transcribed from the frozen vehicle_types.add.xml. Optional: an
+   * older backend does not send it, and those vehicles draw as cars.
+   */
+  type?: string
+}
+
 export interface LaneView {
   lane_id: LaneId | string
   vehicles: number
   avg_wait: number
+  /**
+   * The lane's 0–1 urgency score, exactly as DecisionEngine computed it
+   * this tick (the same number persisted to lane_state_log). Added to the
+   * backend contract 2026-09-12 so lane pressure can be charted live
+   * instead of read back out of SQLite. Optional: an older backend, or an
+   * evaluator-driven snapshot, does not send it.
+   */
+  score?: number
   signal: SumoSignalChar
 }
 
@@ -107,6 +136,9 @@ export interface LiveSnapshot {
   signal: SignalView | null
   metrics: MetricsView
   lanes: LaneView[]
+  /** Added to the backend contract 2026-09-12 so the plate can draw real
+   * traffic. Optional because an evaluator-driven snapshot may omit it. */
+  vehicles?: VehicleView[]
   decision: DecisionView
   emergency_lanes: string[]
   prediction: PredictionView | null

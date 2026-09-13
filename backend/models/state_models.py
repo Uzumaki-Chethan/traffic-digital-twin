@@ -39,6 +39,13 @@ class VehicleState:
     position : Tuple[float, float]
         The vehicle's (x, y) coordinate in the network's local
         coordinate system, as reported by traci.vehicle.getPosition().
+    type_id : str
+        The vehicle's SUMO type, as reported by
+        traci.vehicle.getTypeID() - e.g. "car_normal", "motorcycle_
+        aggressive", "auto_rickshaw", "bus", "truck", "ambulance". These
+        are the types defined in sumo/vehicles/vehicle_types.add.xml.
+        Defaults to "" so a VehicleState can still be built without one
+        (tests, and any caller that predates this field).
     """
 
     id: str
@@ -46,6 +53,7 @@ class VehicleState:
     speed: float
     waiting_time: float
     position: Tuple[float, float]
+    type_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -82,7 +90,16 @@ class SignalState:
     seconds_until_next_switch : float
         Seconds remaining until the signal's next phase change, computed
         as traci.trafficlight.getNextSwitch(tls_id) - the current
-        simulation time.
+        simulation time. Only a real countdown under SUMO's own static
+        program (or during a yellow clearance); under an adaptive
+        controller it is whatever provisional ceiling that controller
+        last armed. Kept for the dashboard's amber countdown, NOT used
+        as an ML feature any more (see seconds_in_current_phase).
+    seconds_in_current_phase : float
+        Seconds the current phase index has been showing, measured by
+        the adapter from the moment it observed the index change.
+        Truthful under any controller, which is why it replaced
+        seconds_until_next_switch as the ML feature on 2026-09-13.
     lane_states : Mapping[str, str]
         Per-lane single-character signal state ('G', 'g', 'y', or 'r'),
         keyed by lane_id, built by cross-referencing
@@ -95,6 +112,7 @@ class SignalState:
     current_phase_index: int
     seconds_until_next_switch: float
     lane_states: Mapping[str, str]
+    seconds_in_current_phase: float
 
 
 @dataclass(frozen=True)

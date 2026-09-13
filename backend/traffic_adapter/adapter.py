@@ -64,6 +64,14 @@ class TrafficAdapter:
             if getattr(traci_manager, "connection", None) is not None
             else traci
         )
+        # Phase clock for SignalState.seconds_in_current_phase: the
+        # phase index last observed and the simulation time at which it
+        # was first seen. None until the first read. This is the one
+        # piece of state this adapter keeps between ticks, and it is
+        # still only observation - it records WHEN the light changed,
+        # it never decides anything about it.
+        self._observed_phase_index = None
+        self._observed_phase_started_at = 0.0
 
     def get_current_state(self) -> SimulationState:
         """
@@ -141,6 +149,39 @@ class TrafficAdapter:
             )
         return tuple(self._traci.simulation.getArrivedIDList())
 
+    def get_stop_starting_vehicle_ids(self) -> Tuple[str, ...]:
+        """
+        Return the IDs of vehicles that BEGAN a scheduled stop (a
+        <stop> element in their route - a bus at a bus stop, a stalled
+        truck in the accident scenario) during the most recent
+        simulation step, as a tuple.
+
+        Exists so Performance Evaluation can keep a vehicle's scheduled
+        stop time out of its measured travel time - the same convention
+        SUMO itself applies to waiting time, which never counts a
+        scheduled stop as delay. Raw fact only, like every read here:
+        what to subtract, and from what, is MetricsCollector's business.
+        """
+        if not self._traci_manager.is_connected:
+            raise RuntimeError(
+                "TrafficAdapter cannot read stop-starting vehicles: the "
+                "TraCIManager is not currently connected."
+            )
+        return tuple(self._traci.simulation.getStopStartingVehiclesIDList())
+
+    def get_stop_ending_vehicle_ids(self) -> Tuple[str, ...]:
+        """
+        Return the IDs of vehicles that ENDED a scheduled stop during the
+        most recent simulation step, as a tuple. Counterpart of
+        get_stop_starting_vehicle_ids().
+        """
+        if not self._traci_manager.is_connected:
+            raise RuntimeError(
+                "TrafficAdapter cannot read stop-ending vehicles: the "
+                "TraCIManager is not currently connected."
+            )
+        return tuple(self._traci.simulation.getStopEndingVehiclesIDList())
+
     def get_emergency_vehicle_lanes(self) -> frozenset:
         """
         Return the set of lane IDs that currently hold at least one
@@ -177,6 +218,12 @@ class TrafficAdapter:
             speed=self._traci.vehicle.getSpeed(vehicle_id),
             waiting_time=self._traci.vehicle.getWaitingTime(vehicle_id),
             position=self._traci.vehicle.getPosition(vehicle_id),
+            # One extra TraCI read per vehicle per tick. Worth it: it is
+            # what lets the dashboard draw a bus as a bus and a
+            # motorcycle as a motorcycle instead of every vehicle as an
+            # identical box. Still a raw fact, like everything else here
+            # - what a type MEANS is the caller's business.
+            type_id=self._traci.vehicle.getTypeID(vehicle_id),
         )
 
     def _extract_signal(self, simulation_time: float) -> SignalState:
@@ -200,12 +247,32 @@ class TrafficAdapter:
         )
         lane_states = self._build_lane_states(raw_state)
 
+        if current_phase_index != self._observed_phase_index:
+            if self._observed_phase_index is None:
+                # First ever read. The phase may already be part-way
+                # through (a run resumed from a saved state, or an
+                # adapter attached mid-run), so recover the elapsed time
+                # from SUMO's own clock: duration - remaining. Exact
+                # under the static program; under an adaptive controller
+                # that re-arms its ceiling every tick this comes out as
+                # ~0, which is the right answer for "just attached".
+                phase_duration = self._traci.trafficlight.getPhaseDuration(_TLS_ID)
+                already_elapsed = max(0.0, phase_duration - seconds_until_next_switch)
+                self._observed_phase_started_at = simulation_time - already_elapsed
+            else:
+                self._observed_phase_started_at = simulation_time
+            self._observed_phase_index = current_phase_index
+        seconds_in_current_phase = max(
+            0.0, simulation_time - self._observed_phase_started_at
+        )
+
         return SignalState(
             tls_id=_TLS_ID,
             raw_state=raw_state,
             current_phase_index=current_phase_index,
             seconds_until_next_switch=seconds_until_next_switch,
             lane_states=lane_states,
+            seconds_in_current_phase=seconds_in_current_phase,
         )
 
     def _build_lane_states(self, raw_state: str):

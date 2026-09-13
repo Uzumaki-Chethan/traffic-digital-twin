@@ -47,16 +47,20 @@ from models import (
 # ===================== Fixture builders =====================
 
 
-def _lane_feature(lane_id: str, vehicle_count: int = 0, waiting_time: float = 0.0) -> LaneFeatures:
+def _lane_feature(
+    lane_id: str, vehicle_count: int = 0, waiting_time: float = 0.0, departure_rate: float = 0.0
+) -> LaneFeatures:
     return LaneFeatures(
         lane_id=lane_id,
         vehicle_count=vehicle_count,
         average_speed=5.0 if vehicle_count else 0.0,
         average_waiting_time=waiting_time,
         max_waiting_time=waiting_time,
-        stopped_vehicle_count=0,
+        stopped_vehicle_count=vehicle_count if waiting_time > 0 else 0,
         arrival_rate=0.0,
-        departure_rate=0.0,
+        # Non-zero only where a test says the lane is discharging - the
+        # preemption floor's gate (DecisionConfig.preemption_floor_min_departure_rate).
+        departure_rate=departure_rate,
         stopped_vehicle_count_trend=0.0,
         waiting_time_trend=0.0,
     )
@@ -73,6 +77,7 @@ def make_features(demand: dict = None, simulation_time: float = 0.0) -> TrafficF
         lane_id: _lane_feature(lane_id, *demand.get(lane_id, (0, 0.0)))
         for lane_id in ALL_APPROACH_LANES
     }
+    # A third tuple element, when given, is the lane's departure_rate.
     return TrafficFeatures(
         simulation_time=simulation_time,
         total_vehicle_count=sum(lf.vehicle_count for lf in lane_features.values()),
@@ -81,7 +86,7 @@ def make_features(demand: dict = None, simulation_time: float = 0.0) -> TrafficF
         stopped_vehicle_count=0,
         lane_features=MappingProxyType(lane_features),
         signal=SignalFeatures(
-            seconds_until_next_switch=10.0,
+            seconds_in_current_phase=20.0,
             lane_signal_states=MappingProxyType({lane_id: 0 for lane_id in ALL_APPROACH_LANES}),
         ),
     )
@@ -142,7 +147,7 @@ def _hysteresis_engine() -> DecisionEngine:
 
 def test_hysteresis_holds_a_marginally_better_alternative():
     engine = _hysteresis_engine()
-    engine.decide(make_features({}), None, dt_seconds=10.0)  # clear min green
+    engine.decide(make_features({}), None, dt_seconds=20.0)  # clear min green (and the 20 s preemption floor)
 
     # EW_straight_left scores only marginally higher than NS_straight_left,
     # well inside the 0.08 base hysteresis margin.
@@ -158,7 +163,7 @@ def test_hysteresis_holds_a_marginally_better_alternative():
 
 def test_hysteresis_switches_when_clearly_better():
     engine = _hysteresis_engine()
-    engine.decide(make_features({}), None, dt_seconds=10.0)  # clear min green
+    engine.decide(make_features({}), None, dt_seconds=20.0)  # clear min green (and the 20 s preemption floor)
 
     # S_in_1/N_in_1 keep 1 vehicle each (not zero) specifically so this
     # exercises the confirmation-debounce path, not gap-out - a
@@ -204,10 +209,18 @@ def test_oversaturation_widens_the_switch_margin():
         # test nothing). light_traffic_congestion_threshold=0.0 keeps
         # light-traffic mode out of this test too (its own dedicated
         # tests cover it below).
+        # min_green_before_preemption_seconds is pinned to the plain
+        # min green here: this test isolates the margin arithmetic, and
+        # the realistic-green floor (its own test below) would otherwise
+        # hold BOTH runs regardless of congestion.
         engine = DecisionEngine(
             initial_phase="NS_straight_left",
             config=DecisionConfig(
                 switch_hysteresis_margin=0.08, light_traffic_congestion_threshold=0.0,
+                min_green_before_preemption_seconds={
+                    "NS_straight_left": 10.0, "EW_straight_left": 10.0,
+                    "NS_right": 8.0, "EW_right": 8.0,
+                },
             ),
         )
         demand = {
@@ -219,10 +232,12 @@ def test_oversaturation_widens_the_switch_margin():
 
     low_congestion = run({})
     # Left-turn lanes (S_in_0/N_in_0/E_in_0/W_in_0), not right-turn
-    # lanes: left-turn demand feeds BOTH main phases identically (see
-    # _phase_scores' left_turn_influence), so it raises congestion_index
-    # without changing the NS-vs-EW score gap or creating a stronger
-    # THIRD competing phase - the two right-turn phases stay at 0.
+    # lanes. Since left turns became protected (2026-09-13) each of these
+    # belongs to one main phase, but they are loaded SYMMETRICALLY here -
+    # NS gets S_in_0+N_in_0, EW gets E_in_0+W_in_0, all identical - so
+    # congestion_index rises without changing the NS-vs-EW gap, and the
+    # two right-turn phases still stay at 0. That is what this test needs;
+    # the mechanism it relies on changed, the property it asserts did not.
     high_congestion = run({
         "S_in_0": (20, 60.0), "N_in_0": (20, 60.0),
         "E_in_0": (20, 60.0), "W_in_0": (20, 60.0),
@@ -247,7 +262,7 @@ def test_light_traffic_mode_suppresses_scored_switching():
             switch_hysteresis_margin=0.08,
         ),
     )
-    engine.decide(make_features({}), None, dt_seconds=10.0)  # clear min green
+    engine.decide(make_features({}), None, dt_seconds=20.0)  # clear min green (and the 20 s preemption floor)
 
     # A gap large enough it would clearly trigger an ordinary switch
     # outside light-traffic mode (see test_hysteresis_switches_when_clearly_better).
@@ -268,7 +283,7 @@ def test_light_traffic_mode_still_allows_gap_out():
         config=DecisionConfig(light_traffic_congestion_threshold=0.5),
     )
     engine.decide(
-        make_features({"S_in_1": (5, 0.0), "N_in_1": (5, 0.0)}), None, dt_seconds=10.0,
+        make_features({"S_in_1": (5, 0.0), "N_in_1": (5, 0.0)}), None, dt_seconds=15.0,
     )
     features = make_features({"E_in_1": (5, 0.0), "W_in_1": (5, 0.0)})  # NS now empty
 
@@ -286,7 +301,7 @@ def test_above_threshold_scored_switching_resumes():
             switch_hysteresis_margin=0.08,
         ),
     )
-    engine.decide(make_features({}), None, dt_seconds=10.0)
+    engine.decide(make_features({}), None, dt_seconds=15.0)
 
     features = make_features({
         "S_in_1": (1, 0.0), "N_in_1": (1, 0.0),
@@ -308,7 +323,7 @@ def test_gap_out_releases_an_empty_phase_immediately():
     # traffic - a single tick should be enough to gap out, no
     # confirmation window required (gap-out bypasses the debounce).
     engine.decide(
-        make_features({"S_in_1": (5, 0.0), "N_in_1": (5, 0.0)}), None, dt_seconds=10.0,
+        make_features({"S_in_1": (5, 0.0), "N_in_1": (5, 0.0)}), None, dt_seconds=15.0,
     )
     features = make_features({"E_in_1": (5, 0.0), "W_in_1": (5, 0.0)})  # NS now empty
 
@@ -322,7 +337,7 @@ def test_gap_out_releases_an_empty_phase_immediately():
 def test_gap_out_does_not_fire_with_residual_demand():
     engine = DecisionEngine(initial_phase="NS_straight_left")
     engine.decide(
-        make_features({"S_in_1": (5, 0.0), "N_in_1": (5, 0.0)}), None, dt_seconds=10.0,
+        make_features({"S_in_1": (5, 0.0), "N_in_1": (5, 0.0)}), None, dt_seconds=15.0,
     )
     # NS_straight_left still has 1 vehicle - not empty - even though
     # EW_straight_left has much more demand; this must go through the
@@ -339,7 +354,7 @@ def test_gap_out_does_not_fire_with_residual_demand():
 
 def test_gap_out_does_not_fire_when_the_whole_junction_is_empty():
     engine = DecisionEngine(initial_phase="NS_straight_left")
-    engine.decide(make_features({}), None, dt_seconds=10.0)  # clear min green, empty
+    engine.decide(make_features({}), None, dt_seconds=20.0)  # clear min green (and the 20 s preemption floor), empty
 
     decision = engine.decide(make_features({}), None, dt_seconds=1.0)  # still empty everywhere
 
@@ -358,7 +373,7 @@ def test_a_reverting_blip_never_triggers_a_switch():
     signal must never have flipped for that blip.
     """
     engine = _hysteresis_engine()
-    engine.decide(make_features({}), None, dt_seconds=10.0)  # clear min green
+    engine.decide(make_features({}), None, dt_seconds=20.0)  # clear min green (and the 20 s preemption floor)
 
     blip = make_features({
         "S_in_1": (5, 0.0), "N_in_1": (5, 0.0),
@@ -382,7 +397,7 @@ def test_a_reverting_blip_never_triggers_a_switch():
 # ===================== Hard starvation guarantee =====================
 
 
-def _starvation_engine() -> DecisionEngine:
+def _starvation_engine(**config_overrides) -> DecisionEngine:
     # starvation_rate_per_second=0.0 proves the HARD limit itself (a
     # guarantee independent of score math) forces the switch, not the
     # separately-adaptive soft starvation pressure the engine also has.
@@ -396,13 +411,17 @@ def _starvation_engine() -> DecisionEngine:
     }
     return DecisionEngine(
         initial_phase="NS_straight_left",
-        config=DecisionConfig(starvation_rate_per_second=0.0, max_green_seconds=far_max_green),
+        config=DecisionConfig(
+            starvation_rate_per_second=0.0, max_green_seconds=far_max_green, **config_overrides
+        ),
     )
 
 
 def test_hard_starvation_forces_a_switch_eventually():
+    # One vehicle on E_in_1 that can never win on score against two
+    # 15-vehicle lanes - only the hard starvation guarantee can serve it.
     engine = _starvation_engine()
-    features = make_features({"S_in_1": (15, 30.0), "N_in_1": (15, 30.0)})
+    features = make_features({"S_in_1": (15, 30.0), "N_in_1": (15, 30.0), "E_in_1": (1, 5.0)})
 
     decision = None
     for _ in range(7):  # 7 * 25s = 175s, comfortably past the 150s hard limit
@@ -414,6 +433,59 @@ def test_hard_starvation_forces_a_switch_eventually():
     assert decision.switched is True
     assert decision.decision_mode == "starvation_override"
     assert decision.active_phase != "NS_straight_left"
+
+
+def test_hard_starvation_with_demand_gate_serves_the_phase_with_traffic():
+    engine = _starvation_engine(starvation_requires_demand=True)
+    features = make_features({"S_in_1": (15, 30.0), "N_in_1": (15, 30.0), "E_in_1": (1, 5.0)})
+    decision = None
+    for _ in range(7):
+        decision = engine.decide(features, None, dt_seconds=25.0)
+        if decision.switched:
+            break
+    assert decision is not None and decision.switched is True
+    assert decision.decision_mode == "starvation_override"
+    assert decision.active_phase == "EW_straight_left"
+
+
+def test_hard_starvation_never_force_serves_an_empty_phase():
+    # With DecisionConfig.starvation_requires_demand on, starvation means
+    # unserved DEMAND: with nobody on any other phase there is nothing to
+    # starve, so the engine keeps serving the phase that has traffic.
+    # (Off by default - tested and found to lose to VAC in light traffic,
+    # see Section 26.4 - but the mechanism must still work when asked.)
+    engine = _starvation_engine(starvation_requires_demand=True)
+    features = make_features({"S_in_1": (15, 30.0), "N_in_1": (15, 30.0)})
+
+    for _ in range(8):  # 200s, well past the 150s hard limit
+        decision = engine.decide(features, None, dt_seconds=25.0)
+        assert decision.decision_mode != "starvation_override"
+        assert decision.active_phase == "NS_straight_left"
+
+
+def test_starvation_pressure_does_not_lift_an_empty_phase():
+    engine = _starvation_engine(starvation_requires_demand=True)
+    # 60s of idling lets every other phase accumulate the full 0.20 cap
+    # of soft pressure - but with nobody on them it must not be applied.
+    features = make_features({"S_in_1": (15, 30.0), "N_in_1": (15, 30.0)})
+    decision = engine.decide(features, None, dt_seconds=60.0)
+    for name, score in decision.phase_scores.items():
+        if name != "NS_straight_left":
+            assert score == 0.0
+
+
+def test_gap_out_releases_to_present_demand_not_forecast():
+    # Current phase empty; W_in_1 has one vehicle actually waiting;
+    # N/S have nobody but the model forecasts a large arrival there.
+    # The gap-out must go to the phase somebody is waiting on.
+    engine = DecisionEngine(config=DecisionConfig(), initial_phase="EW_right")
+    engine.decide(make_features({"E_in_2": (3, 5.0)}), None, dt_seconds=15.0)  # past min green
+    features = make_features({"W_in_1": (1, 12.0)})
+    prediction = make_prediction({"N_in_1": (18, 50.0, 100.0), "S_in_1": (18, 50.0, 100.0)})
+    decision = engine.decide(features, prediction, dt_seconds=1.0)
+    assert decision.switched is True
+    assert decision.decision_mode == "gap_out"
+    assert decision.active_phase == "EW_straight_left"
 
 
 def test_no_starvation_override_before_the_hard_limit():
@@ -507,3 +579,49 @@ def test_custom_config_changes_behaviour():
 def test_missing_calibration_file_falls_back_to_defaults():
     engine = DecisionEngine(calibration_path="/does/not/exist.json")
     assert engine.config == DecisionConfig()
+
+
+def test_scored_preemption_waits_for_the_realistic_green_floor():
+    # A phase still serving traffic keeps its green for
+    # min_green_before_preemption_seconds (20 s on a main phase) before a
+    # score may take it away - even a decisive lead sustained past the
+    # 3 s confirmation window. Gap-out is NOT held back by this floor
+    # (covered by test_gap_out_releases_to_present_demand_not_forecast).
+    engine = _hysteresis_engine()
+    engine.decide(make_features({}), None, dt_seconds=10.0)  # past min green, inside the floor
+    # NS is still serving substantial demand by the engine's own measure
+    # (6 vehicles, 8 s waits -> phase score ~0.25 >=
+    # preemption_floor_min_phase_score), which is what makes the floor
+    # bind; a phase with little left to serve is not held (next test).
+    features = make_features({
+        "S_in_1": (6, 8.0), "N_in_1": (6, 8.0),
+        "E_in_1": (20, 60.0), "W_in_1": (20, 60.0),
+    })
+    for _ in range(9):  # t = 11..19 s: clear lead, still no switch
+        decision = engine.decide(features, None, dt_seconds=1.0)
+        assert decision.switched is False
+    # Past the floor the normal confirmation window applies from here.
+    for _ in range(3):
+        decision = engine.decide(features, None, dt_seconds=1.0)
+    assert decision.switched is True
+    assert decision.active_phase == "EW_straight_left"
+
+
+def test_preemption_floor_does_not_hold_a_phase_with_little_left_to_serve():
+    # NS scores ~0.03 (one car per lane, nobody waiting) - below
+    # preemption_floor_min_phase_score - so the floor is moot and a
+    # clearly better rival takes the phase as soon as min green + the
+    # confirmation window allow. This is the light-traffic shape that
+    # made the gate a phase score rather than a vehicle count or a
+    # discharge rate (Section 26.4b).
+    engine = _hysteresis_engine()
+    engine.decide(make_features({}), None, dt_seconds=10.0)
+    features = make_features({
+        "S_in_1": (1, 0.0), "N_in_1": (1, 0.0),
+        "E_in_1": (20, 60.0), "W_in_1": (20, 60.0),
+    })
+    decision = None
+    for _ in range(3):
+        decision = engine.decide(features, None, dt_seconds=1.0)
+    assert decision.switched is True
+    assert decision.active_phase == "EW_straight_left"

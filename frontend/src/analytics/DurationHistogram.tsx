@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
-import type { DecisionLogRow } from '@/data/api'
+import type { DecisionSample } from './series'
 import { Panel } from '@/ui/Panel'
+import { GrowBar } from '@/ui/Reveal'
 import { f1 } from '@/utils/format'
 
 const BIN = 4 // seconds per bin
@@ -11,7 +12,7 @@ const BIN = 4 // seconds per bin
  * "always about 7 s" or "usually 2 s with occasional 35 s holds", and
  * those are very different controllers.
  */
-export function DurationHistogram({ rows }: { rows: DecisionLogRow[] }) {
+export function DurationHistogram({ rows }: { rows: DecisionSample[] }) {
   const { bins, max, stats } = useMemo(() => {
     const vals = rows.map((r) => r.duration).filter((v) => Number.isFinite(v))
     if (vals.length === 0) return { bins: [] as number[], max: 0, stats: null }
@@ -35,7 +36,7 @@ export function DurationHistogram({ rows }: { rows: DecisionLogRow[] }) {
   if (!stats) {
     return (
       <Panel title="Green duration spread">
-        <div className="py-6 text-center text-[13px] text-ink-mute">No decisions recorded yet.</div>
+        <div className="py-6 text-center text-[13px] text-ink-mute">Waiting for the first decision.</div>
       </Panel>
     )
   }
@@ -49,9 +50,11 @@ export function DurationHistogram({ rows }: { rows: DecisionLogRow[] }) {
             className="flex h-full flex-1 flex-col justify-end"
             title={`${i * BIN}–${(i + 1) * BIN}s held: ${n} decision${n === 1 ? '' : 's'}`}
           >
-            <div
+            <GrowBar
+              vertical
+              fraction={max === 0 ? 0 : Math.max(n > 0 ? 0.03 : 0, n / max)}
+              delay={0.3 + i * 0.02}
               className="w-full rounded-t-[3px] bg-accent"
-              style={{ height: `${max === 0 ? 0 : Math.max(n > 0 ? 3 : 0, (n / max) * 100)}%` }}
             />
           </div>
         ))}

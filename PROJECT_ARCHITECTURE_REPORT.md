@@ -1894,3 +1894,727 @@ needed). `DecisionConfig` defaults as of this section: `switch_hysteresis_margin
 `max_waiting_time_influence=0.15` (this section). `light_traffic_congestion_threshold`
 remains `0.0`/inactive (Section 20.2) - never revisited after the margin/scoring changes in
 Sections 21-22, since the continuous mechanisms kept outperforming it at every step.
+
+---
+
+## SECTION 23 — The console: browser-driven runs and live analytics (CURRENT STATE)
+
+Dated 2026-09-12. Three user-reported problems, one shared root cause, and the
+architectural change that fixes all three.
+
+### 23.1 The symptom, and what was actually wrong
+
+The user opened the dashboard without starting a simulation, clicked Analytics, and got:
+
+```
+/api/analytics/congestion-trend?bucket_seconds=60&group_by=lane -> HTTP 502
+```
+
+They also wanted to start the simulation from the website rather than from a terminal, and
+had noticed the live view had no honest relationship to real time ("its like nothing linked
+to real world scenario, maybe i kept less delay in the simulator").
+
+All three trace back to one decision made in Section 16: the dashboard server runs as a
+daemon thread INSIDE the simulation process (`app.py`). Everything follows from that.
+
+- The server cannot outlive the run, so closing SUMO takes the API down with it — including
+  the endpoints that read nothing but SQLite and would have worked perfectly.
+- Nothing can start a run from the UI, because the UI only exists once a run is up. A Start
+  button had nothing to call.
+- Nobody owned the question "how fast should this play?". `sumo-gui`'s Delay slider answered
+  it accidentally, which is why the user's 800 ms setting made simulated time crawl at
+  ~0.06x real time.
+
+### 23.2 The change: `server.py` owns the lifetime
+
+```
+python app.py      one run; dashboard alive only as long as that run   (unchanged)
+python server.py   console stays up; runs are started/stopped from the UI   (new)
+```
+
+`backend/server.py` serves the identical read-only app (`create_app()`, untouched) and
+mounts the same control router. `backend/services/sim_supervisor.py` starts a run on a
+worker thread inside the console process.
+
+A thread, not a child process, deliberately — and the contrast with the evaluator is the
+argument. The evaluator IS a separate program with its own two SUMO instances, so
+`control_routes.py` launches it with `subprocess.Popen` and it publishes back over HTTP
+(`RemoteLiveStatePublisher`, Section 18). A live run is not: it publishes into the very
+`LiveStateStore` this server reads, and its `RunControl` is the very object the
+pause/resume endpoints hold. In-process makes both a direct reference instead of an HTTP
+round trip, so pause is instant and there is no cross-process state to reconcile.
+
+To make one run callable from two entry points without two lookalike copies drifting apart,
+`app.py`'s `main()` body was extracted verbatim into `backend/simulation_runner.py` as
+`run_simulation(store, control, *, gui)`. `app.py` is now a thin CLI wrapper over it and is
+behaviourally unchanged. `resolve_config(gui)` picks sumo-gui/sumo per run via a throwaway
+Config SUBCLASS rather than assigning to `Config.SUMO_BINARY_NAME`, because Config is a
+process-wide singleton and a console that starts several runs must not leave one run's
+choice behind for the next.
+
+The read-only guarantee is unchanged and, if anything, sharper: `dashboard_server.py` still
+has zero endpoints of its own that can influence a simulation. Every new capability
+(`start-simulation`, `stop-simulation`, `speed`) is in `control_routes.py`, which only
+`app.py` and `server.py` mount, and which now takes `supervisor` as a duck-typed parameter —
+this module never imports the supervisor, keeping the SUMO pipeline out of the import graph
+of a dashboard that may never launch anything.
+
+### 23.3 Pacing: who decides how fast "playing" means
+
+A headless `sumo` run steps as fast as the machine allows — measured at roughly 100x real
+time — which makes a live dashboard a blur and floods its rolling history. Since the browser
+can now start a run, something has to set the pace, and the run loop is the only place that
+can: it is the thing calling `simulationStep()`.
+
+`RunControl.pace(step_seconds)` is therefore called once per step and sleeps whatever is
+left of that step's real-time budget. It keeps an anchor (wall time, simulated time) rather
+than sleeping a fixed amount per step, so error does not accumulate; the anchor is dropped
+on resume and on a speed change (otherwise a paused run would sprint to "catch up" on the
+pause), and re-anchored if the loop falls more than 1 s behind. Sleeps are sliced at 20 ms
+so a pause or stop lands within a frame rather than at the end of one long sleep.
+
+The step length is read once via `getDeltaT()` before the loop, so pacing costs no TraCI
+round trip per step. Measured on a real run: **1.00 sim-s per wall-s at 1x, 5.00 at 5x**.
+`set_speed(None)` restores the old flat-out behaviour. `Config.SUMO_EXTRA_ARGS` (empty by
+default) lets a browser-launched GUI run pass `--start --delay 0`, so sumo-gui's own slider
+does not throttle on top of this — two throttles in series just multiply.
+
+### 23.4 Analytics now reads the live run, not the database
+
+The user's instruction was explicit: keep the same graphs, drive them from the current
+simulation, and say so when nothing is running. Reading SQLite had a second flaw beyond the
+502 — simulated time restarts at zero every run, so a database-wide average at "t = 120 s"
+was an average across a different moment in each recorded run.
+
+`frontend/src/data/liveHistory.ts` accumulates one sample per decision tick from the
+WebSocket stream (~1 h capacity). `frontend/src/analytics/series.ts` derives from it exactly
+the shapes the endpoints used to return, so the charts themselves barely changed — only
+their source. Two details worth recording:
+
+- **Re-render control.** At 5x or unthrottled, ticks arrive dozens of times a second.
+  Samples are always appended, but the `revision` counter components subscribe to is bumped
+  at most once a second, so ten charts refresh at a readable cadence without losing data.
+- **Adaptive bucket width.** The endpoints used a fixed 60 s, which shows one column for the
+  first minute of a live run and a hundred after an hour. `chooseBucket()` widens with the
+  run to keep the axis at roughly a dozen to two dozen columns.
+
+This needed one backend addition: `lanes[].score` in the snapshot — the per-lane urgency
+score `DecisionEngine` already computed and `app.py` already persisted to `lane_state_log`,
+so no new computation and no new TraCI call. The database is still written exactly as
+before; it is the audit trail and the source of the report's figures, and is simply no
+longer what a page about the current run reads.
+
+The history endpoints (`/api/analytics/*`, `/api/logs/*`) are untouched and still served —
+they are what the Performance and Decisions pages will read, and they now survive a
+simulation ending, which is what they should always have done.
+
+### 23.5 3D model corrected against the network
+
+The miniature was drawn with three paint stripes over a 19.2 m road (implying six lanes but
+marking them wrong), and all four signal heads faced the same direction because their lamps
+were offset in world +z regardless of approach. Both are now measured off
+`intersection.net.xml`: solid edge lines at +/-9.6 m, a solid centre line at 0, dashed
+dividers at +/-3.2 and +/-6.4, stop bars at the stop lines, nothing painted inside the
+junction, and the arms cut at +/-21.6 m so 21.6 + 178.4 = 200 closes exactly. Each signal
+head is now a Group rotated to its approach's bearing, standing on the driver's left kerb
+(keep-left), and each of the twelve lanes has its own coloured bar at its stop line the way
+sumo-gui shows per-lane state.
+
+### 23.6 Tests
+
+`tests/test_run_control.py` is new: 15 tests covering pause/resume/stop release, `reset()`
+for a second run, pacing at 1x and 5x, unthrottled and non-positive speeds, prompt return
+from a pending pacing sleep once stopped, and the supervisor's start/stop, one-at-a-time
+refusal, restart-after-end, suppression of a stale "stopping" state, and crash reporting.
+The supervisor takes its runner as a parameter specifically so these need no SUMO.
+
+**Suite: 40/40 pass** (25 existing + 15 new). Verified live as well, against a real headless
+run driven entirely through the HTTP API: start, 1.00x pacing, pause freezing `sim_time`,
+resume, 5.00x pacing, graceful stop, and the console still serving analytics afterwards.
+
+---
+
+## SECTION 24 — Plan-view correctness, vehicle types, arrow signals (CURRENT STATE)
+
+Dated 2026-09-13. A round of user-reported visual defects, one of which turned out
+to be a real data-placement bug rather than a cosmetic one.
+
+### 24.1 The bug: vehicles were drawn in the wrong lanes
+
+Chasing the reported "turning is still wrong in the plan view", the lateral offset
+maths in `frontend/src/overview/vehiclePlacement.ts` was checked against the compiled
+network for the first time. It was wrong on all four approaches:
+
+```
+lane            drawn at      should be     effect
+N_in_0 (kerb)   x = 478       x = 550       drawn in the median lane
+S_in_0 (kerb)   x = 442       x = 370       drawn in the median lane
+E_in_0          y = 252       y = 360       drawn on the OUTBOUND carriageway
+W_in_0          y = 288       y = 180       drawn on the OUTBOUND carriageway
+```
+
+N and S had the lane order reversed; E and W had the order reversed *and* the sign
+flipped, putting eastbound and westbound traffic on the wrong side of the road
+entirely. The fix is a single expression — `lateral(i) = 36*(2-i) + 18`, signed
+`+` for N/E inbound and `-` for S/W, inverted for outbound — verified against all
+24 inbound and outbound lane shapes in `intersection.net.xml`.
+
+Worth recording as a process point: this was never caught because the plate was only
+ever checked by eye, and "a car in a lane" looks fine whichever lane it is in. It was
+found by re-deriving the geometry from the network file, not by looking harder.
+
+### 24.2 Turning: the junction interior now follows the connection table
+
+A vehicle on one of SUMO's internal `:C_*` lanes previously fell through to a plain
+linear map of the whole 400 m network. That map uses a completely different lateral
+scale from the arms (the plate exaggerates lane width ~14x), so every vehicle jumped
+sideways ~26 drawn units entering the junction, snapped its orientation 90 degrees,
+and jumped back on the far side. That is what "shuffle and jump" was.
+
+The twelve `<connection ... via=":C_n_0">` elements are now transcribed into
+`MOVEMENTS`, giving each internal lane its from-arm, to-arm and lane indices. A
+vehicle inside the junction is drawn along a quadratic Bezier from its entry
+stop-line point to its exit stop-line point, with the control point where the two
+centrelines meet — so a left turn hugs the corner and a right turn sweeps wide,
+which is what those movements actually do in left-hand traffic. Progress along the
+curve comes from the vehicle's distance between the internal lane's own endpoints,
+which is exactly 0 entering and 1 leaving.
+
+Verified numerically across all 12 movements: **worst handoff discontinuity 0.000
+drawn units**, entering and leaving, for every straight and every turn. Heading is
+interpolated the same way and unwrapped against each vehicle's previous heading, so
+a -90 -> 180 turn goes the short way rather than spinning 270 degrees.
+
+### 24.3 Vehicle types reach the frontend
+
+`VehicleState` gained `type_id` (`traci.vehicle.getTypeID`, one extra read per vehicle
+per tick) and the snapshot carries it as `type`. The dimensions and colours that go
+with each id are NOT sent — they are static properties of the frozen
+`vehicle_types.add.xml`, so `frontend/src/overview/vehicleTypes.ts` holds that table
+instead. Confirmed live: a running scenario reports `auto_rickshaw`, `bus`, `truck`,
+`car_cautious/normal/aggressive` and `motorcycle_cautious/normal/aggressive` together.
+
+The two views use it differently, on purpose. The 3D miniature draws real bodies at
+real SUMO dimensions in the vType's own colour. The plan view is a schematic where
+colour already means signal state, so a red car on a red lane fill would read as one
+blob — there, type is carried by SIZE alone.
+
+### 24.4 Arrow signal aspects, and motion that does not stutter
+
+The 3D signals were one head per approach with three plain circles. They are now
+mast-arm assemblies: one head per LANE, hung over the lane it controls, its three
+lenses shaped as arrows for that lane's own movement — left, ahead, right. That is
+both what a channelized junction looks like and the most information the view can
+carry, since the twelve lanes really do run twelve independent signal states.
+
+Motion was still stuttering because of two compounding mistakes:
+
+1. **Exponential easing.** `k = 1 - exp(-6 dt)` decelerates as it approaches the
+   target, so every vehicle slowed to a crawl at the end of each tick and jerked off
+   again when the next one landed. Replaced with constant-velocity interpolation
+   across the measured tick interval, allowed to overrun 35% so a late frame does
+   not stall the traffic.
+2. **Re-seeding on the wrong event.** The interpolation was re-aimed whenever a new
+   WebSocket frame arrived — but frames are re-sent at 2 Hz while the simulation
+   only steps at 1 Hz, so half of them restarted each interpolation from halfway with
+   the same target, roughly halving the remaining distance each time. It is now keyed
+   on `sim_time` changing.
+
+Heading is also taken once per tick from the whole segment rather than per frame from
+a shrinking remainder, which was noisy exactly when it mattered.
+
+### 24.5 Smaller fixes and one new panel
+
+- **N and S pavement arrows were inverted** — drawn away from the junction and
+  curving to the wrong side, so a left-turn lane was painted as a backwards right
+  turn. E and W were always correct and are unchanged.
+- **Pan and zoom on the plan view** (`usePanZoom.ts`): scroll to zoom about the
+  pointer, drag to pan, with a reset. Implemented by narrowing the SVG viewBox, so
+  everything stays vector-sharp and hairlines do not thicken.
+- **A stopped run now clears.** Stopping is not pausing: the traffic no longer
+  exists, so the junction goes dark instead of holding a frozen last frame that
+  looks live. A PAUSED run deliberately keeps its vehicles on screen.
+- **Prediction vs actual** (`overview/PredictionPanel.tsx`), chosen by the user from
+  four options, fills the space under the twin. It is the only place the ML layer
+  appears anywhere in the UI, which is why it earned the space. Per-lane predicted
+  against actual vehicle counts as each horizon matures, plus a run-scoped MAE
+  accumulated in `liveHistory`. The horizon is read from the model's own metadata
+  rather than hardcoded. **No confidence figure** — standing instruction, and the
+  error column beside it is better evidence anyway.
+
+---
+
+## SECTION 25 — Protected left turns, GUI handover, speed control (CURRENT STATE)
+
+Dated 2026-09-13. One deliberate change to the signal program itself — the first since
+the network was frozen — plus the controls that make a browser-driven run complete.
+
+### 25.1 Left turns are now protected. Why, given the network says they need not be.
+
+The user asked whether running all four left turns concurrently with the cross street was
+dangerous. The network's own answer is no, and it is unambiguous. Decoding the `<request>`
+block of `intersection.net.xml` directly (SUMO writes foe strings right-to-left, link 0
+last):
+
+```
+link         foes                                    must yield to
+0  S-left     NONE                                    nothing
+3  E-left     NONE                                    nothing
+6  N-left     NONE                                    nothing
+9  W-left     NONE                                    nothing
+```
+
+All four have an empty foe list. The reason is full channelization: every one of the twelve
+movements runs `fromLane -> toLane` of the SAME index, so N-left lands in `C_out_E` lane 0
+while W-straight lands in `C_out_E` lane 1. On paper they never touch.
+
+The user's counter-argument is the stronger one, and it is why the change was made:
+**that permission is entirely contingent on perfect lane discipline.** Two streams sharing
+an exit edge avoid each other only because each holds its own lane exactly. The traffic
+this project models — the same vehicle mix that includes auto-rickshaws and motorcycles
+weaving — does not. A left-turner crossing in front of a moving through-stream on the
+strength of a lane marking is precisely the conflict the foe matrix cannot see.
+
+So each left now runs only in its own approach's phase:
+
+```
+before  phase 1  GGrGrrGGrGrr   S-left S-straight E-left N-left N-straight W-left
+after   phase 1  GGrrrrGGrrrr   S-left S-straight N-left N-straight
+before  phase 5  GrrGGrGrrGGr   S-left E-left E-straight N-left W-left W-straight
+after   phase 5  rrrGGrrrrGGr   E-left E-straight W-left W-straight
+```
+
+Verified over 200 simulated seconds (more than two full cycles): **0 instances** of a left
+turn green at the same moment as the through movement feeding its own exit edge, down from
+5120 steps before.
+
+**A trap worth recording.** Editing `intersection.tll.xml` alone changed nothing. That file
+is a netconvert SOURCE and is not referenced at run time — `intersection.sumocfg` loads the
+compiled `intersection.net.xml`, which carries its own copy of the program. The first
+verification run still showed the old states, which is how this was caught. Both files now
+carry the change and both say so.
+
+### 25.2 What the change cost, and what is now stale
+
+Left-turn capacity drops from roughly 60 s of green per 96 s cycle to 30 s. Everything
+downstream that encoded the shared-left structure moved with it:
+
+- `_PHASE_EXCLUSIVE_LANES` now assigns every one of the twelve lanes to exactly one phase.
+- The `left_turn_influence` scoring bonus is GONE, not retuned. It existed because
+  left demand was shared and had to be folded into both main phases at partial weight;
+  a left lane's demand is now inside its own phase's exclusive urgency, and adding it
+  again would double-count it. The config field is kept (so existing constructions do not
+  raise) and documented as having no effect.
+- Gap-out now counts left lanes, which is correct: this phase is now the only one that
+  will serve those left-turners, so a queue of them is a real reason to hold on.
+- Emergency phase selection is unambiguous: previously a left-turn emergency matched
+  whichever main phase was checked first.
+- `baseline_controllers.py` imports `_PHASE_EXCLUSIVE_LANES`, so VAC picked all of this up
+  automatically and symmetrically — the AI-vs-baseline comparison stays fair by construction.
+
+**STALE RESULTS.** The 7/7-across-13-scenarios VAC sweep in Sections 20-22 and in README.md
+was measured under the old program and no longer describes this configuration. The
+comparison remains methodologically fair (both controllers drive the same network), so what
+is needed is a re-run, not a redesign. The trained Random Forest is in the same position: it
+learned from data generated under the old phase structure, so it is strictly out of
+distribution now and should be regenerated and retrained. Neither has been done; both are
+flagged rather than quietly left to look current.
+
+### 25.3 Opening a SUMO window mid-run
+
+SUMO cannot attach a GUI to a process that is already running, so the only route is to save
+the state and relaunch. Tested before building anything:
+
+```
+saved at t=60.00 with 45 vehicles, tls=GrrGGrGrrGGr
+reloaded at t=60.00 with 45 vehicles, tls=GrrGGrGrrGGr
+same vehicle set: True    lost: 0  gained: 0
+```
+
+`RunControl.request_handover(path)` asks the loop to `saveState` and end; the supervisor's
+worker thread then loops and restarts the SAME run from that state with `sumo-gui`. Because
+it is one thread, `is_running()` never goes false and it reads as one continuous run.
+`DecisionEngine` is now constructed on whatever phase the signal is ACTUALLY showing
+(`trafficlight.getPhase`) rather than assuming phase 0, so the lights do not jump across the
+swap — that also changes nothing for a fresh run, where the answer is phase 0 anyway. If the
+save fails there is nothing to reopen, so the handover is cancelled and the run carries on
+headless.
+
+**`--quit-on-end` is load-bearing.** sumo-gui keeps its window open after the simulation
+ends by default, which left `traci.close()` blocking on a process that was never going to
+exit — the run thread never finished and the console reported the run as still active
+forever, with an orphaned window. Found by measurement (the thread was still alive 10 s
+after "Simulation finished"), not by reading docs. Browser-launched GUI runs now pass
+`--start --delay 0 --quit-on-end true`.
+
+Measured end to end: headless at t=0.05 -> open-gui -> window running at t=14.50 with the
+same run, `gui` true, `running` true throughout; Stop ended it in 1 second with no orphaned
+process.
+
+### 25.4 Speed control, and the remaining view fixes
+
+The speed button cycles on click and reveals a slider on hover (0.25x / 0.5x / 1x / 2x / 5x
+/ max) — same control, two ways to reach it.
+
+- **Vehicles overhung the stop line** in both views. TraCI reports the FRONT BUMPER: measured
+  on a live run, every stopped vehicle sits exactly 1.00 m before its stop line, which is
+  SUMO's own gap. Drawing the body centred on that coordinate pushed half of it across the
+  bar. Both views now offset back half a length along the heading.
+- **Cars parked sideways at the signal** in 3D. A vehicle that appears already stopped in a
+  queue never produces a movement delta, so it kept the default heading of 0 forever. First
+  heading now comes from its lane (`junctionTopology.laneHeading3D`).
+- **3D traffic did not clear on stop**, because clearing lived inside the tick-gated block
+  and sim_time stops changing when the run ends. It is now unconditional.
+- **Leftovers streaked at the start of a second run**: SUMO reuses flow ids, so a surviving
+  car interpolated from its old position across the whole network. Simulated time running
+  backwards now hard-resets the fleet.
+- **Signal heads** are one horizontal four-aspect head per approach — red disc, amber disc, a
+  combined left+ahead green arrow, and a separate right green arrow — which is the shape of
+  this program's own phase structure.
+- The "No simulation running" overlay was removed: it sat exactly on top of the Plan/3D and
+  Fullscreen controls, so those buttons were unreachable until a run started.
+
+### 25.5 Tests
+
+**46/46 pass** (was 40). Six new: the handover resuming the same run in a window, refusing
+when nothing is running, refusing when a window is already open, leaving the run alone when
+the state save fails, `reset()` clearing a pending handover, and a handover releasing a
+paused run. The supervisor takes its runner as a parameter so none of these need SUMO.
+
+---
+
+## SECTION 26 — Retraining for protected lefts: residual targets, the phase clock, and the sweep (CURRENT STATE)
+
+Dated 2026-09-13. The user's instruction was to settle the ML side "once and for all":
+regenerate the training data for the protected-left program (Section 25), find out why the
+retrained model's error went up, check the data for inconsistencies, and get the AI back to
+a clean 7/7 sweep against VAC on every scenario. This section is the record of that work,
+in the order it happened, including the two things that turned out to have been wrong all
+along and only became visible because the data changed.
+
+### 26.1 Regeneration: the data itself was fine
+
+All 38 (scenario, seed) runs were regenerated with the project's own `_run_single()` — the
+only change to how it was invoked was running three at a time in separate OS processes
+(`traci.start()` picks a free port per process), which cut the wall time from the ~4 h of
+the Aug 15 run to 101 min. Every one of the 38 files came back with the SAME row count as
+its Aug 15 original (one run +1), which is the strongest available evidence that the
+pipeline itself behaved identically and only the signal content changed. The Sep 8
+`repair_raw_datasets` pass was NOT needed this time: the `features_to_vector` bug it
+existed to work around is fixed in code, so no rows were dropped — the built datasets grew
+from 16 048 / 3 522 / 2 907 (train / test / held-out) to **28 023 / 6 514 / 4 802**.
+
+A statistical audit of the built datasets found nothing to fix: prediction horizon exactly
+15 s on every row (max 15.10, inside the 0.1 s tolerance), no NaN/inf, no duplicate
+(run, time) keys, no negative targets, negatives only in the four trend columns (which are
+signed by definition), and — the check that matters for this change — per-lane signal
+shares of **31.3 % green on left and through lanes, 12.5 % on right-turn lanes**, i.e.
+exactly 30/96 and 12/96 of the new program's cycle. The only oddity is four sampler-drift
+steps of 1.05 s per run (float accumulation in the 1 s sampler), which the horizon tolerance
+already absorbs.
+
+### 26.2 Why the MAE went up: a harder target, and two things that were always wrong
+
+The straight retrain landed at test MAE 2.06 / held-out 2.35, against 1.63 / 1.99 for the
+old model. Three causes, measured rather than guessed:
+
+**(a) The target got harder — nothing to fix.** Under the old program every left lane was
+green in both main phases, so left-lane wait time was ~0.35 s mean with std 1.0: "predict
+zero" was right, which is why those four lanes scored 0.5 MAE. Under protected lefts the
+same targets are ~5.5 s mean with std 8.3. Their MAE rose to ~1.3 — a far *better* relative
+result on a target with eight times the spread. This alone accounts for the left-lane rows
+of the per-lane table and is simply the reality the program change created.
+
+**(b) The absolute-level target was the wrong thing to predict.** Decomposing the error
+against a persistence baseline ("the value in 15 s equals the value now") showed the forest
+was *worse than persistence on vehicle count on every single lane* (test: 0.5–2.1 vs
+0.2–0.5), and on the held-out `extreme` scenario's right-turn lanes it was 5.3 against
+persistence's 1.5. A tree can only ever emit the mean of the training rows in a leaf: a
+queue longer than anything in training is pulled back into the training range, and a large
+wait is shrunk toward the 77 % of rows whose wait is exactly zero (bias −17 s on 30–60 s
+waits, −36 s above 60 s). This was true of the old model too; the new data exposed it.
+
+**(c) `seconds_until_next_signal_switch` was a train/serve deviation.** It was the model's
+single most important feature (importance 0.031, top of 125). Training records it from
+SUMO's static program, where it is a real countdown (0.8–29.9 s). At run time
+`SignalController` re-arms every green to a 60 s provisional ceiling on every tick
+(`PROVISIONAL_HOLD_SECONDS`), so the adapter reported ~60 on ~97 % of ticks — a value the
+model had never seen, on its most-relied-upon input. Measured by feeding the test set what
+the live system actually sees: an 8 % MAE penalty offline, and a much larger one in
+control (26.4). This predates today's change; it existed from the day the feature was added.
+
+Nine controlled experiments (scratch scripts, no project code touched) isolated each lever:
+
+| experiment | test MAE | held-out MAE | fed what it sees live |
+|---|---|---|---|
+| persistence baseline | 2.72 | 4.31 | — |
+| absolute target, next-switch feature (the straight retrain) | 2.06 | 2.35 | 2.23 |
+| … drop next-switch | 2.12 | 2.37 | 2.12 |
+| … less regularisation (`max_features` 0.33–0.5, deeper) | 2.06–2.07 | 2.32 | 2.36–2.43 (worse) |
+| **residual target** | **1.39** | **1.46** | 1.62 |
+| residual + drop next-switch | 1.49 | 1.58 | 1.49 |
+| **residual + elapsed-in-phase instead of next-switch** | **1.39** | **1.48** | ≈1.39 |
+
+Less regularisation did nothing offline and made the live skew worse (it leans harder on
+the bad feature). The residual target is the single biggest lever. Replacing the countdown
+with elapsed time beats dropping it.
+
+### 26.3 What changed in the code
+
+- **Residual targets** (`ml/feature_schema.py` `TARGET_MODE_*`,
+  `current_values_as_target_vector()`; `ml/training/train.py`; `ml/ml_predictor.py`). The
+  forest now fits `target − current value of the same field on the same lane`; every MAE
+  `train.py` reports is computed on `clip(output + current, 0)`, i.e. on the prediction the
+  Decision Engine actually receives, and the metadata now also records the persistence
+  baseline on the same rows. `train.py` writes `"target_mode": "residual"` into the model's
+  metadata and `MLPredictor.from_path()` reads it back, so a model and its interpretation
+  travel together — a model with no metadata is treated as absolute, so nothing old breaks.
+- **`seconds_in_current_phase` replaces `seconds_until_next_signal_switch` as the network
+  feature** (vector stays 125 wide). `TrafficAdapter` now keeps a phase clock — the one
+  piece of state it holds between ticks, and still pure observation: it records *when* the
+  index changed, it decides nothing. On its first read it recovers elapsed time from SUMO's
+  own `duration − remaining` (exact under the static program; ~0 under a controller that
+  re-arms its ceiling, which is the right answer for "just attached"), so a run resumed from
+  a saved state (Section 25.3) starts with the truth rather than zero. `SignalState` keeps
+  `seconds_until_next_switch` for the dashboard's amber countdown; `SignalFeatures` (the
+  ML-facing type) carries only the new field. Verified from the real generator: 0.05–29.2 s,
+  never above 30 on a main phase or 12 on a right-turn phase.
+- **Confidence formula is now mode-aware.** After the residual retrain the calibrated
+  confidence-vs-error correlation collapsed (count −0.23 → −0.04). The raw score divided
+  tree spread by the prediction's *level* — but in residual mode the level is mostly the
+  persistence base, which the trees never voted on, so a long queue read as "confident"
+  regardless. Measured on the residual model: the relative formula correlated −0.003 with
+  real count error and **+0.16** with wait error (the wrong sign — more confidence where
+  error was higher), while spread alone (`100 / (1 + std)`) reached −0.43 for both.
+  `MLPredictor._confidence` and `evaluate_calibration._confidence_from_spread` now use
+  spread alone in residual mode and the original formula in absolute mode. After refitting
+  the isotonic calibrators the calibrated correlation is **−0.37 (count) / −0.49 (wait)**,
+  against −0.23 / −0.10 for the original model. Since confidence sets the prediction's blend
+  weight in `DecisionEngine`, this matters for control, not just for reporting.
+- The datasets were regenerated a second time (118 min, contended) so that training data
+  comes from the same `FeatureEngineer` the runtime uses — the generator's own design rule —
+  rather than by transforming the first set offline, even though the offline transform is
+  exact under the static program.
+
+**Final model:** test MAE **1.437**, held-out **1.488** (persistence 2.72 / 4.31 on the
+same rows). Vehicle count 0.43 / 0.76, waiting time 2.45 / 2.21. Better than the original
+pre-change model (1.63 / 1.99) on a strictly harder target. Held-out `extreme` 1.73 (was
+2.88). `tests/test_ml_predictor.py` is new (10 tests: schema alignment, absolute vs residual
+output, zero clipping, metadata round-trip, the phase clock's reset/recovery behaviour);
+**56/56 pass**.
+
+### 26.4 The sweep: before and after the model fix
+
+Two full 13-scenario sweeps were run against VAC on the protected-left program, both with
+`DecisionConfig` exactly as Section 22 left it (margin 0.35, starvation cap 0.20,
+wait influences 0.25/0.15) — no engine tuning at all.
+
+**Interim model** (absolute target, next-switch feature — i.e. the straight retrain):
+9/13 clean. `light_seed1` **3/7** (wait −3.6 %, travel −2.0 %, avg queue −8.4 %, speed
+−1.9 %), `balanced_seed1` 6/7 (travel −0.2 %), `east_heavy_seed1` 6/7 (max queue −3.1 %),
+`accident_seed1` 6/7 (worst travel −2.4 %). Archived in
+`results/interim_2026-09-13_absolute_nextswitch/`.
+
+The decisive diagnostic was `light_seed1` with the predictor's influence switched off
+(`max_predicted_weight=0`): **6/7** (wait +6.7 %, worst travel +7.4 %). The scoring was
+fine; the skewed model was actively steering the engine wrong in light traffic — the
+"deviation" in 26.2(c) was not a theoretical concern, it was the loss.
+
+**Sweep with the final model, engine unchanged:** 12/13 clean — every scenario the interim
+model had missed except `light` was fixed by the model alone (`balanced` −0.2 % → +1.8 %
+travel; `east_heavy` −3.1 % → +6.2 % max queue), and every heavy scenario's margins widened
+(e.g. `heavy` wait +64.6 % → +68.1 %, `extreme` +63.9 % → +66.8 %). `light_seed1` stayed at
+**3/7** with numbers almost identical to the interim model's, and `accident_seed1` kept the
+same −2.4 % worst-travel miss. Archived in `results/modelfix_only_2026-09-13/`.
+
+### 26.4a Light traffic: what the AI was actually doing wrong
+
+With the model no longer the cause, `light_seed1` was instrumented (decision-mode counts,
+switch triggers, congestion index) with prediction on and off:
+
+```
+                        switches  gap-out  scored   wins
+prediction on   (0.35)     64        55       9     3/7
+prediction off  (0.0)      64        56       8     6/7
+VAC                        74        -        -
+```
+
+Same number of switches, same trigger mix — the entire difference was **which phase the
+gap-out released to**. `best_other` was the argmax of the *blended* phase scores, so a phase
+with nobody at the line but a forecast arrival could outrank one with a vehicle already
+stopped; in light traffic that is exactly the vehicle whose wait then grows. VAC ranks the
+next phase by present count. Note also that the AI switches **less** than VAC in every
+light seed (64 vs 74, 58 vs 67, 65 vs 75) — the anti-flicker work of Section 19 holds, and
+nothing in this section adds a switch.
+
+Three candidate mechanisms were tested, each on all three `light` seeds, since single-seed
+light-traffic results are chaotic enough to mislead:
+
+| engine variant (final model throughout) | seed 1 | seed 2 | seed 3 |
+|---|---|---|---|
+| Section 22 engine (blended-score gap-out target) | 3/7 | — | — |
+| gap-out target = present-demand *score* | 5/7 | 4/7 | 1/7 |
+| … + starvation only for phases with vehicles | 5/7 (queue −8.0 %) | 3/7 | 1/7 |
+| **gap-out target = present vehicle COUNT, score as tie-break** | **7/7** | **7/7** | 5/7 |
+| … + light-traffic gate at congestion 0.10 | 5/7 | 7/7 | — |
+
+- **Count-first gap-out (`gap_out_uses_present_demand`, on)** is the one that works, and it
+  is the principled one: a gap-out asks "who is actually waiting right now", VAC answers it
+  with raw counts, and average queue length is the metric that count-ranking greedily
+  minimises. The AI's wait-aware score still decides between phases holding the same number
+  of vehicles, and still drives every hold-or-preempt decision. Seed 3's two remaining
+  misses are travel −0.1 % and speed −1.2 % (it was 1/7 before).
+- **Starvation gated on presence (`starvation_requires_demand`)** looked right on paper —
+  before it, a phase 20 s unserved with zero vehicles (pressure 0.20) outranked a phase with
+  one vehicle waiting 10 s (score ~0.10), and the 150 s hard override would force-serve an
+  empty phase — but it lost on every seed. The pressure on empty phases evidently works as
+  a useful "serve the least-recently-served phase" tie-break at gap-out. Kept in code,
+  default **off**, with tests for both settings; the same fate as the light-traffic mode.
+- **The light-traffic gate** (Section 20.2's mechanism, at 0.10 — light traffic's
+  congestion index sits at 0.03, p90 0.07) lost again, as it did in Section 20.
+
+Two other probes for completeness: `switch_confirmation_seconds` 3 → 5 made light worse
+(queue −3.1 %), and prediction weight 0.15 was strictly between 0 and 0.35 (4/7) —
+prediction influence in light traffic was monotonically harmful *only* through the gap-out
+target, which is what the count-first rule removes.
+
+**Sweep with residual model + phase clock + count-first gap-out** (`DecisionConfig`
+otherwise as Section 22): 11/13 clean — `light` 7/7, `balanced` 7/7, every heavy scenario
+7/7 with wider margins than before; `accident_seed1` 6/7 (worst travel −2.4 %) and
+`east_heavy_seed1` 6/7 (max queue 33 vs 32 vehicles). Archived in
+`results/countfirst_gapout_2026-09-13/`. Those two are the subject of 26.4b.
+
+### 26.4b The last two: a realistic-green floor, and a metric that was measuring a script
+
+With the count-first gap-out in, the sweep stood at 11/13. The user's instruction was to
+get both remaining scenarios to 7/7 — and, separately, that a green lasting 10–15 s and then
+going amber "is not feasible in the real world". The two turned out to be connected.
+
+**accident_seed1 (worst travel time −2.4 %).** Logging the four worst vehicles under each
+controller settled it in one run:
+
+```
+      worst                      2nd worst    3rd      4th
+AI    accident_vehicle  635.9 s  car 169.1 s  168.3 s  167.8 s
+VAC   accident_vehicle  621.0 s  car 514.1 s  491.6 s  470.2 s
+```
+
+The worst vehicle under BOTH controllers is the scenario's own stalled truck —
+`<stop lane="E_in_1" duration="550"/>` in `accident.rou.xml` — and the AI's value was
+identical to the decimal across every sweep of the day, model or engine changes
+notwithstanding. The 15 s gap is whether E's phase happened to be green the instant the
+scripted stop ended. Meanwhile the worst *real* vehicle waited 169 s under the AI and
+**514 s under VAC**, because VAC has no starvation protection: it kept feeding the blocked
+lane's ever-growing queue and starved the right-turn lane for eight minutes. The AI "lost"
+the truck's 15 s precisely by refusing to do that.
+
+`MetricsCollector` now keeps a vehicle's *scheduled* stop time out of its travel time —
+the same convention SUMO's own waiting-time accounting applies — via two new adapter reads
+(`get_stop_starting_vehicle_ids` / `get_stop_ending_vehicle_ids`, wrapping
+`simulation.getStopStartingVehiclesIDList` / `getStopEndingVehiclesIDList`), applied to
+both controllers identically. A scripted 550 s parking is not delay the signal caused.
+Result: worst travel time 169.1 s vs 514.1 s, **+67.1 %**, everything else unchanged.
+`tests/test_metrics_collector.py` covers the accounting.
+
+**east_heavy_seed1 (max queue 33 vs 32).** Seeds 2 and 3 were 7/7 with +9–10 % on that
+metric, so this was one vehicle at one instant — but the switch log around the AI's peak
+was the real finding: the heavy approach's own phase was being held **12–17 s** and
+preempted by a waiting phase on score, nine switches in 100 s, while VAC held it 45 s to
+max-out. That is the "green for ten seconds, then amber" behaviour the user rejected, and
+each extra amber costs the heavy approach capacity. Two contributing mechanics:
+
+- the phase timer starts at the switch *decision*, so the 3 s amber counts toward
+  `min_green_seconds` — the old 10/8 floor was 7 s / 5 s of actual green;
+- in a four-phase rotation every rival phase has always been unserved ≥ 20 s, so at the
+  0.20 cap every rival permanently carries +0.20 of starvation pressure — the 0.35 margin
+  was effectively 0.15.
+
+Everything below was A/B-tested on `east_heavy_seed1` *and* all three `light` seeds, because
+light traffic is where any added patience costs, and single-seed light results move by
+±3 % on a one-line change:
+
+| variant | light s1 / s2 / s3 | east_heavy s1 | AI switches (east) |
+|---|---|---|---|
+| count-first gap-out only (start of 26.4b) | 7/7 · 7/7 · 5/7 | 6/7 (maxQ −3.1 %) | 58 |
+| starvation cap 0.20 → 0.10 | 3/7 · 4/7 · 3/7 | 7/7 | 44 |
+| shared min green 15/10 (both controllers) | 3/7 · 4/7 · 7/7 | 7/7 | 44 |
+| both of the above | 4/7 · 6/7 · 6/7 | 7/7 (maxQ +18 %) | 44 |
+| oversaturation bonus 0.25 → 2.0 | — | 6/7 (AI advantage collapses to +12 %) | 38 |
+| **preemption floor 20/12, gated on phase score ≥ 0.12** | **7/7 · 7/7 · 5/7** | **7/7 (maxQ +6.2 %)** | 59 |
+| … same floor, gated on vehicles present ≥ 3 or ≥ 4 | 5/7 · 7/7 · 3/7 | 7/7 | 53 |
+| … same floor, gated on vehicles present ≥ 5 | 7/7 · 7/7 · 5/7 | 6/7 (never binds) | 58 |
+| … same floor, gated on vehicles standing ≥ 3 | 7/7 · 7/7 · 5/7 | 6/7 (never binds) | 59 |
+| … same floor, gated on departure rate ≥ 0.1/s | 5/7 · 7/7 · 4/7 | 7/7 | 50 |
+| … + round-robin tie-break at gap-out | 3/7 · 7/7 · 3/7 | 7/7 | 54 |
+
+The lower cap and the longer shared floor both fixed heavy and both lost light — the same
+pressure that cuts a discharging stream in heavy traffic is what lets a car waiting 30 s
+preempt a phase serving one moving car in light traffic. Raising the floor for *everyone*
+made lone vehicles wait out greens serving nobody. So the fix is a floor that only the
+scored-preference path respects (`min_green_before_preemption_seconds`, 20 s main / 12 s
+right — ≈17 s / 9 s of actual green), and only while the phase is still serving something:
+a restriction the AI places on itself, so the comparison stays fair (VAC never preempts).
+
+Choosing the gate was the instructive part. Logging every tick the floor bound in
+`light_seed1` showed the same shape each time: current phase with **four vehicles present,
+none standing, nothing departing** — four cars just inserted 150 m up the approach — scoring
+0.03 while a rival with a car actually waiting scored 0.20–0.53. Holding a green for cars
+that far away is wrong. Vehicles present could not separate that from a heavy stream (both
+3–4); vehicles standing never bound in heavy traffic at all (the standing queue is gone by
+the time the stream gets cut); the departure rate is backward-looking and kept holding
+phases that had just *finished* discharging. The engine's own phase score separated every
+case cleanly — 0.03–0.10 in all the light moments, 0.3+ mid-stream in heavy — so that is
+the gate: `preemption_floor_min_phase_score = 0.12`. The floor never binds in light traffic
+(numbers identical to no floor) and east_heavy goes to 7/7 with its best margins of the day.
+
+Also tested and kept off: `starvation_requires_demand` (starvation only for phases with
+vehicles) lost on every light seed; the pressure on empty phases is a useful
+least-recently-served tie-break at gap-out. The switch-confirmation window at 5 s and a
+light-traffic gate at 0.10 both lost, as in Section 20.
+
+**Final `DecisionConfig` deltas from Section 22:** `gap_out_uses_present_demand=True`
+(count-first, score tie-break), `min_green_before_preemption_seconds=20/12`,
+`preemption_floor_min_phase_score=0.12`. Everything else — margin 0.35, cap 0.20, min green
+10/8, max green 45/20, wait influences 0.25/0.15, confirmation 3 s — is unchanged.
+`tests/`: **65/65**.
+
+**Final sweep, all changes in:**
+
+| scenario (seed 1) | wins | wait | travel | worst travel | avg queue | max queue | speed | throughput |
+|---|---|---|---|---|---|---|---|---|
+| `light` | **7/7** | +7.8 % | +0.2 % | +7.4 % | +0.7 % | +0.0 % | +1.6 % | +0.0 % |
+| `balanced` | **7/7** | +18.5 % | +1.1 % | +1.9 % | +4.0 % | +0.0 % | +1.6 % | +0.0 % |
+| `normal_traffic` | **7/7** | +86.5 % | +34.7 % | +70.3 % | +65.7 % | +61.4 % | +47.3 % | +0.0 % |
+| `heavy` | **7/7** | +66.9 % | +20.5 % | +40.0 % | +46.2 % | +37.1 % | +24.5 % | +0.0 % |
+| `extreme` | **7/7** | +64.3 % | +37.4 % | +57.4 % | +51.5 % | +50.6 % | +45.5 % | +0.0 % |
+| `rush_hour` | **7/7** | +58.5 % | +10.8 % | +43.9 % | +26.0 % | +33.7 % | +11.0 % | +0.0 % |
+| `north_heavy` | **7/7** | +57.6 % | +10.7 % | +43.8 % | +29.9 % | +11.4 % | +9.3 % | +0.0 % |
+| `south_heavy` | **7/7** | +62.2 % | +8.8 % | +42.1 % | +26.9 % | +7.5 % | +9.7 % | +0.0 % |
+| `east_heavy` | **7/7** | +62.5 % | +15.4 % | +41.1 % | +37.2 % | +6.2 % | +18.5 % | +0.0 % |
+| `west_heavy` | **7/7** | +63.9 % | +13.8 % | +42.9 % | +36.5 % | +13.2 % | +14.8 % | +0.0 % |
+| `accident` | **7/7** | +84.1 % | +34.1 % | +70.2 % | +62.8 % | +54.7 % | +41.2 % | +0.0 % |
+| `emergency_response` | **7/7** | +86.2 % | +32.0 % | +70.3 % | +62.2 % | +56.8 % | +42.5 % | +0.0 % |
+| `rain` | **7/7** | +85.9 % | +35.7 % | +66.2 % | +67.7 % | +64.5 % | +46.2 % | +0.0 % |
+
+**13/13 clean sweeps — every scenario, every metric.** All thirteen `results/comparison_
+<scenario>_seed1.csv` files were written by this one run (evening of 2026-09-13). The AI
+switches less than VAC in every light seed (64 vs 74, 58 vs 67, 65 vs 75) and, under
+saturation, holds a phase serving a stream for at least ~17 s of real green before any
+score can end it. Throughput is tied by construction in every row; the two 0.0 max-queue
+entries (`light`, `balanced`) are exact ties, 31 vs 31 vehicles.
+
+Multi-seed spot checks with this configuration: `light_seed2` 7/7, `light_seed3` 5/7
+(travel −0.1 %, speed −1.2 %), `east_heavy_seed2` 7/7, `east_heavy_seed3` 7/7. As in
+Section 22.3, a literal "every seed of every scenario" guarantee is not claimed.
+
+
+### 26.5 Two honest notes
+
+- The `results/comparison_light_seed1.csv` committed in `deca744` (the commit whose message
+  claims 13/13) shows VAC ahead on 5/7 for light — it disagrees with Section 22's text. Most
+  likely it was overwritten by one of the threshold experiments Section 20.2 describes and
+  never refreshed. It cannot be resolved from history; the old-program files are preserved
+  as-is in `results/old_shared_left_2026-09-08/` and every number in this section comes from
+  runs made today.
+- The model file grew from 388 MB to 654 MB (75 % more rows, deeper trees). It is tracked
+  through Git LFS (`.gitattributes`), as before.

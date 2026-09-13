@@ -74,6 +74,16 @@ class MetricsCollector:
         # Per-vehicle trip tracking for travel time + throughput.
         self._depart_times: Dict[str, float] = {}
         self._arrive_times: Dict[str, float] = {}
+        # Scheduled (<stop>-element) stop time per vehicle, kept OUT of
+        # its travel time. A stop the route file orders is not delay the
+        # signal caused - SUMO's own waiting-time accounting makes the
+        # same distinction. Without this, the accident scenario's
+        # "worst travel time" was the scripted 550 s stall under BOTH
+        # controllers, and the comparison on that metric reduced to
+        # which phase happened to be showing the instant the stall
+        # ended (Section 26.4 of the architecture report).
+        self._scheduled_stop_started_at: Dict[str, float] = {}
+        self._scheduled_stop_seconds: Dict[str, float] = defaultdict(float)
         # First-seen timestamps as a fallback depart time for vehicles
         # already in the network at the very first recorded step.
         self._first_seen_times: Dict[str, float] = {}
@@ -85,6 +95,8 @@ class MetricsCollector:
         state,
         departed_vehicle_ids: Iterable[str] = (),
         arrived_vehicle_ids: Iterable[str] = (),
+        stop_starting_vehicle_ids: Iterable[str] = (),
+        stop_ending_vehicle_ids: Iterable[str] = (),
     ) -> None:
         """
         Fold one SimulationState snapshot into the running aggregates.
@@ -98,6 +110,13 @@ class MetricsCollector:
         arrived_vehicle_ids : iterable of str
             IDs that exited the network this step
             (TrafficAdapter.get_arrived_vehicle_ids()).
+        stop_starting_vehicle_ids, stop_ending_vehicle_ids : iterable of str
+            IDs that began / ended a SCHEDULED stop this step
+            (TrafficAdapter.get_stop_starting_vehicle_ids() /
+            get_stop_ending_vehicle_ids()). Time between the two is
+            subtracted from that vehicle's travel time. Optional: a
+            caller that does not pass them measures travel time gross of
+            scheduled stops, as before.
         """
         now = state.simulation_time
         dt = (
@@ -138,6 +157,12 @@ class MetricsCollector:
         # Trip clocks: departure starts them, arrival stops them.
         for vehicle_id in departed_vehicle_ids:
             self._depart_times.setdefault(vehicle_id, now)
+        for vehicle_id in stop_starting_vehicle_ids:
+            self._scheduled_stop_started_at.setdefault(vehicle_id, now)
+        for vehicle_id in stop_ending_vehicle_ids:
+            started = self._scheduled_stop_started_at.pop(vehicle_id, None)
+            if started is not None:
+                self._scheduled_stop_seconds[vehicle_id] += max(0.0, now - started)
         for vehicle_id in arrived_vehicle_ids:
             # A vehicle could theoretically arrive within the same step
             # window we first observe it; first-seen keeps the clock
@@ -164,7 +189,9 @@ class MetricsCollector:
         throughput_vehicles = len(self._arrive_times)
 
         travel_times = [
-            arrival - self._depart_times.get(vehicle_id, arrival)
+            arrival
+            - self._depart_times.get(vehicle_id, arrival)
+            - self._scheduled_stop_seconds.get(vehicle_id, 0.0)
             for vehicle_id, arrival in self._arrive_times.items()
         ]
         avg_travel_time = (
