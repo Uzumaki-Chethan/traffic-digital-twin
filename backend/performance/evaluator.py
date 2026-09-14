@@ -69,6 +69,7 @@ import argparse
 import csv
 import logging
 import os
+from collections import deque
 
 import sumolib
 
@@ -83,13 +84,78 @@ from signal_controller.signal_controller import SignalController
 
 from performance.baseline_controllers import VehicleActuatedController
 from performance.metrics_collector import MetricsCollector
+from performance.scenarios import scenario_sumocfg_path
 from services.live_state import DEFAULT_STORE as LIVE_STATE, RemoteLiveStatePublisher
 from services.dashboard_server import start_dashboard_server
+from services.snapshot_views import _INDEX_TO_PHASE, side_view
 
 logger = logging.getLogger(__name__)
 
-SCENARIO_DIR = os.path.join(Config.PROJECT_ROOT, "sumo", "config", "scenarios")
 RESULTS_DIR = os.path.join(Config.PROJECT_ROOT, "results")
+
+# How many decision ticks of phase history each side's snapshot carries -
+# the same 60 s band the demo run publishes (simulation_runner.py).
+_PHASE_HISTORY_TICKS = 60
+
+
+def lockstep_gate(control) -> bool:
+    """
+    The RunControl gate at the top of the lockstep loop, mirroring what
+    TraCIManager.run() does for a demo run: block while paused, and
+    return False once a stop has been requested. With no control (a
+    batch run - the CSV sweep, the terminal) it is a no-op that always
+    says "carry on", so those paths are unchanged.
+    """
+    if control is None:
+        return True
+    control.wait_if_paused()
+    if control.stop_requested:
+        return False
+    return True
+
+
+def pace_after_step(control, step_seconds: float) -> None:
+    """Hold simulated time at RunControl's speed; no-op without control."""
+    if control is not None:
+        control.pace(step_seconds)
+
+
+def evaluation_snapshot(scenario, baseline_controller, sim_time, ai_side, base_side,
+                        rows, final: bool) -> dict:
+    """
+    The live snapshot of an evaluation: both controllers' junctions (each
+    built by services.snapshot_views.side_view, so a JunctionPlate draws
+    them exactly as it draws a demo), plus the seven-metric comparison.
+    `final` is True on the last publish only, so the page can lock its
+    verdicts. No prediction - nothing on that page shows the model.
+    """
+    return {
+        "kind": "evaluation",
+        "sim_time": sim_time,
+        "scenario": scenario,
+        "baseline_controller": baseline_controller,
+        "ai": ai_side,
+        "baseline": base_side,
+        "comparison": {"rows": rows, "final": final},
+    }
+
+
+class _FixedTimerDecision:
+    """
+    What the fixed-time baseline "decided": nothing - SUMO's own program
+    runs untouched - but the snapshot still needs a decision block so
+    both sides have the same shape. Built from the signal it is showing.
+    """
+
+    def __init__(self, phase_index):
+        self.active_phase = _INDEX_TO_PHASE.get(
+            phase_index, _INDEX_TO_PHASE.get(phase_index - 1, "unknown"))
+        self.decision_mode = "fixed_timer"
+        self.switched = False
+        self.reason_text = "Fixed-time program - no decisions are made."
+        self.green_duration_seconds = 0.0
+        self.phase_scores = {}
+        self.lane_scores = {}
 
 # Comparison rows: (summary key, human label, better-direction).
 # "lower" means smaller is better (waiting, queues); "higher" means
@@ -151,9 +217,10 @@ class PerformanceEvaluator:
         self._scenario_name = scenario_name
         self._use_gui = use_gui
         self._baseline = baseline
-        sumocfg_path = os.path.join(
-            SCENARIO_DIR, "{}.sumocfg".format(scenario_name)
-        )
+        try:
+            sumocfg_path = scenario_sumocfg_path(scenario_name)
+        except ValueError as exc:
+            raise FileNotFoundError(str(exc)) from exc
         if not os.path.isfile(sumocfg_path):
             raise FileNotFoundError(
                 "Scenario config not found: {}".format(sumocfg_path)
@@ -169,6 +236,23 @@ class PerformanceEvaluator:
             "current state only.", Config.ML_MODEL_PATH,
         )
         return None
+
+    def _live_snapshot(self, latest, phase_history_ai, phase_history_base,
+                       collector_ai, collector_base, final: bool) -> dict:
+        ai_side = side_view(
+            latest["state_ai"], latest["features_ai"], latest["decision_ai"],
+            dict(latest["state_ai"].signal.lane_states), phase_history_ai,
+        )
+        base_side = side_view(
+            latest["state_base"], latest["features_base"], latest["decision_base"],
+            dict(latest["state_base"].signal.lane_states), phase_history_base,
+        )
+        rows = self._comparison_rows(collector_ai.summary(), collector_base.summary())
+        return evaluation_snapshot(
+            self._scenario_name, self._baseline,
+            max(latest["features_ai"].simulation_time, latest["features_base"].simulation_time),
+            ai_side, base_side, rows, final,
+        )
 
     @staticmethod
     def _comparison_rows(ai_summary: dict, base_summary: dict) -> list:
@@ -193,7 +277,7 @@ class PerformanceEvaluator:
             })
         return rows
 
-    def run(self, live_store=None) -> dict:
+    def run(self, live_store=None, control=None) -> dict:
         """
         Execute both simulations in lockstep and return:
 
@@ -220,6 +304,14 @@ class PerformanceEvaluator:
 
             adapter_ai = TrafficAdapter(manager_ai)
             adapter_base = TrafficAdapter(manager_base)
+
+            # Read once: pacing (pace_after_step) needs the step length
+            # every iteration and must not pay a TraCI round trip for it.
+            step_seconds = float(manager_ai.connection.simulation.getDeltaT())
+            phase_history_ai = deque(maxlen=_PHASE_HISTORY_TICKS)
+            phase_history_base = deque(maxlen=_PHASE_HISTORY_TICKS)
+            latest = {"state_ai": None, "features_ai": None, "decision_ai": None,
+                      "state_base": None, "features_base": None, "decision_base": None}
 
             # ---- Simulation A: the full AI pipeline ----
             twin = DigitalTwin()
@@ -282,6 +374,12 @@ class PerformanceEvaluator:
             last_live_publish = [None]
 
             while True:
+                # Pause / stop from the console's top bar (see
+                # services.run_control). A batch run passes no control.
+                if not lockstep_gate(control):
+                    logger.info("Evaluation stopped from the console.")
+                    break
+
                 ai_pending = conn_ai.simulation.getMinExpectedNumber() > 0
                 base_pending = conn_base.simulation.getMinExpectedNumber() > 0
                 if not ai_pending and not base_pending:
@@ -317,6 +415,14 @@ class PerformanceEvaluator:
                         if decision.switched:
                             switch_counts["ai"] += 1
                         last_decision_time[0] = features.simulation_time
+                        latest["state_ai"], latest["features_ai"], latest["decision_ai"] = (
+                            state_ai, features, decision,
+                        )
+                        phase_history_ai.append({
+                            "time": features.simulation_time,
+                            "phase": decision.active_phase,
+                            "is_yellow": state_ai.signal.current_phase_index not in _INDEX_TO_PHASE,
+                        })
 
                 if base_pending:
                     conn_base.simulationStep()
@@ -348,39 +454,50 @@ class PerformanceEvaluator:
                             if decision_base.switched:
                                 switch_counts["baseline"] += 1
                             last_decision_time_base[0] = features_base.simulation_time
-                    # else (fixed_timer): measurement only. No twin, no
-                    # features, no decisions, no signal commands ever
-                    # touch this connection - SUMO's own static tlLogic
-                    # controls it untouched.
+                            latest["state_base"], latest["features_base"], latest["decision_base"] = (
+                                state_base, features_base, decision_base,
+                            )
+                            phase_history_base.append({
+                                "time": features_base.simulation_time,
+                                "phase": decision_base.active_phase,
+                                "is_yellow": state_base.signal.current_phase_index not in _INDEX_TO_PHASE,
+                            })
+                    elif live_store is not None:
+                        # fixed_timer: measurement only - no twin, no
+                        # features, no decisions, no signal commands ever
+                        # touch this connection; SUMO's own static tlLogic
+                        # controls it untouched. The live view still needs
+                        # per-lane facts to draw, so a features object is
+                        # engineered from the raw state for DISPLAY only.
+                        if twin_base is None:
+                            twin_base = DigitalTwin()
+                            feature_engineer_base = FeatureEngineer(twin_base)
+                        twin_base.update(state_base)
+                        features_base = feature_engineer_base.generate_features()
+                        decision_base = _FixedTimerDecision(state_base.signal.current_phase_index)
+                        latest["state_base"], latest["features_base"], latest["decision_base"] = (
+                            state_base, features_base, decision_base,
+                        )
+                        if not phase_history_base or phase_history_base[-1]["phase"] != decision_base.active_phase:
+                            phase_history_base.append({
+                                "time": features_base.simulation_time,
+                                "phase": decision_base.active_phase,
+                                "is_yellow": state_base.signal.current_phase_index not in _INDEX_TO_PHASE,
+                            })
 
-                # Live AI-vs-baseline feed for the dashboard (~1 Hz).
-                # summary() is a pure function over accumulated
-                # integrals, so calling it mid-run is safe; the numbers
-                # simply converge as the run progresses.
-                if live_store is not None:
-                    now = collector_ai.summary()["simulation_duration_seconds"]
-                    if last_live_publish[0] is None or now - last_live_publish[0] >= 1.0:
-                        ai_mid = collector_ai.summary()
-                        base_mid = collector_base.summary()
-                        live_store.publish({
-                            "sim_time": max(
-                                ai_mid["simulation_duration_seconds"],
-                                base_mid["simulation_duration_seconds"],
-                            ),
-                            "signal": None,
-                            "metrics": {
-                                "vehicles": 0, "avg_speed": ai_mid["avg_speed_mps"],
-                                "avg_wait": ai_mid["avg_waiting_time_seconds"],
-                                "queue": ai_mid["avg_queue_length_vehicles"],
-                                "stopped": ai_mid["max_stopped_vehicles"],
-                            },
-                            "lanes": [], "decision": {}, "emergency_lanes": [],
-                            "prediction": None, "phase_history": [],
-                            "comparison": {
-                                "rows": self._comparison_rows(ai_mid, base_mid),
-                                "baseline_controller": self._baseline,
-                            },
-                        })
+                pace_after_step(control, step_seconds)
+
+                # Live feed for the console's Performance page: both
+                # controllers' junctions plus the running comparison,
+                # once per decision tick (1 s simulated), paced like a
+                # demo run so the two plates animate at the same rate.
+                if live_store is not None and latest["state_ai"] is not None and latest["state_base"] is not None:
+                    now = latest["features_ai"].simulation_time
+                    if last_live_publish[0] is None or now - last_live_publish[0] >= Config.DECISION_INTERVAL_SECONDS - 1e-6:
+                        live_store.publish(self._live_snapshot(
+                            latest, phase_history_ai, phase_history_base,
+                            collector_ai, collector_base, final=False,
+                        ))
                         last_live_publish[0] = now
 
         except KeyboardInterrupt:
@@ -391,6 +508,14 @@ class PerformanceEvaluator:
 
         ai_summary = collector_ai.summary()
         base_summary = collector_base.summary()
+
+        if live_store is not None and latest["state_ai"] is not None and latest["state_base"] is not None:
+            # The last word: the same shape with the finished numbers and
+            # final=True, so the page can lock its verdicts.
+            live_store.publish(self._live_snapshot(
+                latest, phase_history_ai, phase_history_base,
+                collector_ai, collector_base, final=True,
+            ))
 
         improvement = {
             row["key"]: row["improvement"]
