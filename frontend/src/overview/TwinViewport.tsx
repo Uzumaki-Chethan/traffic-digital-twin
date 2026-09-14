@@ -1,11 +1,10 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Box, Map, Maximize2, Minimize2, Minus, Plus, RotateCcw } from 'lucide-react'
+import { Box, Crosshair, Map, Maximize2, Minimize2, Minus, Plus } from 'lucide-react'
 import clsx from 'clsx'
 import type { LaneView, VehicleView } from '@/data/types'
 import { JunctionPlate } from './JunctionPlate'
-import { H as PLATE_H, W as PLATE_W } from './plateGeometry'
-import { usePanZoom } from './usePanZoom'
+import { usePanZoom, type ViewState } from './usePanZoom'
 
 // three.js is ~150 kB gzipped, so the 3D view is split out and only
 // fetched when someone actually switches to it. The plan view — the
@@ -13,10 +12,12 @@ import { usePanZoom } from './usePanZoom'
 const Junction3D = lazy(() => import('./Junction3D').then((m) => ({ default: m.Junction3D })))
 
 /**
- * The twin viewport and its controls. Two modes: the schematic plan
- * (default — exaggerated lane widths, readable across a room) and a
- * to-scale 3D miniature. Controls sit bottom-left and appear on hover or
- * keyboard focus, so nothing covers the drawing while it is being read.
+ * The twin viewport and its controls. Two modes: the plan (default — a
+ * true-scale map with sumo-gui's zoom: scroll, drag, and a button that
+ * frames the junction; zooming right out shows the whole network) and
+ * a to-scale 3D miniature. Controls sit bottom-left and appear on hover
+ * or keyboard focus, so nothing covers the drawing while it is being
+ * read.
  */
 export function TwinViewport({
   lanes,
@@ -24,6 +25,7 @@ export function TwinViewport({
   vehicles,
   powered,
   allow3d = true,
+  sharedView,
 }: {
   lanes: LaneView[]
   emergencyLanes: string[]
@@ -32,15 +34,17 @@ export function TwinViewport({
   /** Performance shows two junctions side by side in plan view only -
    * two three.js scenes at once is not a comparison anyone asked for. */
   allow3d?: boolean
+  /** Lifted pan/zoom state, so two viewports frame the same window. */
+  sharedView?: ViewState
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const stage = useRef<HTMLDivElement>(null)
   const [isFull, setIsFull] = useState(false)
   const [hovered, setHovered] = useState(false)
   const [mode, setMode] = useState<'plan' | '3d'>('plan')
-  // The plan view gets the same freedom the 3D view has had: scroll to
-  // zoom, drag to pan. Narrows the SVG viewBox, so it stays sharp.
-  const pan = usePanZoom(stage, PLATE_W, PLATE_H)
+  // Scroll to zoom, drag to pan, in metres. Narrows the SVG viewBox, so
+  // the drawing stays sharp at any magnification.
+  const pan = usePanZoom(stage, sharedView)
 
   useEffect(() => {
     const onChange = () => setIsFull(document.fullscreenElement === ref.current)
@@ -78,7 +82,7 @@ export function TwinViewport({
         className={isFull ? 'aspect-[920/540] max-h-full w-full max-w-full' : 'h-full w-full'}
         style={
           mode === 'plan'
-            ? { touchAction: 'none', cursor: pan.zoomed ? 'grab' : 'default' }
+            ? { touchAction: 'none', cursor: 'grab' }
             : undefined
         }
         {...(mode === 'plan' ? pan.handlers : {})}
@@ -90,6 +94,7 @@ export function TwinViewport({
             vehicles={vehicles}
             powered={powered}
             viewBox={pan.viewBox}
+            pxPerMetre={pan.pxPerMetre}
           />
         ) : (
           <Suspense
@@ -118,17 +123,12 @@ export function TwinViewport({
 
             {mode === 'plan' && (
               <div className="flex items-center overflow-hidden rounded-control border border-rule bg-plate shadow-[var(--shadow-panel)]">
-                <IconButton onClick={() => pan.zoomBy(1 / 1.6)} label="Zoom out" icon={<Minus size={14} aria-hidden />} />
-                <span className="num w-[46px] px-1 text-center text-[12px] text-ink-mute">
-                  {pan.view.k.toFixed(1)}×
+                <IconButton onClick={() => pan.zoomBy(1 / 1.6)} label="Zoom out" icon={<Minus size={14} aria-hidden />} disabled={!pan.canZoomOut} />
+                <span className="num w-[46px] px-1 text-center text-[12px] text-ink-mute" title="Zoom; 1× shows the whole network">
+                  {pan.zoom.toFixed(1)}×
                 </span>
-                <IconButton onClick={() => pan.zoomBy(1.6)} label="Zoom in" icon={<Plus size={14} aria-hidden />} />
-                <IconButton
-                  onClick={pan.reset}
-                  label="Reset view"
-                  icon={<RotateCcw size={13} aria-hidden />}
-                  disabled={!pan.zoomed}
-                />
+                <IconButton onClick={() => pan.zoomBy(1.6)} label="Zoom in" icon={<Plus size={14} aria-hidden />} disabled={!pan.canZoomIn} />
+                <IconButton onClick={pan.home} label="Frame the junction" icon={<Crosshair size={13} aria-hidden />} disabled={pan.atHome} />
               </div>
             )}
             <button

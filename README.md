@@ -208,9 +208,10 @@ the simulation process.
 
 Four pages are built:
 
-- **Overview** — the junction itself, in a to-scale plan view or an
-  interactive 3D miniature (drag to orbit, scroll to zoom), both drawing
-  the real SUMO vehicles; active phase with its decision mode and reason;
+- **Overview** — the junction itself, in a true-scale plan view (sumo-gui's
+  zoom: scroll, drag, 1× = the whole network, a button frames the junction)
+  or an interactive 3D miniature (drag to orbit, scroll to zoom), both
+  drawing the real SUMO vehicles at their real size; active phase with its decision mode and reason;
   the twelve lanes with live signal state; a 60 s phase-history band; and
   the network metrics strip.
 - **Analytics** — the run happening right now, in detail: lane pressure

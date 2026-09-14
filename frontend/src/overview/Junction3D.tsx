@@ -678,9 +678,15 @@ export function Junction3D({ lanes, vehicles, powered }: Props) {
             car.headingFrom = car.heading
             const dx = car.to.x - car.from.x
             const dz = car.to.z - car.from.z
-            // Heading from the whole segment, once — not per frame from a
-            // shrinking remainder, which is noisy just as it matters.
-            if (dx * dx + dz * dz > 0.09) car.headingTo = Math.atan2(dx, dz)
+            // On an arm the heading IS the lane's: SUMO changes lane as a
+            // sideways jump between ticks, and a heading taken from that
+            // segment parks the car at 45 degrees in its queue (seen on
+            // every heavy run). Only mid-junction, on an internal lane,
+            // does the movement itself carry the heading - from the whole
+            // segment, once, not per frame from a shrinking remainder.
+            const laneAngle = v.lane.startsWith(':') ? null : laneHeading3D(v.lane)
+            if (laneAngle !== null) car.headingTo = laneAngle
+            else if (dx * dx + dz * dz > 0.09) car.headingTo = Math.atan2(dx, dz)
             car.seen = true
           }
         }

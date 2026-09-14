@@ -1,17 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { RefObject } from 'react'
+import type { Dispatch, RefObject, SetStateAction } from 'react'
+import { CENTRE, NET, PLATE_ASPECT } from './plateGeometry'
 
 /**
- * Pan and zoom for the plan view.
+ * Pan and zoom for the plan view, in metres.
  *
- * The 3D miniature has had orbit/zoom/pan since it was built; the plan
- * view had nothing, so the only way to look closely at one approach was
- * fullscreen. This gives it the same freedom in the idiom a flat drawing
- * wants: scroll to zoom about the pointer, drag to pan, and a reset.
+ * The plan view is a true-scale map (plateGeometry), so the viewport is
+ * a window onto the network: a centre and a visible height, both in
+ * metres. Zooming out stops at the whole 400 m network (1x); the
+ * "Junction" button frames the box and the first ~53 m of each arm,
+ * where queues form, which is also the default. Scroll to zoom about
+ * the pointer, drag to pan, like sumo-gui. It narrows the SVG viewBox
+ * rather than CSS-transforming the element, so it stays vector-sharp.
  *
- * It works by narrowing the SVG viewBox rather than CSS-transforming the
- * element, so everything stays vector-sharp at any magnification and the
- * hairlines do not thicken.
+ * It also measures the stage, so the plate can draw labels and signal
+ * heads at a constant PIXEL size whatever the zoom (pxPerMetre).
+ *
+ * The view state can be lifted: the Performance page hands both windows
+ * one state so Trinetra and the baseline are always framed identically.
  *
  * The wheel listener is attached manually because React's onWheel is
  * passive — preventDefault() there is ignored, and the page would scroll
@@ -19,48 +25,72 @@ import type { RefObject } from 'react'
  */
 
 export interface View {
-  x: number
-  y: number
-  k: number
+  /** Centre of the window, plan metres. */
+  cx: number
+  cy: number
+  /** Visible height, metres. Width follows the stage's aspect. */
+  h: number
 }
 
-const MIN_ZOOM = 1
-const MAX_ZOOM = 12
+/** Junction framing: 150 m tall - the 43 m box plus ~53 m of each arm. */
+export const HOME_VIEW: View = { cx: CENTRE, cy: CENTRE, h: 150 }
+/** Whole network, with a little ground round it - the zoom-out limit, 1x. */
+export const FIT_VIEW: View = { cx: CENTRE, cy: CENTRE, h: NET + 12 }
+const MIN_H = 24
 
-export function usePanZoom(target: RefObject<HTMLElement | null>, width: number, height: number) {
-  const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 })
+export type ViewState = [View, Dispatch<SetStateAction<View>>]
+
+function clamp(v: View): View {
+  const h = Math.min(FIT_VIEW.h, Math.max(MIN_H, v.h))
+  return {
+    h,
+    cx: Math.min(NET, Math.max(0, v.cx)),
+    cy: Math.min(NET, Math.max(0, v.cy)),
+  }
+}
+
+function same(a: View, b: View): boolean {
+  return Math.abs(a.cx - b.cx) < 0.01 && Math.abs(a.cy - b.cy) < 0.01 && Math.abs(a.h - b.h) < 0.01
+}
+
+export function usePanZoom(target: RefObject<HTMLElement | null>, shared?: ViewState) {
+  const local = useState<View>(HOME_VIEW)
+  const [view, setView] = shared ?? local
   const drag = useRef<{ id: number; x: number; y: number } | null>(null)
+  const [stagePx, setStagePx] = useState({ w: 920, h: 540 })
 
-  const clamp = useCallback(
-    (v: View): View => {
-      const k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, v.k))
-      const w = width / k
-      const h = height / k
-      return {
-        k,
-        x: Math.min(width - w, Math.max(0, v.x)),
-        y: Math.min(height - h, Math.max(0, v.y)),
-      }
-    },
-    [width, height],
-  )
+  useEffect(() => {
+    const el = target.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      if (width > 0 && height > 0) setStagePx({ w: width, h: height })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [target])
+
+  const aspect = stagePx.h > 0 ? stagePx.w / stagePx.h : PLATE_ASPECT
 
   /** Zoom by a factor, keeping the point at (fx, fy) of the box fixed. */
   const zoomAt = useCallback(
     (factor: number, fx: number, fy: number) => {
       setView((v) => {
-        const k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, v.k * factor))
-        // The plate coordinate currently under that spot stays under it.
-        const px = v.x + fx * (width / v.k)
-        const py = v.y + fy * (height / v.k)
-        return clamp({ k, x: px - fx * (width / k), y: py - fy * (height / k) })
+        const h = Math.min(FIT_VIEW.h, Math.max(MIN_H, v.h / factor))
+        const w0 = v.h * aspect
+        const w1 = h * aspect
+        // The metre under that spot stays under it.
+        const px = v.cx - w0 / 2 + fx * w0
+        const py = v.cy - v.h / 2 + fy * v.h
+        return clamp({ h, cx: px - fx * w1 + w1 / 2, cy: py - fy * h + h / 2 })
       })
     },
-    [clamp, width, height],
+    [aspect, setView],
   )
 
   const zoomBy = useCallback((factor: number) => zoomAt(factor, 0.5, 0.5), [zoomAt])
-  const reset = useCallback(() => setView({ x: 0, y: 0, k: 1 }), [])
+  const home = useCallback(() => setView(HOME_VIEW), [setView])
+  const fit = useCallback(() => setView(FIT_VIEW), [setView])
 
   useEffect(() => {
     const el = target.current
@@ -98,12 +128,12 @@ export function usePanZoom(target: RefObject<HTMLElement | null>, width: number,
       setView((v) =>
         clamp({
           ...v,
-          x: v.x - (dx / rect.width) * (width / v.k),
-          y: v.y - (dy / rect.height) * (height / v.k),
+          cx: v.cx - (dx / rect.height) * v.h,
+          cy: v.cy - (dy / rect.height) * v.h,
         }),
       )
     },
-    [clamp, width, height],
+    [setView],
   )
 
   const endDrag = useCallback((e: React.PointerEvent) => {
@@ -112,15 +142,22 @@ export function usePanZoom(target: RefObject<HTMLElement | null>, width: number,
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
   }, [])
 
-  const w = width / view.k
-  const h = height / view.k
+  const w = view.h * aspect
+  const pxPerMetre = stagePx.h / view.h
 
   return {
     view,
-    viewBox: `${view.x.toFixed(2)} ${view.y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)}`,
-    zoomed: view.k > 1.001,
+    viewBox: `${(view.cx - w / 2).toFixed(2)} ${(view.cy - view.h / 2).toFixed(2)} ${w.toFixed(2)} ${view.h.toFixed(2)}`,
+    /** Magnification relative to the whole network fitted: 1x at Fit. */
+    zoom: FIT_VIEW.h / view.h,
+    pxPerMetre,
+    atHome: same(view, HOME_VIEW),
+    atFit: same(view, FIT_VIEW),
+    canZoomIn: view.h > MIN_H + 0.01,
+    canZoomOut: view.h < FIT_VIEW.h - 0.01,
     zoomBy,
-    reset,
+    home,
+    fit,
     handlers: {
       onPointerDown,
       onPointerMove,

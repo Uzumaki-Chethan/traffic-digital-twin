@@ -1,6 +1,7 @@
 import { Panel } from '@/ui/Panel'
 import { TwinViewport } from '@/overview/TwinViewport'
 import type { SideView } from '@/data/types'
+import type { ViewState } from '@/overview/usePanZoom'
 import { phaseLabel } from '@/utils/signal'
 import { f1 } from '@/utils/format'
 
@@ -13,10 +14,13 @@ export function ControllerWindow({
   title,
   side,
   powered,
+  sharedView,
 }: {
   title: string
   side: SideView | null
   powered: boolean
+  /** Both windows share one pan/zoom so the two are always framed alike. */
+  sharedView: ViewState
 }) {
   const lanes = side?.lanes ?? []
   return (
@@ -38,7 +42,7 @@ export function ControllerWindow({
       }
       bodyClassName="px-2 pb-2"
     >
-      <TwinViewport lanes={lanes} emergencyLanes={[]} vehicles={side?.vehicles} powered={powered} allow3d={false} />
+      <TwinViewport lanes={lanes} emergencyLanes={[]} vehicles={side?.vehicles} powered={powered} allow3d={false} sharedView={sharedView} />
     </Panel>
   )
 }

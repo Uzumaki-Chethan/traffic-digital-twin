@@ -2845,11 +2845,51 @@ cannot host the evaluation's two simulations in one process, so it was not pursu
   aggressive car parked 23.0 units behind it overlapped by construction. Lengths now derive
   from `plateGeometry.ARM_UNITS_PER_METRE`; the tightest legal spacing of every type leaves
   a visible gap (motorcycle 1.1 units, everything else ≥ 3.4).
-- **"Extreme doesn't look extreme."** It doesn't, and it is the scenario, not the drawing:
-  `extreme` is 1,334 veh/h per approach ≈ 445 per lane, against a lane capacity of roughly
-  500 veh/h at ~25 % green — 90 % of capacity. Queues build (VAC reached 80 queued) but a
-  car still arrives only every ~8 s per lane on a 178 m arm, so the arms never fill, and
-  the first minute at 1× is just the network filling. The manifest defined it as "heavy,
-  uniform, held out", never as gridlock. Offered to the user: keep it and name it honestly
-  on its card, or add a demand-above-capacity "Gridlock" scenario as a demo/evaluation card
-  outside the training manifest. Pending their choice.
+- **"Extreme doesn't look extreme."** The first analysis here concluded it was the scenario
+  (1,334 veh/h per approach, ~90 % of lane capacity, "never gridlock") and not the drawing.
+  The user pushed back — the same file looked extreme in sumo-gui during development — and
+  the user was right. See 28.5.
+
+### 28.5 The plan view becomes a map (2026-09-14, later the same day)
+
+The plate was a *schematic*: 3.2 m lanes drawn 36 units wide and 178 m arms 334 units long
+— eleven times wider than long — so twelve lanes stayed legible on a projector. Section
+28.4's overlap fix made vehicle *lengths* true to the arm (1.87 units/m) while their widths
+stayed a fifth of the lane. The consequence is the whole "extreme" complaint: in sumo-gui a
+1.8 m car fills more than half of its 3.2 m lane, so eight queued cars are a solid 56 m bar
+at the line; on the plate the same eight cars were a row of small dots with green road all
+round them. Same simulation, same 90–170 vehicles, read as a third of the traffic.
+
+The user's instruction: *"give the arms like sumo only, so that it can be zoomed out, in,
+fit"* — and keep the look. So:
+
+- **`plateGeometry.ts` is now in metres.** One SVG unit is one metre; x is SUMO's x and y is
+  `400 − sumo_y`. Every number is transcribed from `intersection.net.xml`: 3.2 m lanes, 9.6 m
+  corridors, inbound lanes ending 21.6 m from the centre, the junction's own polygon (a
+  19.2 m opening on each side joined by 12 m fillets that curve *into* the corners — the
+  shape's vertices sit 12 m from the outer corner, which the first draft got backwards and
+  drew as a bulging rounded square), lane centres at 208.0 / 204.8 / 201.6. The 3D miniature
+  already used these; the two views now agree to the metre. Vehicles are drawn at their
+  vType `length × width` — the same table (`vehicleTypes.ts`) the 3D view builds bodies from,
+  and the same file SUMO reads — at their SUMO coordinate, front bumper shifted back half a
+  length. `vehiclePlacement.ts` lost its arm decomposition and Bezier turns: there is nothing
+  to map any more. Heading on an arm is the lane's own (SUMO changes lane as a sideways jump
+  between ticks; a heading taken from that movement parked cars at 45° in their queues —
+  fixed in the 3D view in the same commit); only on an internal lane does the movement
+  carry the heading.
+- **The look stayed.** Hatched junction box with dashed boundary, pedestrian crossing bands,
+  medians, dashed dividers, painted movement arrows, three-lamp heads, drafting north arrow,
+  lane fill = signal, `--plate-vehicle` bodies. Things that must stay readable at any zoom —
+  lane names, signal heads, the north arrow — are drawn in a screen-pixel frame
+  (`scale(1 / pxPerMetre)`), and per-lane detail hides below 8 px of lane width. Lane names
+  are painted on the road under the traffic, staggered 20 / 52 / 84 m back from the line
+  (three 11 px labels on lanes 9 px apart would stack); approach names sit at the arm ends.
+- **Zoom is sumo-gui's.** `usePanZoom` is a window in metres (centre + visible height);
+  scroll zooms about the pointer, drag pans, the readout is the magnification relative to
+  the whole network fitted (**1×** = all 400 m, the zoom-out limit), and one button frames
+  the junction (150 m tall — the box plus ~53 m of each arm, the default). A separate "Fit"
+  button was tried and removed at the user's request: its icon read as a second fullscreen
+  button. The Performance page lifts one view state into both windows, so Trinetra and the
+  baseline are always framed identically — a comparison at two zooms is not a comparison.
+- Verified in the browser on `extreme_seed1`: queues now read as queues, in Overview and in
+  both Performance windows.

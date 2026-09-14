@@ -9,10 +9,12 @@ snapshot stream and `GET /api/*`, plus the narrow control surface in
 Built from a Stitch export whose layout the user approved, then iterated on
 colour and typography over about fifteen rounds (`docs/design/` has the brief).
 
-- **Overview** (`/`) — the junction as the hero, in either a schematic plan view
-  (scroll to zoom, drag to pan) or an interactive 3D miniature (`TwinViewport`
-  toggles; 3D is lazy-loaded as its own chunk). Both draw the real SUMO vehicles,
-  as their real types — a bus is a bus. Under it, **Prediction vs actual**: the only
+- **Overview** (`/`) — the junction as the hero, in either a true-scale plan view
+  (one SVG unit = one metre; scroll to zoom about the pointer, drag to pan, 1× =
+  the whole 400 m network, a button frames the junction) or an interactive 3D
+  miniature (`TwinViewport` toggles; 3D is lazy-loaded as its own chunk). Both
+  draw the real SUMO vehicles at their real `length × width`, as their real
+  types — a bus is a bus, and a queue looks as it does in sumo-gui. Under it, **Prediction vs actual**: the only
   place the ML layer appears in the UI. Beside it: the active-phase panel with the
   Desired-vs-Actual pair, the 12-lane ledger with plate cross-highlight, a
   dual-track ring-barrier phase history, and the metrics band.
@@ -56,15 +58,16 @@ See `PROJECT_ARCHITECTURE_REPORT.md` Section 23.4 before changing this back.
 
 - Junction geometry: `sumo/network/intersection.net.xml` has `lefthand="true"`;
   lane shapes put every inbound carriageway on the driver's left, kerb lane
-  (`_in_0`) = left turn. `src/overview/plateGeometry.ts` documents the plan-view
-  coordinates; `Junction3D.tsx` documents the true-scale 3D ones (9.6 m
-  carriageway, 21.6 m to the stop line, 178.4 m arms). Vehicle placement was
+  (`_in_0`) = left turn. `src/overview/plateGeometry.ts` holds the plan-view
+  geometry in metres (since 2026-09-14 the plan is a map, not a schematic) and
+  `Junction3D.tsx` the same numbers for the 3D scene (9.6 m carriageway, 21.6 m
+  to the stop line, 178.4 m arms, 12 m corner fillets). Vehicle placement was
   wrong on all four approaches until 2026-09-13 and was only caught by re-deriving
   it from the network file — check geometry against source, never by eye.
 - Junction paths: the twelve `<connection ... via=":C_n_0">` elements give each
-  internal lane its from/to arm and lane. `vehiclePlacement.ts` uses them so a
-  turning vehicle follows its actual movement across the junction; verified to
-  hand off with zero discontinuity at both ends of all twelve.
+  internal lane its from/to arm and lane (`junctionTopology.ts`). Vehicles are
+  drawn at their SUMO coordinates, so nothing re-routes them; the table gives a
+  vehicle its first heading before it has moved.
 - Vehicle types and dimensions come from the frozen `vehicle_types.add.xml`, held
   in `src/overview/vehicleTypes.ts` — the snapshot sends only the type id.
 - Decision modes: six (`priority`, `gap_out`, `light_traffic_patience`,

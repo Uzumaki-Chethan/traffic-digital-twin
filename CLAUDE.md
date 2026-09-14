@@ -296,7 +296,11 @@ unprompted, but do keep this section current if that changes:
   rejected on 2026-09-11 — it also assumed a Flask/Socket.IO backend that doesn't exist).
   A 3D miniature of the junction DOES exist now, at the user's explicit request
   (`overview/Junction3D.tsx`) — three.js, true network scale, sumo-gui's own look; that is
-  not the rejected neon "3D cyberpunk" direction. Analytics reads the LIVE stream only, by
+  not the rejected neon "3D cyberpunk" direction. Since 2026-09-14 the plan view is ALSO
+  true scale (`overview/plateGeometry.ts` is in metres, transcribed from the net file;
+  vehicles at their vType length × width; sumo-gui-style zoom with 1× = whole network) —
+  the user asked for it after the schematic's exaggerated lane widths made heavy traffic
+  look light. Keep the drafting look; do not go back to a schematic scale (Section 28.5). Analytics reads the LIVE stream only, by
   explicit instruction — see PROJECT_ARCHITECTURE_REPORT.md Section 23.4 before pointing it
   back at the database. See `frontend/README.md` for what's verified vs. still open (logo
   asset lost, no visual verification in the build environment).

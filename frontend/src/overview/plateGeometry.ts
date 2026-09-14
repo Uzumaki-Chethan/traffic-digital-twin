@@ -1,130 +1,200 @@
 /**
- * Junction plate geometry — verified against the compiled network
- * (sumo/network/intersection.net.xml, lefthand="true"):
+ * Plan-view geometry, in METRES — the network's own coordinates.
  *
- *   N_in lanes x = 201.6 / 204.8 / 208.0  -> east of centre, kerb (N_in_0) easternmost
- *   S_in lanes x = 192.0 / 195.2 / 198.4  -> west of centre,  kerb (S_in_0) westernmost
- *   W_in lanes y = 201.6 / 204.8 / 208.0  -> north of centre, kerb (W_in_0) northernmost
- *   E_in lanes y = 192.0 / 195.2 / 198.4  -> south of centre, kerb (E_in_0) southernmost
+ * Since 2026-09-14 the plan view is a map, not a schematic: one SVG user
+ * unit is one metre, x is SUMO's x, and y is `NET - sumo_y` because
+ * SUMO's y axis points north while the SVG's points down. Everything
+ * here is transcribed from sumo/network/intersection.net.xml:
  *
- * i.e. every inbound carriageway sits on the driver's LEFT (keep-left),
- * lane 0 = kerb = left turn, lane 1 = straight, lane 2 = median = right
- * turn (intersection.con.xml). SUMO's y axis points north; the SVG's
- * points down, so N is the top of the drawing.
+ *   network            400 x 400 m, junction C at (200, 200)
+ *   lanes              3.2 m wide, three per direction (9.6 m corridors)
+ *   inbound lanes end  21.6 m from the centre (x/y = 178.4 or 221.6)
+ *   junction corners   12 m kerb fillets (190.4 -> 178.4 at the box edge)
+ *   N_in lane centres  x = 208.0 / 204.8 / 201.6 for lanes 0 / 1 / 2
+ *   C_out_N            x = 192.0 / 195.2 / 198.4 - the other side
  *
- * Canvas 920×540, centre (460,270). 6 lanes × 36 = 216 wide corridors.
+ * Keep-left: every inbound carriageway sits on the driver's left, lane 0
+ * = kerb = left turn, lane 1 = straight, lane 2 = median = right turn.
+ *
+ * The schematic this replaced drew 3.2 m lanes 36 units wide and 178 m
+ * arms 334 units long — eleven times wider than long — so true-length
+ * vehicles read as dots in an empty lane and heavy traffic looked light.
+ * At true scale the same queue looks exactly as it does in sumo-gui; the
+ * viewport zooms instead (usePanZoom).
  */
 
-export const W = 920
-export const H = 540
-export const CX = 460
-export const CY = 270
-export const LANE = 36
-export const HALF = 108 // corridor half-width
-export const BOX = { x: CX - HALF, y: CY - HALF, w: 2 * HALF, h: 2 * HALF } // 352,162 216×216
-export const KERB_R = 28
+import { MOVEMENTS, parseArmLane, type Arm } from './junctionTopology'
+
+export const NET = 400
+export const CENTRE = 200
+export const LANE_W = 3.2
+export const ROAD_HALF = 9.6
+export const JUNCTION_HALF = 21.6
+export const KERB_R = 12
+/** Inbound lane length: the 200 m arm minus the 21.6 m to the stop line. */
+export const ARM_METRES = CENTRE - JUNCTION_HALF // 178.4
+
+/** The plate's own aspect - the viewport box it is drawn into. */
+export const PLATE_ASPECT = 920 / 540
+
+export interface Point {
+  x: number
+  y: number
+}
+
+/** SUMO coordinates -> plan-view coordinates (north up). */
+export function toSvg(p: Point): Point {
+  return { x: p.x, y: NET - p.y }
+}
 
 export type Axis = 'v' | 'h'
 export interface LaneGeom {
   id: string
-  approach: 'N' | 'S' | 'E' | 'W'
+  approach: Arm
+  index: number
   axis: Axis
-  /** perpendicular extent of the lane */
+  /** Perpendicular extent of the lane (x for a vertical lane, y for horizontal). */
   lo: number
   hi: number
-  /** along-axis: arm outer edge -> stop bar */
+  /** Along-axis: arm outer edge -> stop line. */
   outer: number
   stop: number
-  /** direction of travel along the axis: +1 toward increasing coord */
+  /** Direction of travel along the axis: +1 toward increasing coordinate. */
   dir: 1 | -1
+  /** Heading of inbound travel, degrees, 0 = +x (east), 90 = +y (down/south). */
+  heading: number
 }
 
-// Stop bars sit at the outer edge of an 8-unit pedestrian crossing that
-// hugs the junction box (crossing band: 144–152 N, 388–396 S, 334–342 W,
-// 578–586 E).
-const STOP_N = BOX.y - 18 // 144
-const STOP_S = BOX.y + BOX.h + 18 // 396
-const STOP_W = BOX.x - 18 // 334
+/**
+ * Lateral offset of a lane centre from the road centreline, signed, in
+ * the plan view's coordinates. Inbound is on the driver's left: for the
+ * N approach (travelling south) that is east (+x); S (north) -> west;
+ * W (east) -> north, which is -y here; E (west) -> south (+y). Lane 0 is
+ * the kerb lane, furthest out.
+ */
+function lateral(arm: Arm, index: number, inbound: boolean): number {
+  const out = (2 - index) * LANE_W + LANE_W / 2 // 8.0, 4.8, 1.6
+  const side = arm === 'N' || arm === 'E' ? 1 : -1
+  return out * side * (inbound ? 1 : -1)
+}
 
-/** Inbound lane length in the network (intersection.net.xml): 200 m arm
- * minus the 21.6 m to the stop line. */
-export const ARM_METRES = 178.4
-/** Drawn units per metre ALONG AN ARM: the 178.4 m of approach are
- * compressed into the 334 units between the plate edge and the stop
- * line. The junction box uses a coarser scale (5 units/m) - the plate is
- * a schematic, not a map - so anything that must line up with real
- * spacing (vehicle lengths in a queue) uses this arm scale. */
-export const ARM_UNITS_PER_METRE = STOP_W / ARM_METRES // 1.87
-const STOP_E = BOX.x + BOX.w + 18 // 586
-export const CROSSING = 8
+const HEADING_IN: Record<Arm, number> = { N: 90, S: -90, E: 180, W: 0 }
+const HEADING_OUT: Record<Arm, number> = { N: -90, S: 90, E: 0, W: 180 }
 
-export const LANES: LaneGeom[] = [
-  // North approach, inbound southbound, east of median (x 460–568)
-  { id: 'N_in_2', approach: 'N', axis: 'v', lo: 460, hi: 496, outer: 0, stop: STOP_N, dir: 1 },
-  { id: 'N_in_1', approach: 'N', axis: 'v', lo: 496, hi: 532, outer: 0, stop: STOP_N, dir: 1 },
-  { id: 'N_in_0', approach: 'N', axis: 'v', lo: 532, hi: 568, outer: 0, stop: STOP_N, dir: 1 },
-  // South approach, inbound northbound, west of median (x 352–460)
-  { id: 'S_in_0', approach: 'S', axis: 'v', lo: 352, hi: 388, outer: H, stop: STOP_S, dir: -1 },
-  { id: 'S_in_1', approach: 'S', axis: 'v', lo: 388, hi: 424, outer: H, stop: STOP_S, dir: -1 },
-  { id: 'S_in_2', approach: 'S', axis: 'v', lo: 424, hi: 460, outer: H, stop: STOP_S, dir: -1 },
-  // West approach, inbound eastbound, north of median (y 162–270)
-  { id: 'W_in_0', approach: 'W', axis: 'h', lo: 162, hi: 198, outer: 0, stop: STOP_W, dir: 1 },
-  { id: 'W_in_1', approach: 'W', axis: 'h', lo: 198, hi: 234, outer: 0, stop: STOP_W, dir: 1 },
-  { id: 'W_in_2', approach: 'W', axis: 'h', lo: 234, hi: 270, outer: 0, stop: STOP_W, dir: 1 },
-  // East approach, inbound westbound, south of median (y 270–378)
-  { id: 'E_in_2', approach: 'E', axis: 'h', lo: 270, hi: 306, outer: W, stop: STOP_E, dir: -1 },
-  { id: 'E_in_1', approach: 'E', axis: 'h', lo: 306, hi: 342, outer: W, stop: STOP_E, dir: -1 },
-  { id: 'E_in_0', approach: 'E', axis: 'h', lo: 342, hi: 378, outer: W, stop: STOP_E, dir: -1 },
-]
+function inboundLane(arm: Arm, index: number): LaneGeom {
+  const id = `${arm}_in_${index}`
+  const off = lateral(arm, index, true)
+  const centre = CENTRE + off
+  const lo = centre - LANE_W / 2
+  const hi = centre + LANE_W / 2
+  switch (arm) {
+    case 'N':
+      return { id, approach: arm, index, axis: 'v', lo, hi, outer: 0, stop: CENTRE - JUNCTION_HALF, dir: 1, heading: 90 }
+    case 'S':
+      return { id, approach: arm, index, axis: 'v', lo, hi, outer: NET, stop: CENTRE + JUNCTION_HALF, dir: -1, heading: -90 }
+    case 'W':
+      return { id, approach: arm, index, axis: 'h', lo, hi, outer: 0, stop: CENTRE - JUNCTION_HALF, dir: 1, heading: 0 }
+    default:
+      return { id, approach: arm, index, axis: 'h', lo, hi, outer: NET, stop: CENTRE + JUNCTION_HALF, dir: -1, heading: 180 }
+  }
+}
+
+export const LANES: LaneGeom[] = (['N', 'S', 'W', 'E'] as Arm[]).flatMap((arm) =>
+  [0, 1, 2].map((i) => inboundLane(arm, i)),
+)
 
 export const LANE_BY_ID: Record<string, LaneGeom> = Object.fromEntries(LANES.map((l) => [l.id, l]))
 
-/**
- * Pavement movement arrows, keep-left. Each is a path in canvas coords
- * ending in an arrowhead marker, so it must be drawn IN THE DIRECTION OF
- * TRAVEL — toward the junction for an inbound lane.
- *
- * The N and S sets were both inverted until 2026-09-13: they ran away
- * from the junction and curved to the wrong side, so a left-turn lane
- * was painted as a right turn pointing backwards. Travelling south (N
- * approach) the driver's left is EAST; travelling north (S approach) it
- * is WEST. Lane 0 is the kerb lane and turns left; lane 2 is the median
- * lane and turns right. E and W were always correct and are unchanged.
- */
-export const ARROWS: Record<string, string> = {
-  // N approach: travelling SOUTH (down the drawing). Left turn -> east.
-  N_in_0: 'M 550 58 L 550 74 Q 550 82 558 82 L 564 82',
-  N_in_1: 'M 514 58 L 514 86',
-  N_in_2: 'M 478 58 L 478 74 Q 478 82 470 82 L 464 82',
-  // S approach: travelling NORTH (up the drawing). Left turn -> west.
-  S_in_0: 'M 370 482 L 370 466 Q 370 458 362 458 L 356 458',
-  S_in_1: 'M 406 482 L 406 454',
-  S_in_2: 'M 442 482 L 442 466 Q 442 458 450 458 L 456 458',
-  W_in_0: 'M 120 180 L 132 180 Q 140 180 140 172 L 140 166',
-  W_in_1: 'M 120 216 L 144 216',
-  W_in_2: 'M 120 252 L 132 252 Q 140 252 140 260 L 140 266',
-  E_in_2: 'M 800 288 L 788 288 Q 780 288 780 280 L 780 274',
-  E_in_1: 'M 800 324 L 776 324',
-  E_in_0: 'M 800 360 L 788 360 Q 780 360 780 368 L 780 374',
+/** Centre of the lane at the stop line, plan coordinates. */
+export function stopLinePoint(l: LaneGeom): Point {
+  const mid = (l.lo + l.hi) / 2
+  return l.axis === 'v' ? { x: mid, y: l.stop } : { x: l.stop, y: mid }
 }
 
-/** Where the lane-ID label sits, near the outer end of each lane. */
 /**
- * Where a lane's label sits. E/W labels line up beside their lanes. N/S
- * lanes are only 36 units apart, narrower than any readable label, so
- * their three labels stack as a short legend at the top (N) or bottom
- * (S) of the arm, in lane order from the median outwards - each row
- * still points at its lane by order, not by column. (Three labels at
- * lane midpoints overlapped into one unreadable string - the 2026-09-13
- * visual check's first finding.)
+ * Heading, in plan degrees, for traffic on any lane the network names —
+ * the first heading a vehicle gets before it has moved. Mid-junction it
+ * faces the way it came in; the movement delta sweeps it round.
  */
-export function labelPos(l: LaneGeom): { x: number; y: number; anchor: 'start' | 'middle' | 'end' } {
-  const mid = (l.lo + l.hi) / 2
-  if (l.axis === 'v') {
-    const row = Number(l.id.slice(-1)) // 0, 1, 2 = left, straight, right
-    const armMid = l.approach === 'N' ? (460 + 568) / 2 : (352 + 460) / 2
-    const y = l.approach === 'N' ? 14 + row * 13 : H - 8 - (2 - row) * 13
-    return { x: armMid, y, anchor: 'middle' }
+export function laneHeading(lane: string): number | null {
+  const movement = MOVEMENTS[lane]
+  if (movement) return HEADING_IN[movement.from]
+  const parsed = parseArmLane(lane)
+  if (!parsed) return null
+  return parsed.inbound ? HEADING_IN[parsed.arm] : HEADING_OUT[parsed.arm]
+}
+
+/**
+ * Painted movement arrow for a lane, as a path in a LOCAL frame: the lane
+ * runs along +x toward the stop line at x = 0, lane centre at y = 0, and
+ * because rotation keeps handedness, the driver's left is always -y.
+ * Sized like real road paint: 5 m long, starting 7 m before the line.
+ */
+export function arrowPath(index: number): string {
+  const tail = -12
+  const head = -7
+  if (index === 1) return `M ${tail} 0 L ${head} 0`
+  const side = index === 0 ? -1 : 1 // lane 0 turns left (-y), lane 2 right
+  const bend = tail + 3.2
+  return `M ${tail} 0 L ${bend} 0 Q ${bend + 1.4} 0 ${bend + 1.4} ${side * 1.4} L ${bend + 1.4} ${side * 3}`
+}
+
+/** Rotation that takes the local arrow frame onto a lane. */
+export function laneTransform(l: LaneGeom): string {
+  const p = stopLinePoint(l)
+  return `translate(${p.x} ${p.y}) rotate(${l.heading})`
+}
+
+/**
+ * The junction's outline, exactly the `<junction id="C">` shape: a
+ * 19.2 m-wide opening on each side joined by 12 m quarter-circle kerbs
+ * that curve INTO the corner (centred on the outer corner, so the road
+ * corner is filleted, not bulged) - the shape's own vertices
+ * (212.6, 187.4) etc. sit 12 m from (221.6, 178.4).
+ */
+export function junctionOutline(): string {
+  const a = CENTRE - JUNCTION_HALF // 178.4
+  const b = CENTRE + JUNCTION_HALF // 221.6
+  const lo = CENTRE - ROAD_HALF // 190.4
+  const hi = CENTRE + ROAD_HALF // 209.6
+  const r = KERB_R
+  return [
+    `M ${lo} ${a} L ${hi} ${a}`,
+    `A ${r} ${r} 0 0 0 ${b} ${lo}`,
+    `L ${b} ${hi}`,
+    `A ${r} ${r} 0 0 0 ${hi} ${b}`,
+    `L ${lo} ${b}`,
+    `A ${r} ${r} 0 0 0 ${a} ${hi}`,
+    `L ${a} ${lo}`,
+    `A ${r} ${r} 0 0 0 ${lo} ${a}`,
+    'Z',
+  ].join(' ')
+}
+
+/** The four arms as road rectangles: [x, y, w, h]. */
+export const ARM_RECTS: Array<[number, number, number, number]> = [
+  [CENTRE - ROAD_HALF, 0, 2 * ROAD_HALF, CENTRE - JUNCTION_HALF], // north
+  [CENTRE - ROAD_HALF, CENTRE + JUNCTION_HALF, 2 * ROAD_HALF, CENTRE - JUNCTION_HALF], // south
+  [0, CENTRE - ROAD_HALF, CENTRE - JUNCTION_HALF, 2 * ROAD_HALF], // west
+  [CENTRE + JUNCTION_HALF, CENTRE - ROAD_HALF, CENTRE - JUNCTION_HALF, 2 * ROAD_HALF], // east
+]
+
+export const APPROACH_NAMES: Record<Arm, string> = { N: 'North', S: 'South', E: 'East', W: 'West' }
+
+/** Where an approach's name sits, beside the outer end of its arm on the
+ * inbound side - a little way in, so it clears the viewport's edge and
+ * the controls that sit over the bottom-left corner. */
+export function approachLabelPoint(arm: Arm): Point {
+  const along = 30
+  const beside = 4
+  switch (arm) {
+    case 'N':
+      return { x: CENTRE + ROAD_HALF + beside, y: along }
+    case 'S':
+      return { x: CENTRE - ROAD_HALF - beside, y: NET - along }
+    case 'W':
+      return { x: along, y: CENTRE - ROAD_HALF - beside }
+    default:
+      return { x: NET - along, y: CENTRE + ROAD_HALF + beside }
   }
-  return { x: l.approach === 'W' ? 6 : W - 6, y: mid + 3, anchor: l.approach === 'W' ? 'start' : 'end' }
 }

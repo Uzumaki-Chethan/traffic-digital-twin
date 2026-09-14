@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { SlidersHorizontal } from 'lucide-react'
 import { useSim } from '@/data/store'
@@ -9,6 +10,7 @@ import { scenarioName } from '@/data/scenarios'
 import { verdictFor } from '@/data/verdict'
 import { Reveal } from '@/ui/Reveal'
 import { ControllerWindow } from '@/performance/ControllerWindow'
+import { HOME_VIEW, type View } from '@/overview/usePanZoom'
 import { MetricBlock } from '@/performance/MetricBlock'
 import { EvalStartPrompt } from '@/performance/EvalStartPrompt'
 
@@ -21,6 +23,9 @@ import { EvalStartPrompt } from '@/performance/EvalStartPrompt'
  */
 export function PerformancePage() {
   const latest = useSim((s) => s.latest)
+  // One pan/zoom for both windows: a comparison only means something
+  // when the two junctions are framed identically.
+  const sharedView = useState<View>(HOME_VIEW)
   const link = useSim((s) => s.link)
   const run = useRunStore((s) => s.state)
   const evalScenario = useSettings((s) => s.evalScenario)
@@ -63,10 +68,10 @@ export function PerformancePage() {
 
       <div className="grid grid-cols-2 gap-2">
         <Reveal index={0}>
-          <ControllerWindow title="Trinetra" side={frame?.ai ?? null} powered={powered} />
+          <ControllerWindow title="Trinetra" side={frame?.ai ?? null} powered={powered} sharedView={sharedView} />
         </Reveal>
         <Reveal index={1}>
-          <ControllerWindow title="Vehicle-actuated control" side={frame?.baseline ?? null} powered={powered} />
+          <ControllerWindow title="Vehicle-actuated control" side={frame?.baseline ?? null} powered={powered} sharedView={sharedView} />
         </Reveal>
       </div>
 
