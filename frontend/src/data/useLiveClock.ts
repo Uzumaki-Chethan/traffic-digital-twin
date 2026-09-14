@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSim } from './store'
-import { isLive } from './types'
+import { isEvaluation, isLive } from './types'
 
 /**
  * Frames arrive at 2 Hz but the clocks move continuously, and the sim may
@@ -40,6 +40,10 @@ export function useLiveClock() {
   }, [])
 
   const live = isLive(latest) ? latest : null
+  // An evaluation frame ticks the same clock; its AI side carries the
+  // phase timing the bar shows.
+  const side = isEvaluation(latest) ? latest.ai : live
+  const simTime = live ? live.sim_time : isEvaluation(latest) ? latest.sim_time : null
   const staleSeconds = receivedAt ? Math.max(0, (now - receivedAt) / 1000) : 0
   // Wall seconds since the sim last ticked, capped so a stalled sim never
   // runs the clocks ahead of reality.
@@ -50,8 +54,8 @@ export function useLiveClock() {
     staleSeconds,
     tickAge: tickAt ? Math.max(0, (now - tickAt) / 1000) : 0,
     rate,
-    simTime: live ? live.sim_time + lead : null,
-    heldSeconds: live ? live.decision.duration + lead : null,
-    clearance: live?.signal?.is_yellow ? Math.max(0, live.signal.countdown - lead) : null,
+    simTime: simTime == null ? null : simTime + lead,
+    heldSeconds: side ? side.decision.duration + lead : null,
+    clearance: side?.signal?.is_yellow ? Math.max(0, side.signal.countdown - lead) : null,
   }
 }

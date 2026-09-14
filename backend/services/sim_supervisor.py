@@ -219,8 +219,14 @@ class SimulationSupervisor:
             def runner(store, control, scenario_name, baseline):
                 evaluator = PerformanceEvaluator(scenario_name, use_gui=False, baseline=baseline)
                 result = evaluator.run(live_store=store, control=control)
-                # Same artefact a terminal run leaves behind.
-                PerformanceEvaluator.save_csv(result)
+                # Same artefact a terminal run leaves behind - but only
+                # for a run that reached its natural end. One stopped
+                # from the browser is a partial result and must never
+                # replace the completed run's CSV that README.md cites.
+                if not control.stop_requested:
+                    PerformanceEvaluator.save_csv(result)
+                else:
+                    logger.info("Evaluation stopped early; results CSV left untouched.")
 
         try:
             runner(self._store, self.run_control, scenario_name, baseline)

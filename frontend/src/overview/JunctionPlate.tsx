@@ -186,7 +186,19 @@ export function JunctionPlate({ lanes, emergencyLanes, vehicles, powered, viewBo
           <path key={g.id} d={ARROWS[g.id]} />
         ))}
       </g>
-      <g fill="var(--plate-marking)" fontFamily="var(--font-num)" fontSize="12" opacity="0.9">
+      {/* Barlow, not the mono face: the vendored JetBrains Mono subset has
+          no middle dot, and "North · Left" is words now, not a code. */}
+      <g
+        fill="var(--plate-marking)"
+        fontFamily="var(--font-ui)"
+        fontSize="12"
+        fontWeight="500"
+        opacity="0.95"
+        stroke="var(--plate-road)"
+        strokeWidth="2.5"
+        strokeLinejoin="round"
+        paintOrder="stroke"
+      >
         {LANES.map((g) => {
           const p = labelPos(g)
           return (

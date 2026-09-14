@@ -123,7 +123,13 @@ export function MetricBlock({
       )}
       <div className="mt-1 flex justify-between text-[11.5px] text-ink-mute">
         <span className="num">{Math.round(t0)}s</span>
-        <span>{tied ? 'tied by construction — both controllers serve the same vehicles' : 'simulated time · running totals'}</span>
+        <span>
+          {tied
+            ? final
+              ? 'equal by construction — both controllers served the same vehicles'
+              : 'trips completed so far — equal once both finish, since they serve the same vehicles'
+            : 'simulated time · running totals'}
+        </span>
         <span className="num">{Math.round(t1)}s</span>
       </div>
     </Panel>

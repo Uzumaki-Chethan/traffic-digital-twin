@@ -83,13 +83,13 @@ export const LANE_BY_ID: Record<string, LaneGeom> = Object.fromEntries(LANES.map
  */
 export const ARROWS: Record<string, string> = {
   // N approach: travelling SOUTH (down the drawing). Left turn -> east.
-  N_in_0: 'M 550 36 L 550 52 Q 550 60 558 60 L 564 60',
-  N_in_1: 'M 514 36 L 514 64',
-  N_in_2: 'M 478 36 L 478 52 Q 478 60 470 60 L 464 60',
+  N_in_0: 'M 550 58 L 550 74 Q 550 82 558 82 L 564 82',
+  N_in_1: 'M 514 58 L 514 86',
+  N_in_2: 'M 478 58 L 478 74 Q 478 82 470 82 L 464 82',
   // S approach: travelling NORTH (up the drawing). Left turn -> west.
-  S_in_0: 'M 370 504 L 370 488 Q 370 480 362 480 L 356 480',
-  S_in_1: 'M 406 504 L 406 476',
-  S_in_2: 'M 442 504 L 442 488 Q 442 480 450 480 L 456 480',
+  S_in_0: 'M 370 482 L 370 466 Q 370 458 362 458 L 356 458',
+  S_in_1: 'M 406 482 L 406 454',
+  S_in_2: 'M 442 482 L 442 466 Q 442 458 450 458 L 456 458',
   W_in_0: 'M 120 180 L 132 180 Q 140 180 140 172 L 140 166',
   W_in_1: 'M 120 216 L 144 216',
   W_in_2: 'M 120 252 L 132 252 Q 140 252 140 260 L 140 266',

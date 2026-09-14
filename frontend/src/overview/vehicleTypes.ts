@@ -78,13 +78,13 @@ export function plateSize(shape: VehicleShape): { length: number; width: number 
   const length = Math.round(shape.length * PLATE_UNITS_PER_METRE * 10) / 10
   switch (shape.kind) {
     case 'motorcycle':
-      return { length, width: 6 }
+      return { length, width: 4 }
     case 'rickshaw':
-      return { length, width: 8 }
+      return { length, width: 6 }
     case 'bus':
     case 'truck':
-      return { length, width: 11 }
+      return { length, width: 9 }
     default:
-      return { length, width: 10 }
+      return { length, width: 7 }
   }
 }
