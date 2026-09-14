@@ -365,3 +365,20 @@ def test_handover_releases_a_paused_run():
     assert not released.wait(0.2)
     control.request_handover("state.xml")
     assert released.wait(2.0)
+
+
+# ===================== resolve_config(sumocfg=) =====================
+
+def test_resolve_config_sumocfg_override_is_a_throwaway_subclass():
+    from config import Config
+    from simulation_runner import resolve_config
+    cfg = resolve_config(sumocfg="/tmp/x.sumocfg")
+    assert cfg.SUMOCFG_PATH == "/tmp/x.sumocfg"
+    assert cfg is not Config and issubclass(cfg, Config)
+    assert Config.SUMOCFG_PATH != "/tmp/x.sumocfg"
+
+
+def test_resolve_config_without_overrides_is_config_itself():
+    from config import Config
+    from simulation_runner import resolve_config
+    assert resolve_config() is Config

@@ -75,7 +75,7 @@ def _signal_view(state):
     }
 
 
-def resolve_config(gui=None, base=Config, load_state=None):
+def resolve_config(gui=None, base=Config, load_state=None, sumocfg=None):
     """
     Return the Config to run with.
 
@@ -87,10 +87,14 @@ def resolve_config(gui=None, base=Config, load_state=None):
     choice behind for the next. get_sumo_binary() is a classmethod, so it
     resolves cls.SUMO_BINARY_NAME from the subclass exactly as intended.
     """
-    if gui is None and load_state is None:
+    if gui is None and load_state is None and sumocfg is None:
         return base
     extra = list(getattr(base, "SUMO_EXTRA_ARGS", None) or [])
     overrides = {}
+    if sumocfg:
+        # Which scenario to run - chosen per run from the browser (see
+        # performance.scenarios), never assigned into the shared Config.
+        overrides["SUMOCFG_PATH"] = sumocfg
     if gui is not None:
         overrides["SUMO_BINARY_NAME"] = "sumo-gui" if gui else "sumo"
         if gui:
@@ -117,7 +121,7 @@ def resolve_config(gui=None, base=Config, load_state=None):
 
 
 def run_simulation(store, control=None, *, gui=None, base_config=Config,
-                   load_state=None):
+                   load_state=None, sumocfg=None):
     """
     Run one live simulation to completion.
 
@@ -138,13 +142,16 @@ def run_simulation(store, control=None, *, gui=None, base_config=Config,
         A state file written by a previous handover. The simulation
         resumes from exactly there - same vehicles, same signal state,
         same simulated time - instead of starting at t=0.
+    sumocfg : str | None
+        The scenario's .sumocfg to run (see performance.scenarios). None
+        runs whatever base_config says - the frozen production route.
     base_config : type
         The Config to start from. Only overridden in tests.
 
     Raises whatever the simulation raised, after closing TraCI and the
     database - the caller decides whether that is fatal.
     """
-    config = resolve_config(gui, base_config, load_state)
+    config = resolve_config(gui, base_config, load_state, sumocfg)
     config.validate()
 
     manager = TraCIManager(config)
