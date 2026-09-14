@@ -35,6 +35,13 @@ export interface RunState {
   handing_over?: boolean
   /** Set when the last run ended by crashing, in plain text. */
   error?: string | null
+  /** What the console's worker is running (2026-09-14): a demo run, an
+   * evaluation (Trinetra vs a baseline, see the Performance page), or
+   * nothing. Only the console reports it. */
+  kind?: 'demo' | 'evaluation' | null
+  /** Scenario id of the current (or last) run — "default" is the
+   * production route. Never shown raw; data/scenarios.ts names it. */
+  scenario?: string | null
 }
 
 interface Store {
@@ -88,7 +95,14 @@ async function send(path: string, body?: unknown): Promise<void> {
 }
 
 export const runControl = {
-  start: (gui: boolean) => send('/api/control/start-simulation', { gui }),
+  /** Console: start a demo run of `scenarioName` (data/scenarios.ts ids;
+   * "default" = the production route, sent as no scenario at all). */
+  start: (gui: boolean, scenarioName = 'default') =>
+    send('/api/control/start-simulation',
+      scenarioName === 'default' ? { gui } : { gui, scenario_name: scenarioName }),
+  /** Console: start Trinetra vs VAC on `scenarioName`, in-process, headless. */
+  startEvaluation: (scenarioName: string) =>
+    send('/api/control/start-evaluation', { scenario_name: scenarioName, baseline: 'vac' }),
   /** Console: end the run the supervisor is hosting. */
   stop: () => send('/api/control/stop-simulation'),
   /**
