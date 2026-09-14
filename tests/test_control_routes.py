@@ -105,3 +105,11 @@ def test_evaluation_rejects_an_unknown_baseline(console):
     client, _, _ = console
     r = client.post("/api/control/start-evaluation", json={"scenario_name": "light_seed1", "baseline": "magic"})
     assert r.status_code == 400
+
+
+def test_spa_fallback_serves_the_app_for_deep_links_but_not_api_paths():
+    from services.dashboard_server import create_app
+    client = TestClient(create_app(LiveStateStore()))
+    assert client.get("/settings").status_code == 200
+    assert client.get("/performance").status_code == 200
+    assert client.get("/api/does-not-exist").status_code == 404

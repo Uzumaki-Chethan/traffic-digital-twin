@@ -44,7 +44,7 @@ import threading
 from typing import Optional
 
 import uvicorn
-from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -297,8 +297,7 @@ def create_app(store: LiveStateStore, extra_router: Optional[APIRouter] = None) 
             name="assets",
         )
 
-    @app.get("/", response_class=HTMLResponse)
-    async def index():
+    def _index_response() -> HTMLResponse:
         if os.path.isfile(_FRONTEND_INDEX):
             with open(_FRONTEND_INDEX, "r", encoding="utf-8") as fh:
                 return HTMLResponse(fh.read())
@@ -307,6 +306,21 @@ def create_app(store: LiveStateStore, extra_router: Optional[APIRouter] = None) 
             "in frontend/, or <code>npm run dev</code> for development "
             "(it proxies to this server).</p>"
         )
+
+    @app.get("/", response_class=HTMLResponse)
+    async def index():
+        return _index_response()
+
+    # SPA fallback: the React router owns /analytics, /performance,
+    # /settings, ... so a deep link or a reload on one of them must get
+    # index.html, not a 404. Registered last, so every real route above
+    # (/api/*, /ws, /assets) still wins; anything under /api that does
+    # not exist stays a 404 rather than turning into a page.
+    @app.get("/{path:path}", response_class=HTMLResponse, include_in_schema=False)
+    async def spa_fallback(path: str):
+        if path.startswith("api/") or path == "ws" or path.startswith("assets/"):
+            raise HTTPException(status_code=404, detail="Not Found")
+        return _index_response()
 
     return app
 
