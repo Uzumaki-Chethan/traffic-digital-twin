@@ -50,8 +50,8 @@ always-on console) both just call it.
 | Final optimization + demo polish | ⬜ |
 
 Full engineering context and history: see `PROJECT_ARCHITECTURE_REPORT.md`
-(read the highest-numbered `SECTION N ... (CURRENT STATE)` first — Section 27
-as of 2026-09-13).
+(read the highest-numbered `SECTION N ... (CURRENT STATE)` first — Section 28
+as of 2026-09-14).
 
 ---
 
@@ -141,22 +141,24 @@ number):
 
 | scenario (seed 1) | wins | wait | travel | worst travel | avg queue | max queue | speed | throughput |
 |---|---|---|---|---|---|---|---|---|
-| `light` | **7/7** | +7.8 % | +0.2 % | +7.4 % | +0.7 % | +0.0 % | +1.6 % | +0.0 % |
-| `balanced` | **7/7** | +18.5 % | +1.1 % | +1.9 % | +4.0 % | +0.0 % | +1.6 % | +0.0 % |
-| `normal_traffic` | **7/7** | +86.5 % | +34.7 % | +70.3 % | +65.7 % | +61.4 % | +47.3 % | +0.0 % |
-| `heavy` | **7/7** | +66.9 % | +20.5 % | +40.0 % | +46.2 % | +37.1 % | +24.5 % | +0.0 % |
-| `extreme` | **7/7** | +64.3 % | +37.4 % | +57.4 % | +51.5 % | +50.6 % | +45.5 % | +0.0 % |
-| `rush_hour` | **7/7** | +58.5 % | +10.8 % | +43.9 % | +26.0 % | +33.7 % | +11.0 % | +0.0 % |
-| `north_heavy` | **7/7** | +57.6 % | +10.7 % | +43.8 % | +29.9 % | +11.4 % | +9.3 % | +0.0 % |
-| `south_heavy` | **7/7** | +62.2 % | +8.8 % | +42.1 % | +26.9 % | +7.5 % | +9.7 % | +0.0 % |
-| `east_heavy` | **7/7** | +62.5 % | +15.4 % | +41.1 % | +37.2 % | +6.2 % | +18.5 % | +0.0 % |
-| `west_heavy` | **7/7** | +63.9 % | +13.8 % | +42.9 % | +36.5 % | +13.2 % | +14.8 % | +0.0 % |
-| `accident` | **7/7** | +84.1 % | +34.1 % | +70.2 % | +62.8 % | +54.7 % | +41.2 % | +0.0 % |
-| `emergency_response` | **7/7** | +86.2 % | +32.0 % | +70.3 % | +62.2 % | +56.8 % | +42.5 % | +0.0 % |
-| `rain` | **7/7** | +85.9 % | +35.7 % | +66.2 % | +67.7 % | +64.5 % | +46.2 % | +0.0 % |
+| `light` | **7/7** | +7.1 % | +0.3 % | +7.8 % | +0.7 % | +0.0 % | +1.6 % | +0.0 % |
+| `balanced` | **7/7** | +17.8 % | +1.1 % | +2.1 % | +3.8 % | +0.0 % | +1.6 % | +0.0 % |
+| `normal_traffic` | **7/7** | +86.2 % | +34.7 % | +70.3 % | +65.2 % | +61.4 % | +46.9 % | +0.0 % |
+| `heavy` | **7/7** | +66.5 % | +20.5 % | +40.2 % | +46.0 % | +30.2 % | +24.7 % | +0.0 % |
+| `extreme` | **7/7** | +64.1 % | +37.3 % | +57.4 % | +51.5 % | +50.0 % | +45.5 % | +0.0 % |
+| `rush_hour` | **7/7** | +58.4 % | +10.8 % | +43.8 % | +25.9 % | +34.4 % | +10.9 % | +0.0 % |
+| `north_heavy` | **7/7** | +57.0 % | +10.5 % | +43.9 % | +29.3 % | +11.4 % | +9.1 % | +0.0 % |
+| `south_heavy` | **7/7** | +61.5 % | +8.8 % | +42.4 % | +26.4 % | +7.5 % | +9.5 % | +0.0 % |
+| `east_heavy` | **7/7** | +61.9 % | +15.4 % | +41.3 % | +36.9 % | +3.2 % | +18.6 % | +0.0 % |
+| `west_heavy` | **7/7** | +63.8 % | +14.8 % | +43.1 % | +37.6 % | +21.1 % | +16.1 % | +0.0 % |
+| `accident` | **7/7** | +83.8 % | +34.0 % | +70.2 % | +62.5 % | +54.7 % | +41.3 % | +0.0 % |
+| `emergency_response` | **7/7** | +85.9 % | +32.0 % | +70.2 % | +61.7 % | +56.8 % | +42.5 % | +0.0 % |
+| `rain` | **7/7** | +85.7 % | +35.6 % | +66.2 % | +67.5 % | +64.5 % | +46.4 % | +0.0 % |
 
 **13/13 clean sweeps — every scenario, every metric.** All thirteen `results/comparison_
-<scenario>_seed1.csv` files were written by this one run (evening of 2026-09-13). The AI
+<scenario>_seed1.csv` files were written by one run on 2026-09-14, after the performance
+work of Section 28 (the whole sweep now takes ~6 minutes; metrics are sampled once per
+decision tick, so these differ from the 2026-09-13 table only by sampling noise). The AI
 switches less than VAC in every light seed (64 vs 74, 58 vs 67, 65 vs 75) and, under
 saturation, holds a phase serving a stream for at least ~17 s of real green before any
 score can end it. Throughput is tied by construction in every row; the two 0.0 max-queue

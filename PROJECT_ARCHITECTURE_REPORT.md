@@ -2762,3 +2762,94 @@ one, so this is visible rather than surprising.
 Section 26's visual check that were outside this work (the 3D zoom is orbit-centred, the
 idle "Green held 3s", Analytics peak windows on short runs); and the auto-rickshaw could
 still read more clearly as a three-wheeler from some angles.
+
+---
+
+## SECTION 28 — Nine times faster: TraCI subscriptions and a 1 Hz read cadence (CURRENT STATE)
+
+Dated 2026-09-14. The user's report: at "1×" the Performance page ran at 0.5–0.6× real time,
+and "we should optimise the code fully so that there are absolutely no lag issues". Also
+two visual defects on the same page, folded in at the end of this section.
+
+### 28.1 Where the time went — measured, not guessed
+
+A 60-second `extreme` demo run (one side) under `cProfile`:
+
+```
+445,256 TraCI round trips in 60 simulated seconds
+  _extract_vehicle  86,470 calls  →  5 socket calls each (position, lane, speed, waiting time, type)
+  = ~7,400 round trips per simulated second, on ONE side
+```
+
+`TrafficAdapter.get_current_state()` read every variable of every vehicle with its own
+request, every 0.05 s step, for a decision made once per second. The two-sided evaluation
+doubled it; on this laptop that was 0.9× real time unthrottled, which is what the user saw.
+SUMO's own stepping was ~28 s of the 166 s a full extreme run took — the simulator could
+run at 30×; the Python round trips were the run.
+
+### 28.2 Two changes, both inside the adapter's boundary
+
+**Subscriptions.** Each vehicle is now subscribed once, on the step it first appears
+(`traci.vehicle.subscribe` for lane, speed, waiting time, position); from then on SUMO
+delivers every subscribed variable for every vehicle *inside the `simulationStep()` reply*,
+and a step's state is one `getAllSubscriptionResults()` call. Type and vehicle class are
+static for a vehicle's life, so they are read once and cached rather than subscribed — a
+subscription is delivered every step whether it is read or not, so every variable in it is
+parsing cost twenty times a second. The traffic light is subscribed the same way (four
+calls → one), and the controlled-links table is read once per connection rather than per
+step. `get_emergency_vehicle_lanes()` is served from the last step's results and costs
+nothing. Values are byte-identical to the direct reads they replace.
+
+**Cadence.** `TraCIManager.run()` gained `callback_interval_seconds`: SUMO still steps at
+0.05 s, but state is read and the pipeline (twin, features, forest, decision, logging,
+publish) runs once per decision tick. The evaluator's own lockstep loop does the same. Ticks
+land on exactly the simulated times the per-step loop decided at — the first step, then
+every full second after it (0.05, 1.05, 2.05 …) — which is what keeps the AI's decisions
+identical. The trap in this: SUMO's departed / arrived / stop-starting / stop-ending lists
+report only the *last* step, so a 1 Hz reader would lose 19 of every 20 steps of them and
+the throughput and travel-time accounting would silently break (the first attempt served
+238 of 240 vehicles). `TrafficAdapter.observe_step()` — one simulation-domain subscription,
+a handful of ids per step — is called after every step and accumulates those lists; the
+four id getters hand back what accumulated since they were last asked. The evaluator also
+flushes them once after its loop, or the last vehicles home never count.
+
+Proof the pipeline is unchanged: the `light_seed1` training run regenerates **byte-identical
+(866/866 rows)** under the new adapter and cadence — the 15 s trend lookback lands on the
+same history entry either way — so the datasets and model stand as they are. The one
+intended difference is that the evaluation metrics now integrate per tick rather than per
+step: same behaviour, same worst vehicles, same verdicts; travel times are resolved to the
+second and the averages move within sampling noise (light: wait +7.77 % → +7.07 %).
+
+### 28.3 Measured
+
+| | before | after |
+|---|---|---|
+| extreme demo, one side, unthrottled | 1.5× real time | ~8× (5.8× incl. the 6 s model load) |
+| extreme evaluation, two sides, unthrottled | 0.9× | **7.9×** |
+| `light_seed1` batch evaluation | 117 s | 29 s |
+| one training run (`light_seed1`) | ~130 s | 16 s |
+| the full 13-scenario sweep | ~75 min | **~6 min** |
+
+The sweep was re-run on the new pipeline: **13/13, every metric** (the table in README.md is
+this run). What remains per step is SUMO itself plus traci's Python-side parsing of the
+subscription payload; going further would mean `libsumo` (no socket, no parsing), which
+cannot host the evaluation's two simulations in one process, so it was not pursued.
+
+### 28.4 The two plate defects from the same report
+
+- **Vehicles overlapping in a stopped queue.** Section 27 sized plate vehicles at the plate's
+  *average* scale (920 units / 400 m = 2.3 per metre). The arms — where queues form — are
+  drawn at 334 units / 178.4 m = **1.87 per metre**, and SUMO's front-to-front spacing is the
+  leader's length plus the *follower's* `minGap`, which `vehicle_types.add.xml` sets from
+  0.6 m (aggressive motorcycle) to 3.5 m (truck). A bus drawn 24.2 units long with an
+  aggressive car parked 23.0 units behind it overlapped by construction. Lengths now derive
+  from `plateGeometry.ARM_UNITS_PER_METRE`; the tightest legal spacing of every type leaves
+  a visible gap (motorcycle 1.1 units, everything else ≥ 3.4).
+- **"Extreme doesn't look extreme."** It doesn't, and it is the scenario, not the drawing:
+  `extreme` is 1,334 veh/h per approach ≈ 445 per lane, against a lane capacity of roughly
+  500 veh/h at ~25 % green — 90 % of capacity. Queues build (VAC reached 80 queued) but a
+  car still arrives only every ~8 s per lane on a 178 m arm, so the arms never fill, and
+  the first minute at 1× is just the network filling. The manifest defined it as "heavy,
+  uniform, held out", never as gridlock. Offered to the user: keep it and name it honestly
+  on its card, or add a demand-above-capacity "Gridlock" scenario as a demo/evaluation card
+  outside the training manifest. Pending their choice.
