@@ -26,6 +26,7 @@ from types import MappingProxyType
 from typing import Dict, List, Tuple
 
 import traci
+import traci.constants as tc
 
 from models import SignalState, SimulationState, VehicleState
 
@@ -37,6 +38,38 @@ logger = logging.getLogger(__name__)
 # not built now, see the design review's note on deferred multi-junction
 # support.
 _TLS_ID = "C"
+
+# What is read per vehicle per step, as ONE TraCI subscription rather
+# than five round trips (2026-09-14). Profiled on a 60 s extreme run:
+# 445,256 round trips, one per variable per vehicle per 0.05 s step -
+# ~7,400 per simulated second on ONE side - which is what held the
+# evaluation (two sides) at ~0.5x real time on a laptop. A subscription
+# makes SUMO deliver every subscribed variable for every subscribed
+# vehicle in the simulationStep() reply, so the per-step cost is one
+# getAllSubscriptionResults() call. Values are byte-identical to the
+# direct reads they replace; the only difference is who asks.
+_VEHICLE_VARS = (
+    tc.VAR_LANE_ID, tc.VAR_SPEED, tc.VAR_WAITING_TIME, tc.VAR_POSITION,
+)
+# Static for a vehicle's whole life: read once when it is first seen and
+# remembered, never subscribed - SUMO delivers a subscription every step
+# whether or not it is read, so every variable in it is parsing cost
+# twenty times a second.
+_VEHICLE_STATIC_VARS = (tc.VAR_TYPE, tc.VAR_VEHICLECLASS)
+_TLS_VARS = (
+    tc.TL_RED_YELLOW_GREEN_STATE, tc.TL_CURRENT_PHASE,
+    tc.TL_NEXT_SWITCH, tc.TL_PHASE_DURATION,
+)
+# The per-step event lists SUMO only reports for the LAST step. A caller
+# that reads state once per decision tick (1 Hz - see observe_step) would
+# miss 19 of every 20 steps' departures, arrivals and stops, so the
+# adapter watches every step for these through one simulation-domain
+# subscription and hands over what accumulated since the caller last
+# asked. Tiny payloads: a handful of ids per step.
+_SIM_EVENT_VARS = (
+    tc.VAR_DEPARTED_VEHICLES_IDS, tc.VAR_ARRIVED_VEHICLES_IDS,
+    tc.VAR_STOP_STARTING_VEHICLES_IDS, tc.VAR_STOP_ENDING_VEHICLES_IDS,
+)
 
 
 class TrafficAdapter:
@@ -72,6 +105,20 @@ class TrafficAdapter:
         # it never decides anything about it.
         self._observed_phase_index = None
         self._observed_phase_started_at = 0.0
+        # Subscription bookkeeping (see _VEHICLE_VARS). A vehicle is read
+        # directly on the one step it first appears - its subscription
+        # only reports from the NEXT step - and from its subscription
+        # after that. _last_vehicle_results is the most recent step's
+        # results, which get_emergency_vehicle_lanes() reads instead of
+        # asking SUMO again.
+        self._subscribed_vehicles = set()
+        self._static_by_vehicle = {}
+        self._last_vehicle_results = {}
+        self._tls_subscribed = False
+        self._controlled_links = None
+        # Event accumulation between reads (see observe_step / _SIM_EVENT_VARS).
+        self._observing = False
+        self._pending_events = {var: [] for var in _SIM_EVENT_VARS}
 
     def get_current_state(self) -> SimulationState:
         """
@@ -98,9 +145,17 @@ class TrafficAdapter:
 
         simulation_time = self._traci.simulation.getTime()
 
-        vehicle_ids = self._traci.vehicle.getIDList()
+        results = self._vehicle_results()
         vehicles: List[VehicleState] = [
-            self._extract_vehicle(vehicle_id) for vehicle_id in vehicle_ids
+            VehicleState(
+                id=vehicle_id,
+                lane_id=r[tc.VAR_LANE_ID],
+                speed=r[tc.VAR_SPEED],
+                waiting_time=r[tc.VAR_WAITING_TIME],
+                position=tuple(r[tc.VAR_POSITION]),
+                type_id=r[tc.VAR_TYPE],
+            )
+            for vehicle_id, r in results.items()
         ]
 
         signal = self._extract_signal(simulation_time)
@@ -110,6 +165,48 @@ class TrafficAdapter:
             vehicles=vehicles,
             signal=signal,
         )
+
+    def observe_step(self) -> None:
+        """
+        Call once after EVERY simulation step when state itself is read
+        less often than every step (the runner and the evaluator read at
+        the 1 Hz decision cadence). Collects this step's departed /
+        arrived / stop-starting / stop-ending vehicle ids into the pending
+        lists that get_departed_vehicle_ids() and its siblings then
+        return and clear. One subscription result read per step; no
+        per-vehicle traffic. Without this having been called, those
+        getters fall back to SUMO's last-step-only answer, exactly as
+        before 2026-09-14.
+        """
+        simulation = self._traci.simulation
+        if not self._observing:
+            subscribe = getattr(simulation, "subscribe", None)
+            if subscribe is None:
+                return
+            subscribe(_SIM_EVENT_VARS)
+            self._observing = True
+            # The subscription reports from the next step; this step's
+            # lists are read directly so nothing is lost at the seam.
+            self._pending_events[tc.VAR_DEPARTED_VEHICLES_IDS].extend(simulation.getDepartedIDList())
+            self._pending_events[tc.VAR_ARRIVED_VEHICLES_IDS].extend(simulation.getArrivedIDList())
+            self._pending_events[tc.VAR_STOP_STARTING_VEHICLES_IDS].extend(simulation.getStopStartingVehiclesIDList())
+            self._pending_events[tc.VAR_STOP_ENDING_VEHICLES_IDS].extend(simulation.getStopEndingVehiclesIDList())
+            return
+        results = simulation.getSubscriptionResults()
+        if not results:
+            return
+        for var in _SIM_EVENT_VARS:
+            ids = results.get(var)
+            if ids:
+                self._pending_events[var].extend(ids)
+
+    def _take_events(self, var, direct):
+        """Accumulated ids for `var` if observing (and clear them), else SUMO's last step."""
+        if self._observing:
+            ids = tuple(self._pending_events[var])
+            self._pending_events[var] = []
+            return ids
+        return tuple(direct())
 
     def get_departed_vehicle_ids(self) -> Tuple[str, ...]:
         """
@@ -129,7 +226,7 @@ class TrafficAdapter:
                 "TrafficAdapter cannot read departed vehicles: the "
                 "TraCIManager is not currently connected."
             )
-        return tuple(self._traci.simulation.getDepartedIDList())
+        return self._take_events(tc.VAR_DEPARTED_VEHICLES_IDS, self._traci.simulation.getDepartedIDList)
 
     def get_arrived_vehicle_ids(self) -> Tuple[str, ...]:
         """
@@ -147,7 +244,7 @@ class TrafficAdapter:
                 "TrafficAdapter cannot read arrived vehicles: the "
                 "TraCIManager is not currently connected."
             )
-        return tuple(self._traci.simulation.getArrivedIDList())
+        return self._take_events(tc.VAR_ARRIVED_VEHICLES_IDS, self._traci.simulation.getArrivedIDList)
 
     def get_stop_starting_vehicle_ids(self) -> Tuple[str, ...]:
         """
@@ -167,7 +264,7 @@ class TrafficAdapter:
                 "TrafficAdapter cannot read stop-starting vehicles: the "
                 "TraCIManager is not currently connected."
             )
-        return tuple(self._traci.simulation.getStopStartingVehiclesIDList())
+        return self._take_events(tc.VAR_STOP_STARTING_VEHICLES_IDS, self._traci.simulation.getStopStartingVehiclesIDList)
 
     def get_stop_ending_vehicle_ids(self) -> Tuple[str, ...]:
         """
@@ -180,7 +277,7 @@ class TrafficAdapter:
                 "TrafficAdapter cannot read stop-ending vehicles: the "
                 "TraCIManager is not currently connected."
             )
-        return tuple(self._traci.simulation.getStopEndingVehiclesIDList())
+        return self._take_events(tc.VAR_STOP_ENDING_VEHICLES_IDS, self._traci.simulation.getStopEndingVehiclesIDList)
 
     def get_emergency_vehicle_lanes(self) -> frozenset:
         """
@@ -199,32 +296,74 @@ class TrafficAdapter:
                 "TrafficAdapter cannot read emergency vehicles: the "
                 "TraCIManager is not currently connected."
             )
+        # Served from the last get_current_state() step's subscription
+        # results (vehicle class is subscribed alongside the rest), so
+        # this costs no round trips at all. Falls back to asking SUMO if
+        # nothing has been read yet.
+        results = self._last_vehicle_results
+        if not results:
+            results = {
+                vehicle_id: self._read_vehicle_directly(vehicle_id)
+                for vehicle_id in self._traci.vehicle.getIDList()
+            }
         emergency_lanes = set()
-        for vehicle_id in self._traci.vehicle.getIDList():
-            if self._traci.vehicle.getVehicleClass(vehicle_id) == "emergency":
-                lane_id = self._traci.vehicle.getLaneID(vehicle_id)
-                if lane_id:
-                    emergency_lanes.add(lane_id)
+        for r in results.values():
+            if r.get(tc.VAR_VEHICLECLASS) == "emergency" and r.get(tc.VAR_LANE_ID):
+                emergency_lanes.add(r[tc.VAR_LANE_ID])
         return frozenset(emergency_lanes)
 
-    def _extract_vehicle(self, vehicle_id: str) -> VehicleState:
+    def _vehicle_results(self) -> dict:
         """
-        Read every required raw attribute for a single vehicle exactly
-        once, and return it as a VehicleState.
+        This step's raw variables for every vehicle on the network, keyed
+        by vehicle id: {vehicle_id: {tc.VAR_*: value}}.
+
+        Two round trips for the whole fleet - the id list and the
+        subscription results - plus, for a vehicle seen for the first
+        time this step, one subscribe and one direct read of each
+        variable (a subscription delivers from the next step on). The id
+        list is the authority, not the departed list: a run resumed from
+        a saved state starts with vehicles that never "departed".
         """
-        return VehicleState(
-            id=vehicle_id,
-            lane_id=self._traci.vehicle.getLaneID(vehicle_id),
-            speed=self._traci.vehicle.getSpeed(vehicle_id),
-            waiting_time=self._traci.vehicle.getWaitingTime(vehicle_id),
-            position=self._traci.vehicle.getPosition(vehicle_id),
-            # One extra TraCI read per vehicle per tick. Worth it: it is
-            # what lets the dashboard draw a bus as a bus and a
-            # motorcycle as a motorcycle instead of every vehicle as an
-            # identical box. Still a raw fact, like everything else here
-            # - what a type MEANS is the caller's business.
-            type_id=self._traci.vehicle.getTypeID(vehicle_id),
-        )
+        vehicle = self._traci.vehicle
+        ids = vehicle.getIDList()
+        subscribed = vehicle.getAllSubscriptionResults() if self._subscribed_vehicles else {}
+        results = {}
+        for vehicle_id in ids:
+            r = subscribed.get(vehicle_id)
+            if r is None or any(var not in r for var in _VEHICLE_VARS):
+                r = self._read_vehicle_directly(vehicle_id)
+                if vehicle_id not in self._subscribed_vehicles:
+                    vehicle.subscribe(vehicle_id, _VEHICLE_VARS)
+                    self._subscribed_vehicles.add(vehicle_id)
+            else:
+                r = dict(r)
+                r.update(self._static_by_vehicle[vehicle_id])
+            results[vehicle_id] = r
+        # Vehicles that left the network drop out of the results on their
+        # own; keep the bookkeeping from growing with them.
+        if len(self._subscribed_vehicles) > 2 * len(results) + 64:
+            self._subscribed_vehicles &= set(results)
+            self._static_by_vehicle = {k: v for k, v in self._static_by_vehicle.items() if k in results}
+        self._last_vehicle_results = results
+        return results
+
+    def _read_vehicle_directly(self, vehicle_id: str) -> dict:
+        """The five reads a subscription replaces, for a vehicle's first step."""
+        vehicle = self._traci.vehicle
+        static = self._static_by_vehicle.get(vehicle_id)
+        if static is None:
+            static = {
+                tc.VAR_TYPE: vehicle.getTypeID(vehicle_id),
+                tc.VAR_VEHICLECLASS: vehicle.getVehicleClass(vehicle_id),
+            }
+            self._static_by_vehicle[vehicle_id] = static
+        return {
+            tc.VAR_LANE_ID: vehicle.getLaneID(vehicle_id),
+            tc.VAR_SPEED: vehicle.getSpeed(vehicle_id),
+            tc.VAR_WAITING_TIME: vehicle.getWaitingTime(vehicle_id),
+            tc.VAR_POSITION: vehicle.getPosition(vehicle_id),
+            **static,
+        }
 
     def _extract_signal(self, simulation_time: float) -> SignalState:
         """
@@ -240,11 +379,17 @@ class TrafficAdapter:
         method stays correct even if the network were ever swapped out
         entirely.
         """
-        raw_state = self._traci.trafficlight.getRedYellowGreenState(_TLS_ID)
-        current_phase_index = self._traci.trafficlight.getPhase(_TLS_ID)
-        seconds_until_next_switch = (
-            self._traci.trafficlight.getNextSwitch(_TLS_ID) - simulation_time
-        )
+        tls = self._tls_results()
+        if tls is not None:
+            raw_state = tls[tc.TL_RED_YELLOW_GREEN_STATE]
+            current_phase_index = tls[tc.TL_CURRENT_PHASE]
+            seconds_until_next_switch = tls[tc.TL_NEXT_SWITCH] - simulation_time
+        else:
+            raw_state = self._traci.trafficlight.getRedYellowGreenState(_TLS_ID)
+            current_phase_index = self._traci.trafficlight.getPhase(_TLS_ID)
+            seconds_until_next_switch = (
+                self._traci.trafficlight.getNextSwitch(_TLS_ID) - simulation_time
+            )
         lane_states = self._build_lane_states(raw_state)
 
         if current_phase_index != self._observed_phase_index:
@@ -256,7 +401,10 @@ class TrafficAdapter:
                 # under the static program; under an adaptive controller
                 # that re-arms its ceiling every tick this comes out as
                 # ~0, which is the right answer for "just attached".
-                phase_duration = self._traci.trafficlight.getPhaseDuration(_TLS_ID)
+                phase_duration = (
+                    tls[tc.TL_PHASE_DURATION] if tls is not None
+                    else self._traci.trafficlight.getPhaseDuration(_TLS_ID)
+                )
                 already_elapsed = max(0.0, phase_duration - seconds_until_next_switch)
                 self._observed_phase_started_at = simulation_time - already_elapsed
             else:
@@ -275,6 +423,26 @@ class TrafficAdapter:
             seconds_in_current_phase=seconds_in_current_phase,
         )
 
+    def _tls_results(self):
+        """
+        The signal's subscribed variables for this step, or None when
+        subscriptions are unavailable (a test's fake connection) or on the
+        very first read, when the subscription has just been placed and
+        reports from the next step - the caller then reads directly.
+        """
+        trafficlight = self._traci.trafficlight
+        subscribe = getattr(trafficlight, "subscribe", None)
+        if subscribe is None:
+            return None
+        if not self._tls_subscribed:
+            subscribe(_TLS_ID, _TLS_VARS)
+            self._tls_subscribed = True
+            return None
+        results = trafficlight.getSubscriptionResults(_TLS_ID)
+        if not results or any(var not in results for var in _TLS_VARS):
+            return None
+        return results
+
     def _build_lane_states(self, raw_state: str):
         """
         Cross-reference getControlledLinks() (one entry per controlled
@@ -292,7 +460,11 @@ class TrafficAdapter:
         can never be mutated after this method returns, consistent with
         every other read-only mapping in this project.
         """
-        controlled_links = self._traci.trafficlight.getControlledLinks(_TLS_ID)
+        # The link table is a property of the network, not of the step:
+        # read once per connection, not once per 0.05 s.
+        if self._controlled_links is None:
+            self._controlled_links = self._traci.trafficlight.getControlledLinks(_TLS_ID)
+        controlled_links = self._controlled_links
 
         lane_states: Dict[str, str] = {}
         for link_index, connections in enumerate(controlled_links):

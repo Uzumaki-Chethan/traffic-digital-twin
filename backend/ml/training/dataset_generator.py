@@ -124,7 +124,13 @@ def _run_single(scenario: Scenario, seed: int) -> str:
             features = feature_engineer.generate_features()
             collector.observe(features)
 
-        manager.run(collect_step)
+        # Same 1 Hz cadence the runtime reads at (simulation_runner.py),
+        # so a training row is built from exactly the twin history the
+        # live pipeline would have had at that moment.
+        manager.run(
+            collect_step, on_step=adapter.observe_step,
+            callback_interval_seconds=TrainingConfig.SAMPLING_INTERVAL_SECONDS,
+        )
     finally:
         manager.close()
 

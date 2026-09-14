@@ -308,6 +308,11 @@ class PerformanceEvaluator:
             # Read once: pacing (pace_after_step) needs the step length
             # every iteration and must not pay a TraCI round trip for it.
             step_seconds = float(manager_ai.connection.simulation.getDeltaT())
+            # State is read, metrics recorded and decisions made once per
+            # decision tick; SUMO still steps at 0.05 s and the adapters
+            # watch every step for the event lists (Section 28).
+            every = max(1, int(round(Config.DECISION_INTERVAL_SECONDS / step_seconds)))
+            step_index = 0
             phase_history_ai = deque(maxlen=_PHASE_HISTORY_TICKS)
             phase_history_base = deque(maxlen=_PHASE_HISTORY_TICKS)
             latest = {"state_ai": None, "features_ai": None, "decision_ai": None,
@@ -387,6 +392,16 @@ class PerformanceEvaluator:
 
                 if ai_pending:
                     conn_ai.simulationStep()
+                    adapter_ai.observe_step()
+                if base_pending:
+                    conn_base.simulationStep()
+                    adapter_base.observe_step()
+                step_index += 1
+                # Same tick times as before the cadence change: the first
+                # step, then every full second after it (0.05, 1.05, ...).
+                on_tick = step_index % every == 1 % every
+
+                if ai_pending and on_tick:
                     state_ai = record(collector_ai, adapter_ai)
                     twin.update(state_ai)
                     features = feature_engineer.generate_features()
@@ -424,8 +439,7 @@ class PerformanceEvaluator:
                             "is_yellow": state_ai.signal.current_phase_index not in _INDEX_TO_PHASE,
                         })
 
-                if base_pending:
-                    conn_base.simulationStep()
+                if base_pending and on_tick:
                     state_base = record(collector_base, adapter_base)
 
                     if baseline_controller is not None:
@@ -499,6 +513,15 @@ class PerformanceEvaluator:
                             collector_ai, collector_base, final=False,
                         ))
                         last_live_publish[0] = now
+
+            # Arrivals (and stops) that landed on the steps after the
+            # last tick are still pending in the adapters: consume them,
+            # or the last vehicles home never count as served.
+            for collector, adapter in ((collector_ai, adapter_ai), (collector_base, adapter_base)):
+                try:
+                    record(collector, adapter)
+                except Exception:  # noqa: BLE001 - a closed connection at the very end is not a result
+                    logger.debug("Final metrics flush skipped.", exc_info=True)
 
         except KeyboardInterrupt:
             logger.info("Evaluation interrupted by user.")

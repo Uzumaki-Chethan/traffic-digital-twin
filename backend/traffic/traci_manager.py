@@ -104,10 +104,12 @@ class TraCIManager:
         self._connected = True
         logger.info("Connected to TraCI (label=%s)", effective_label)
 
-    def run(self, callback=None, control=None):
+    def run(self, callback=None, control=None, on_step=None,
+            callback_interval_seconds=None):
         """
         Step the simulation until completion. Optionally invoke a callback
-        after every simulation step.
+        after every simulation step - or, with callback_interval_seconds,
+        after every step that lands on that interval.
 
         Parameters
         ----------
@@ -117,6 +119,18 @@ class TraCIManager:
             Optional pause/stop/speed state, checked once per step. Omitted
             (the default) the loop behaves exactly as it always has, so the
             evaluator's own lockstep runs are untouched by this.
+        on_step : Callable | None
+            Cheap hook run after EVERY step regardless of the interval -
+            TrafficAdapter.observe_step, which keeps the per-step event
+            lists (departures, arrivals, stops) from being lost between
+            callbacks.
+        callback_interval_seconds : float | None
+            Run `callback` only every this many simulated seconds (rounded
+            to whole steps; the first step always fires it). None runs it
+            every step, as before 2026-09-14. The runner passes the 1 s
+            decision interval: reading state twenty times per second for
+            a decision made once per second was most of the per-step
+            cost (Section 28).
         """
         if not self._connected:
             raise RuntimeError(
@@ -143,6 +157,11 @@ class TraCIManager:
                              "running unpaced.", exc_info=True)
 
         try:
+            every = 1
+            if callback_interval_seconds and step_seconds:
+                every = max(1, int(round(callback_interval_seconds / step_seconds)))
+            step_index = 0
+
             while conn.simulation.getMinExpectedNumber() > 0:
                 if control is not None:
                     # Park here while paused; returns at once when running.
@@ -168,8 +187,14 @@ class TraCIManager:
                         break
 
                 conn.simulationStep()
+                step_index += 1
 
-                if callback:
+                if on_step:
+                    on_step()
+                # Ticks land on the same simulated times the per-step
+                # loop decided at (0.05, 1.05, 2.05 ...): the first step,
+                # then every full second after it.
+                if callback and step_index % every == 1 % every:
                     callback()
 
                 # After the callback, so the decision tick's own cost is
