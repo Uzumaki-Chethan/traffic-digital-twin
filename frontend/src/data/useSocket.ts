@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { connectSocket } from './socket'
 import { useSim } from './store'
 import { pushLiveSample } from './liveHistory'
+import { pushEvalSample } from './evalHistory'
 
 /** Mount exactly once (App.tsx). Every page reads from the store. */
 export function useSocket() {
@@ -17,6 +18,8 @@ export function useSocket() {
         // has to be remembered as it goes past — the snapshot itself
         // carries only the current instant. See data/liveHistory.ts.
         pushLiveSample(snapshot)
+        // Same idea for an evaluation - the Performance page's charts.
+        pushEvalSample(snapshot)
       },
       onClose: () => setLink('closed'),
     })
