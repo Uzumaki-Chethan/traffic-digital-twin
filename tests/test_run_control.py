@@ -19,6 +19,8 @@ import sys
 import tempfile
 import threading
 import time
+
+import pytest
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
@@ -150,8 +152,8 @@ class _FakeRunner:
         self.calls = []
         self._write_state = write_state
 
-    def __call__(self, store, control, *, gui=False, load_state=None):
-        self.calls.append({"store": store, "gui": gui, "load_state": load_state})
+    def __call__(self, store, control, *, gui=False, load_state=None, sumocfg=None):
+        self.calls.append({"store": store, "gui": gui, "load_state": load_state, "sumocfg": sumocfg})
         self.started.set()
         # Behave like the real run loop: step until asked to stop or to
         # hand over to a SUMO window.
@@ -237,7 +239,7 @@ def test_stopped_run_does_not_report_stopping_forever():
 
 
 def test_supervisor_reports_a_crashed_run_instead_of_hiding_it():
-    def explode(store, control, *, gui=False, load_state=None):
+    def explode(store, control, *, gui=False, load_state=None, sumocfg=None):
         raise ValueError("SUMO is not installed")
 
     sup = SimulationSupervisor(store=object(), runner=explode)
@@ -250,7 +252,7 @@ def test_supervisor_reports_a_crashed_run_instead_of_hiding_it():
 
 
 def test_a_new_start_clears_the_previous_error():
-    def explode(store, control, *, gui=False, load_state=None):
+    def explode(store, control, *, gui=False, load_state=None, sumocfg=None):
         raise ValueError("boom")
 
     sup = SimulationSupervisor(store=object(), runner=explode)
@@ -382,3 +384,101 @@ def test_resolve_config_without_overrides_is_config_itself():
     from config import Config
     from simulation_runner import resolve_config
     assert resolve_config() is Config
+
+
+# ===================== supervisor: kind, scenario, evaluations =====================
+
+class _FakeEvaluation:
+    """Stands in for the in-process evaluation runner: same 4 arguments,
+    runs until stopped, records what it was asked to run."""
+
+    def __init__(self):
+        self.started = threading.Event()
+        self.calls = []
+
+    def __call__(self, store, control, scenario_name, baseline):
+        self.calls.append({"store": store, "control": control,
+                           "scenario_name": scenario_name, "baseline": baseline})
+        self.started.set()
+        while not control.stop_requested:
+            control.wait_if_paused()
+            time.sleep(0.01)
+
+
+def test_supervisor_reports_kind_and_scenario_for_a_demo():
+    runner = _FakeRunner()
+    sup = SimulationSupervisor(store=object(), runner=runner)
+    sup.start(gui=False, scenario_name="light_seed1")
+    assert runner.started.wait(2.0)
+    try:
+        status = sup.status_dict()
+        assert status["kind"] == "demo" and status["scenario"] == "light_seed1"
+        assert runner.calls[0]["sumocfg"].endswith("light_seed1.sumocfg")
+    finally:
+        sup.stop(); sup.join(timeout=3.0)
+    assert sup.status_dict()["kind"] is None
+
+
+def test_supervisor_default_scenario_when_none_given():
+    runner = _FakeRunner()
+    sup = SimulationSupervisor(store=object(), runner=runner)
+    sup.start()
+    assert runner.started.wait(2.0)
+    try:
+        assert sup.status_dict()["scenario"] == "default"
+        assert runner.calls[0]["sumocfg"] is None  # production route = Config's own path
+    finally:
+        sup.stop(); sup.join(timeout=3.0)
+
+
+def test_start_evaluation_runs_the_evaluation_runner_with_the_shared_control():
+    evaluation = _FakeEvaluation()
+    sup = SimulationSupervisor(store=object(), evaluation_runner=evaluation)
+    sup.start_evaluation("heavy_seed1", baseline="vac")
+    assert evaluation.started.wait(2.0)
+    try:
+        status = sup.status_dict()
+        assert status["kind"] == "evaluation" and status["scenario"] == "heavy_seed1"
+        assert status["running"] is True and status["can_start"] is False
+        call = evaluation.calls[0]
+        assert call["scenario_name"] == "heavy_seed1" and call["baseline"] == "vac"
+        assert call["control"] is sup.run_control
+    finally:
+        sup.stop(); sup.join(timeout=3.0)
+    assert sup.status_dict()["kind"] is None and sup.status_dict()["can_start"] is True
+
+
+def test_second_start_of_either_kind_is_refused_with_the_right_sentence():
+    runner = _FakeRunner(); evaluation = _FakeEvaluation()
+    sup = SimulationSupervisor(store=object(), runner=runner, evaluation_runner=evaluation)
+    sup.start(); assert runner.started.wait(2.0)
+    with pytest.raises(RuntimeError, match="A demo run is active"):
+        sup.start_evaluation("light_seed1")
+    sup.stop(); sup.join(timeout=3.0)
+    sup.start_evaluation("light_seed1"); assert evaluation.started.wait(2.0)
+    try:
+        with pytest.raises(RuntimeError, match="An evaluation is active"):
+            sup.start()
+        with pytest.raises(RuntimeError, match="An evaluation is active"):
+            sup.start_evaluation("light_seed1")
+    finally:
+        sup.stop(); sup.join(timeout=3.0)
+
+
+def test_open_gui_is_refused_for_an_evaluation():
+    evaluation = _FakeEvaluation()
+    sup = SimulationSupervisor(store=object(), evaluation_runner=evaluation)
+    sup.start_evaluation("light_seed1"); assert evaluation.started.wait(2.0)
+    try:
+        with pytest.raises(RuntimeError, match="Only a demo run"):
+            sup.open_gui()
+    finally:
+        sup.stop(); sup.join(timeout=3.0)
+
+
+def test_unknown_scenario_is_refused_before_a_thread_starts():
+    runner = _FakeRunner()
+    sup = SimulationSupervisor(store=object(), runner=runner)
+    with pytest.raises(ValueError):
+        sup.start(scenario_name="../../evil")
+    assert not sup.is_running()
