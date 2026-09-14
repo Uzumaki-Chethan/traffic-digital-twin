@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Gauge, Monitor, Pause, Play, Square } from 'lucide-react'
 import clsx from 'clsx'
+import { useLocation } from 'react-router-dom'
 import { runControl, useRunStore } from '@/data/runState'
+import { useSettings } from '@/data/settings'
+import { scenarioName } from '@/data/scenarios'
 
 /**
  * Start / pause / stop / speed for the simulation, in the top bar, wired
@@ -39,23 +42,44 @@ function speedIndex(speed: number | null): number {
 export function RunControls() {
   const state = useRunStore((s) => s.state)
   const busy = useRunStore((s) => s.busy)
+  const demoScenario = useSettings((s) => s.demoScenario)
+  const evalScenario = useSettings((s) => s.evalScenario)
+  // On Performance the bar starts an EVALUATION (Trinetra vs VAC on the
+  // scenario picked in Settings); everywhere else it starts a demo run.
+  // Same bar, same pause/stop/speed - the backend runs either on the
+  // same worker with the same controls.
+  const onPerformance = useLocation().pathname.startsWith('/performance')
 
   if (!state?.available) return null
 
   // Idle console: the only thing worth offering is a way to begin.
   if (state.can_start) {
+    if (onPerformance) {
+      return (
+        <div className="flex items-center gap-1.5">
+          <Button
+            primary
+            onClick={() => void runControl.startEvaluation(evalScenario)}
+            disabled={busy}
+            label="Start"
+            title={`Start the evaluation — Trinetra vs VAC on ${scenarioName(evalScenario)}`}
+            icon={<Play size={13} aria-hidden />}
+          />
+        </div>
+      )
+    }
     return (
       <div className="flex items-center gap-1.5">
         <Button
           primary
-          onClick={() => void runControl.start(false)}
+          onClick={() => void runControl.start(false, demoScenario)}
           disabled={busy}
           label="Start"
-          title="Start a simulation (headless — watch it on this page)"
+          title={`Start a simulation of ${scenarioName(demoScenario)} (headless — watch it on this page)`}
           icon={<Play size={13} aria-hidden />}
         />
         <Button
-          onClick={() => void runControl.start(true)}
+          onClick={() => void runControl.start(true, demoScenario)}
           disabled={busy}
           label=""
           title="Start a simulation and open the SUMO window as well"
@@ -105,7 +129,7 @@ export function RunControls() {
 
       {/* Continue THIS run in a SUMO window. Not a restart: the run saves
           its state and resumes from it, so the same vehicles carry over. */}
-      {state.managed && state.running && !state.gui && (
+      {state.managed && state.running && !state.gui && state.kind !== 'evaluation' && (
         <Button
           onClick={() => void runControl.openGui()}
           disabled={busy || stopping || handing}

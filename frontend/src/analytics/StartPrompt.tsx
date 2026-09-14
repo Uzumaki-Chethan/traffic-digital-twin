@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { Monitor, Play } from 'lucide-react'
 import { Panel } from '@/ui/Panel'
 import { runControl, useRunStore, type RunState } from '@/data/runState'
+import { useSettings } from '@/data/settings'
 
 /**
  * What Analytics shows before there is anything to analyse.
@@ -20,6 +21,7 @@ import { runControl, useRunStore, type RunState } from '@/data/runState'
  */
 export function StartPrompt({ run }: { run: RunState | null }) {
   const busy = useRunStore((s) => s.busy)
+  const demoScenario = useSettings((s) => s.demoScenario)
   const failure = useRunStore((s) => s.failure)
   const [launched, setLaunched] = useState(false)
 
@@ -66,7 +68,7 @@ export function StartPrompt({ run }: { run: RunState | null }) {
                   disabled={busy}
                   onClick={() => {
                     setLaunched(true)
-                    void runControl.start(false)
+                    void runControl.start(false, demoScenario)
                   }}
                 />
                 <StartButton
@@ -76,7 +78,7 @@ export function StartPrompt({ run }: { run: RunState | null }) {
                   disabled={busy}
                   onClick={() => {
                     setLaunched(true)
-                    void runControl.start(true)
+                    void runControl.start(true, demoScenario)
                   }}
                 />
               </div>
