@@ -99,10 +99,22 @@ export const ARROWS: Record<string, string> = {
 }
 
 /** Where the lane-ID label sits, near the outer end of each lane. */
-export function labelPos(l: LaneGeom): { x: number; y: number; rotate: number } {
+/**
+ * Where a lane's label sits. E/W labels line up beside their lanes. N/S
+ * lanes are only 36 units apart, narrower than any readable label, so
+ * their three labels stack as a short legend at the top (N) or bottom
+ * (S) of the arm, in lane order from the median outwards - each row
+ * still points at its lane by order, not by column. (Three labels at
+ * lane midpoints overlapped into one unreadable string - the 2026-09-13
+ * visual check's first finding.)
+ */
+export function labelPos(l: LaneGeom): { x: number; y: number; anchor: 'start' | 'middle' | 'end' } {
   const mid = (l.lo + l.hi) / 2
   if (l.axis === 'v') {
-    return { x: mid, y: l.approach === 'N' ? 14 : H - 8, rotate: 0 }
+    const row = Number(l.id.slice(-1)) // 0, 1, 2 = left, straight, right
+    const armMid = l.approach === 'N' ? (460 + 568) / 2 : (352 + 460) / 2
+    const y = l.approach === 'N' ? 14 + row * 13 : H - 8 - (2 - row) * 13
+    return { x: armMid, y, anchor: 'middle' }
   }
-  return { x: l.approach === 'W' ? 6 : W - 6, y: mid + 3, rotate: 0 }
+  return { x: l.approach === 'W' ? 6 : W - 6, y: mid + 3, anchor: l.approach === 'W' ? 'start' : 'end' }
 }

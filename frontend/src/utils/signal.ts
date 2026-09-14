@@ -122,3 +122,11 @@ export function movementOf(laneId: string): string {
   return MOVEMENT[laneId.slice(-1) as '0' | '1' | '2'] ?? '—'
 }
 export const APPROACH_NAME: Record<string, string> = { N: 'North', S: 'South', E: 'East', W: 'West' }
+
+/** "North · Left" for N_in_0 - the one wording every lane label uses on
+ * screen since 2026-09-14. SUMO's lane ids stay in the payload only. */
+export function laneLabel(laneId: string): string {
+  const approach = APPROACH_NAME[laneId.charAt(0)]
+  if (!approach) return laneId
+  return `${approach} · ${movementOf(laneId)}`
+}

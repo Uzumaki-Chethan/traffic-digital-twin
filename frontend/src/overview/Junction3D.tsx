@@ -436,14 +436,21 @@ export function Junction3D({ lanes, vehicles, powered }: Props) {
     const bodyCache = new Map<string, { body: THREE.BufferGeometry; cab: THREE.BufferGeometry | null }>()
     const paintCache = new Map<string, THREE.MeshStandardMaterial>()
     const glassMat = own(new THREE.MeshStandardMaterial({ color: '#2b3038', roughness: 0.25 }))
+    const rubberMat = own(new THREE.MeshStandardMaterial({ color: '#1a1a1a', roughness: 0.9 }))
+    const canopyMat = own(new THREE.MeshStandardMaterial({ color: '#1f1f1f', roughness: 0.8 }))
+    // Wheels, shared: a motorcycle's two and an auto-rickshaw's three.
+    const wheelGeom = own(new THREE.CylinderGeometry(0.31, 0.31, 0.12, 14))
+    const smallWheelGeom = own(new THREE.CylinderGeometry(0.24, 0.24, 0.1, 14))
 
     function bodyFor(shape: VehicleShape) {
       const key = `${shape.kind}:${shape.length}:${shape.width}:${shape.height}`
       const hit = bodyCache.get(key)
       if (hit) return hit
       const { length: L, width: Wd, height: Ht, kind } = shape
-      // Bus and truck are one tall slab; everything else gets a lower
-      // body with a cabin on top, which is what reads as "a car" here.
+      // Bus and truck are one tall slab; a car gets a lower body with a
+      // cabin on top. Motorcycles and auto-rickshaws are built in
+      // buildVehicle from their own parts - a box at their dimensions
+      // just looked like a shrunken car (2026-09-14 visual check).
       const slab = kind === 'bus' || kind === 'truck'
       const built = {
         body: own(new THREE.BoxGeometry(Wd, slab ? Ht * 0.92 : Ht * 0.62, L)),
@@ -461,7 +468,81 @@ export function Junction3D({ lanes, vehicles, powered }: Props) {
       return mat
     }
 
+    function wheel(geom: THREE.BufferGeometry, x: number, y: number, z: number) {
+      const m = new THREE.Mesh(geom, rubberMat)
+      m.rotation.z = Math.PI / 2
+      m.position.set(x, y, z)
+      return m
+    }
+
+    // Part geometries per shape key, like bodyFor: built once per vehicle
+    // TYPE, not per vehicle, so a busy run never accumulates geometry.
+    const partsCache = new Map<string, Record<string, THREE.BufferGeometry>>()
+    function partsFor(shape: VehicleShape, build: () => Record<string, THREE.BufferGeometry>) {
+      const key = `${shape.kind}:${shape.length}:${shape.width}:${shape.height}`
+      let hit = partsCache.get(key)
+      if (!hit) {
+        hit = build()
+        for (const g of Object.values(hit)) own(g)
+        partsCache.set(key, hit)
+      }
+      return hit
+    }
+
+    /** Two wheels, a narrow frame, a rider - a motorcycle at 2.0 x 0.7 m. */
+    function buildMotorcycle(shape: VehicleShape): THREE.Group {
+      const g = new THREE.Group()
+      const { length: L, colour } = shape
+      const coat = paintFor(colour)
+      const parts = partsFor(shape, () => ({
+        frame: new THREE.BoxGeometry(0.3, 0.3, L * 0.7),
+        tank: new THREE.BoxGeometry(0.34, 0.26, L * 0.28),
+        rider: new THREE.BoxGeometry(0.4, 0.62, 0.42),
+        helmet: new THREE.BoxGeometry(0.26, 0.26, 0.26),
+      }))
+      const frame = new THREE.Mesh(parts.frame, coat)
+      frame.position.y = 0.55
+      const tank = new THREE.Mesh(parts.tank, coat)
+      tank.position.set(0, 0.78, L * 0.12)
+      const rider = new THREE.Mesh(parts.rider, canopyMat)
+      rider.position.set(0, 1.05, -L * 0.08)
+      const helmet = new THREE.Mesh(parts.helmet, coat)
+      helmet.position.set(0, 1.48, -L * 0.08)
+      g.add(frame, tank, rider, helmet, wheel(wheelGeom, 0, 0.31, L * 0.36), wheel(wheelGeom, 0, 0.31, -L * 0.36))
+      return g
+    }
+
+    /** Three wheels, a short tall cab, a canopy - an auto-rickshaw at 2.6 x 1.4 m. */
+    function buildRickshaw(shape: VehicleShape): THREE.Group {
+      const g = new THREE.Group()
+      const { length: L, width: Wd, height: Ht, colour } = shape
+      const coat = paintFor(colour)
+      const parts = partsFor(shape, () => ({
+        cab: new THREE.BoxGeometry(Wd, Ht * 0.7, L * 0.7),
+        nose: new THREE.BoxGeometry(Wd * 0.5, Ht * 0.45, L * 0.3),
+        canopy: new THREE.BoxGeometry(Wd * 1.04, 0.08, L * 0.8),
+        screen: new THREE.BoxGeometry(Wd * 0.8, Ht * 0.3, 0.05),
+      }))
+      const cab = new THREE.Mesh(parts.cab, coat)
+      cab.position.set(0, Ht * 0.5, -L * 0.08)
+      const nose = new THREE.Mesh(parts.nose, coat)
+      nose.position.set(0, Ht * 0.38, L * 0.35)
+      const canopy = new THREE.Mesh(parts.canopy, canopyMat)
+      canopy.position.set(0, Ht - 0.04, -L * 0.06)
+      const screen = new THREE.Mesh(parts.screen, glassMat)
+      screen.position.set(0, Ht * 0.7, L * 0.27)
+      g.add(
+        cab, nose, canopy, screen,
+        wheel(smallWheelGeom, 0, 0.24, L * 0.42),
+        wheel(smallWheelGeom, Wd * 0.44, 0.24, -L * 0.3),
+        wheel(smallWheelGeom, -Wd * 0.44, 0.24, -L * 0.3),
+      )
+      return g
+    }
+
     function buildVehicle(shape: VehicleShape): THREE.Group {
+      if (shape.kind === 'motorcycle') return buildMotorcycle(shape)
+      if (shape.kind === 'rickshaw') return buildRickshaw(shape)
       const g = new THREE.Group()
       const { body, cab } = bodyFor(shape)
       const slab = cab === null

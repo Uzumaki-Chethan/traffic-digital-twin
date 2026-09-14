@@ -4,7 +4,7 @@ import type { LaneBucket } from './series'
 import { LANE_IDS } from '@/data/types'
 import { useSim } from '@/data/store'
 import { Panel } from '@/ui/Panel'
-import { movementOf } from '@/utils/signal'
+import { laneLabel } from '@/utils/signal'
 
 /**
  * Twelve lanes down, time across — each cell is that lane's mean
@@ -72,8 +72,7 @@ export function LanePressureHeatmap({ buckets, width }: { buckets: LaneBucket[];
                   dim && 'opacity-45',
                 )}
               >
-                <span className="num w-[74px] shrink-0 text-[12px] text-ink-strong">{id}</span>
-                <span className="w-[62px] shrink-0 text-[12px] text-ink-mute">{movementOf(id)}</span>
+                <span className="w-[136px] shrink-0 text-[12px] text-ink-strong">{laneLabel(id)}</span>
                 <div className="flex flex-1 gap-[3px]">
                   {starts.map((s) => {
                     const v = row[s]

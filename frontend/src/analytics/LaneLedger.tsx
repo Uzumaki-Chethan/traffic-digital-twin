@@ -4,7 +4,7 @@ import { LANE_IDS } from '@/data/types'
 import { useSim } from '@/data/store'
 import { Panel } from '@/ui/Panel'
 import { f1 } from '@/utils/format'
-import { APPROACH_NAME, lampOf, movementOf } from '@/utils/signal'
+import { lampOf, laneLabel } from '@/utils/signal'
 import { SignalChip } from '@/ui/SignalChip'
 
 export interface LaneWaitMean {
@@ -39,8 +39,6 @@ export function LaneLedger({
           <thead>
             <tr className="text-[12px] text-ink-mute">
               <th className="px-2 pb-1 font-medium">Lane</th>
-              <th className="px-2 pb-1 font-medium">Approach</th>
-              <th className="px-2 pb-1 font-medium">Movement</th>
               <th className="px-2 pb-1 font-medium">Signal now</th>
               <th className="px-2 pb-1 text-right font-medium">Vehicles now</th>
               <th className="px-2 pb-1 text-right font-medium">Wait now</th>
@@ -66,9 +64,7 @@ export function LaneLedger({
                     active && 'bg-hover',
                   )}
                 >
-                  <td className="num px-2 text-ink-strong">{id}</td>
-                  <td className="px-2 text-ink">{APPROACH_NAME[id[0]]}</td>
-                  <td className="px-2 text-ink">{movementOf(id)}</td>
+                  <td className="px-2 text-ink-strong">{laneLabel(id)}</td>
                   <td className="px-2">
                     <SignalChip lamp={lamp} />
                   </td>
