@@ -48,31 +48,12 @@ from database import DatabaseLogger
 logger = logging.getLogger(__name__)
 
 # Inverse of SignalController.PHASE_TO_INDEX: green index -> phase name.
-_INDEX_TO_PHASE = {idx: name for name, idx in PHASE_TO_INDEX.items()}
-
-
-def _signal_view(state):
-    """
-    Build the dashboard's signal payload from a SimulationState's raw
-    signal snapshot: current phase name, whether SUMO is mid-yellow,
-    and the countdown to the next switch.
-    """
-    idx = state.signal.current_phase_index
-    if idx in _INDEX_TO_PHASE:
-        return {
-            "phase": _INDEX_TO_PHASE[idx],
-            "is_yellow": False,
-            "green": True,
-            "countdown": max(0.0, state.signal.seconds_until_next_switch),
-        }
-    # Odd index = yellow clearance out of the previous even (green) phase.
-    prev_green = _INDEX_TO_PHASE.get(idx - 1, "unknown")
-    return {
-        "phase": prev_green,
-        "is_yellow": True,
-        "green": False,
-        "countdown": max(0.0, state.signal.seconds_until_next_switch),
-    }
+# The snapshot's parts are built by services/snapshot_views.py, shared
+# with the evaluator so both sides of a live evaluation draw exactly as a
+# demo run does.
+from services.snapshot_views import (  # noqa: E402
+    _INDEX_TO_PHASE, decision_view, lanes_view, metrics_view, signal_view, vehicles_view,
+)
 
 
 def resolve_config(gui=None, base=Config, load_state=None, sumocfg=None):
@@ -340,7 +321,7 @@ def run_simulation(store, control=None, *, gui=None, base_config=Config,
             # dashboard snapshot further down: sig_view is the ACTUAL
             # TraCI-confirmed signal state, distinct from `decision`
             # (the DESIRED state DecisionEngine just produced).
-            sig_view = _signal_view(state)
+            sig_view = signal_view(state)
             lane_states = dict(state.signal.lane_states)
 
             # ---- Persistence (1 Hz, insert-only, failure-tolerant) ----
@@ -397,79 +378,23 @@ def run_simulation(store, control=None, *, gui=None, base_config=Config,
                 "phase": decision.active_phase,
                 "is_yellow": sig_view["is_yellow"],
             })
-            lanes_payload = [
-                {
-                    "lane_id": lane_id,
-                    "vehicles": (
-                        features.lane_features[lane_id].vehicle_count
-                        if lane_id in features.lane_features else 0
-                    ),
-                    "avg_wait": (
-                        features.lane_features[lane_id].average_waiting_time
-                        if lane_id in features.lane_features else 0.0
-                    ),
-                    # The same per-lane urgency score persisted above, so
-                    # the dashboard can plot lane pressure live instead of
-                    # reading it back out of SQLite afterwards. Rounded:
-                    # it is a 0-1 score drawn as a shade, and four decimal
-                    # places is already more than any pixel can show.
-                    "score": round(decision.lane_scores.get(lane_id, 0.0), 4),
-                    "signal": lane_states.get(lane_id, "r"),
-                }
-                for lane_id in ALL_APPROACH_LANES
-            ]
             store.publish({
+                # Tells the frontend which page this frame belongs to:
+                # a demo run (this) or an evaluation (both controllers
+                # side by side - see performance/evaluator.py).
+                "kind": "demo",
                 "sim_time": features.simulation_time,
                 "signal": sig_view,
-                "metrics": {
-                    "vehicles": features.total_vehicle_count,
-                    "avg_speed": features.average_speed,
-                    "avg_wait": features.average_waiting_time,
-                    "queue": features.stopped_vehicle_count,
-                    "stopped": features.stopped_vehicle_count,
-                },
-                "lanes": lanes_payload,
-                # Per-vehicle positions, so the dashboard can draw the
-                # actual traffic on its plan view instead of inferring it
-                # from per-lane counts. These come straight from
-                # TrafficAdapter's existing VehicleState.position (a real
-                # traci.vehicle.getPosition() reading in SUMO network
-                # metres) - no new TraCI call, and still strictly
-                # read-only: nothing here can influence control.
-                #
-                # Cost: this payload is published once per decision tick
-                # (~1s, not per 0.05s step - see the early return above),
-                # so a busy junction adds roughly 2-3 KB/s. Coordinates
-                # are rounded to centimetres because sub-centimetre
-                # precision is invisible on screen and just costs bytes.
-                "vehicles": [
-                    {
-                        "id": v.id,
-                        "lane": v.lane_id,
-                        "x": round(v.position[0], 2),
-                        "y": round(v.position[1], 2),
-                        "speed": round(v.speed, 2),
-                        # SUMO's own type id, so the dashboard can draw a
-                        # bus as a bus. The dimensions that go with each
-                        # type live in vehicle_types.add.xml, which is
-                        # frozen, so the frontend holds that table rather
-                        # than this paying for two more TraCI reads per
-                        # vehicle per tick to send static numbers.
-                        "type": v.type_id,
-                    }
-                    for v in state.vehicles
-                ],
-                "decision": {
-                    "active_phase": decision.active_phase,
-                    "mode": decision.decision_mode,
-                    "switched": decision.switched,
-                    "reason": decision.reason_text,
-                    "duration": decision.green_duration_seconds,
-                    "phase_scores": dict(decision.phase_scores),
-                },
+                "metrics": metrics_view(features),
+                "lanes": lanes_view(features, decision.lane_scores, lane_states),
+                # Per-vehicle positions so the dashboard can draw the
+                # actual traffic. Published once per decision tick (~1 s),
+                # ~2-3 KB/s on a busy junction. Still strictly read-only.
+                "vehicles": vehicles_view(state),
+                "decision": decision_view(decision),
                 "emergency_lanes": sorted(emergency_lanes),
                 "prediction": latest_evaluated,
-                "comparison": None,  # populated by evaluator --dashboard runs
+                "comparison": None,
                 "phase_history": list(phase_history),
             })
 
