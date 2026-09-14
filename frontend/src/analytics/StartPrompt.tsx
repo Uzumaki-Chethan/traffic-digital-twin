@@ -115,7 +115,7 @@ export function StartPrompt({ run }: { run: RunState | null }) {
   )
 }
 
-function StartButton({
+export function StartButton({
   onClick,
   disabled,
   label,

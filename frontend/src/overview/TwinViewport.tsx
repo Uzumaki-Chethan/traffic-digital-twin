@@ -23,11 +23,15 @@ export function TwinViewport({
   emergencyLanes,
   vehicles,
   powered,
+  allow3d = true,
 }: {
   lanes: LaneView[]
   emergencyLanes: string[]
   vehicles?: VehicleView[]
   powered: boolean
+  /** Performance shows two junctions side by side in plan view only -
+   * two three.js scenes at once is not a comparison anyone asked for. */
+  allow3d?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const stage = useRef<HTMLDivElement>(null)
@@ -105,10 +109,12 @@ export function TwinViewport({
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
             className="absolute bottom-3 left-3 flex items-center gap-1.5"
           >
-            <div className="flex overflow-hidden rounded-control border border-rule bg-plate shadow-[var(--shadow-panel)]">
-              <ModeButton active={mode === 'plan'} onClick={() => setMode('plan')} icon={<Map size={14} aria-hidden />} label="Plan" />
-              <ModeButton active={mode === '3d'} onClick={() => setMode('3d')} icon={<Box size={14} aria-hidden />} label="3D" />
-            </div>
+            {allow3d && (
+              <div className="flex overflow-hidden rounded-control border border-rule bg-plate shadow-[var(--shadow-panel)]">
+                <ModeButton active={mode === 'plan'} onClick={() => setMode('plan')} icon={<Map size={14} aria-hidden />} label="Plan" />
+                <ModeButton active={mode === '3d'} onClick={() => setMode('3d')} icon={<Box size={14} aria-hidden />} label="3D" />
+              </div>
+            )}
 
             {mode === 'plan' && (
               <div className="flex items-center overflow-hidden rounded-control border border-rule bg-plate shadow-[var(--shadow-panel)]">
