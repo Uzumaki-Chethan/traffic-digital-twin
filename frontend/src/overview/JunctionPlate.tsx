@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { LaneView, VehicleView } from '@/data/types'
 import { useSim } from '@/data/store'
-import { lampOf, lampLit, lampColor, isPermissive } from '@/utils/signal'
+import { lampOf, lampLit, lampColor, isPermissive, laneLabel } from '@/utils/signal'
 import {
   ARROWS,
   BOX,
@@ -186,13 +186,24 @@ export function JunctionPlate({ lanes, emergencyLanes, vehicles, powered, viewBo
           <path key={g.id} d={ARROWS[g.id]} />
         ))}
       </g>
-      <g fill="var(--plate-marking)" fontFamily="var(--font-num)" fontSize="12" opacity="0.9">
+      {/* Barlow, not the mono face: the vendored JetBrains Mono subset has
+          no middle dot, and "North · Left" is words now, not a code. */}
+      <g
+        fill="var(--plate-marking)"
+        fontFamily="var(--font-ui)"
+        fontSize="12"
+        fontWeight="500"
+        opacity="0.95"
+        stroke="var(--plate-road)"
+        strokeWidth="2.5"
+        strokeLinejoin="round"
+        paintOrder="stroke"
+      >
         {LANES.map((g) => {
           const p = labelPos(g)
-          const anchor = g.axis === 'v' ? 'middle' : g.approach === 'W' ? 'start' : 'end'
           return (
-            <text key={g.id} x={p.x} y={p.y} textAnchor={anchor}>
-              {g.id}
+            <text key={g.id} x={p.x} y={p.y} textAnchor={p.anchor}>
+              {laneLabel(g.id)}
             </text>
           )
         })}

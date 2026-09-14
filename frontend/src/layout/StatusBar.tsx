@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { useSim } from '@/data/store'
-import { isLive } from '@/data/types'
+import { isEvaluation, isLive } from '@/data/types'
 import { useLiveClock } from '@/data/useLiveClock'
 import { clock } from '@/utils/format'
 import { APPROACH_NAME, modeMeta } from '@/utils/signal'
@@ -27,6 +27,9 @@ export function StatusBar() {
   const run = useRunStore((s) => s.state)
 
   const live = isLive(latest) ? latest : lastLive
+  // During an evaluation there is no demo frame, but there is a run:
+  // the clock and the paused/ended states must not read as "waiting".
+  const evaluating = isEvaluation(latest) && run?.running === true
   const linkLost = link !== 'open' || staleSeconds > 3
   // The backend knows whether it is paused; ask it. The tick-age
   // heuristic is only the fallback for a backend with no control layer
@@ -72,7 +75,7 @@ export function StatusBar() {
         <RunControls />
 
         <div className="text-right">
-          {live === null ? (
+          {live === null && !evaluating ? (
             <div className="text-[13px]">{ended ? 'No simulation running' : 'Waiting for simulation'}</div>
           ) : paused ? (
             <div className="text-[14px] font-semibold">Simulation paused</div>

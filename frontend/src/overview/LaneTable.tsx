@@ -3,7 +3,7 @@ import { LANE_IDS, type LaneView } from '@/data/types'
 import { useSim } from '@/data/store'
 import { Panel } from '@/ui/Panel'
 import { f1 } from '@/utils/format'
-import { lampOf, movementOf } from '@/utils/signal'
+import { lampOf, laneLabel } from '@/utils/signal'
 import { SignalChip } from '@/ui/SignalChip'
 
 /**
@@ -23,7 +23,6 @@ export function LaneTable({ lanes, powered }: { lanes: LaneView[]; powered: bool
         <thead>
           <tr className="text-[12px] font-medium text-ink-mute">
             <th className="px-2 py-1 font-medium">Lane</th>
-            <th className="px-2 py-1 font-medium">Movement</th>
             <th className="px-2 py-1 font-medium">Signal</th>
             <th className="px-2 py-1 text-right font-medium">Vehicles</th>
             <th className="px-2 py-1 text-right font-medium">Avg wait</th>
@@ -45,8 +44,7 @@ export function LaneTable({ lanes, powered }: { lanes: LaneView[]; powered: bool
                 )}
                 style={active ? { boxShadow: 'inset 2px 0 0 var(--accent)' } : undefined}
               >
-                <td className="num px-2 font-medium text-ink-strong">{id}</td>
-                <td className="px-2 text-ink">{movementOf(id)}</td>
+                <td className="px-2 font-medium text-ink-strong">{laneLabel(id)}</td>
                 <td className="px-2">
                   <SignalChip lamp={lamp} />
                 </td>

@@ -55,29 +55,36 @@ export function shapeOf(typeId: string | undefined): VehicleShape {
   return VEHICLE_TYPES[typeId] ?? DEFAULT_SHAPE
 }
 
+/** Plate units per network metre along an arm: the plate is 920 wide
+ * for the 400 m network (plateGeometry.ts). */
+export const PLATE_UNITS_PER_METRE = 920 / 400
+
 /**
  * Plate-view marker size for a type, in drawn units.
  *
- * The plan view is a schematic, so it does NOT use the SUMO colours —
- * colour there already means signal state, and a red car sitting on a
- * red lane fill would read as one blob. Size carries the type instead:
- * a motorcycle is visibly small, a bus visibly long. Length is scaled
- * hard (the arms are compressed ~14x) but not to true scale, or a
- * motorcycle would be a single pixel.
+ * LENGTH is true to scale: SUMO length x PLATE_UNITS_PER_METRE, so a
+ * queue draws exactly as SUMO spaces it (4.5 m car + 2.5 m gap = 7 m
+ * between fronts = 16.1 units). Before 2026-09-14 a car was drawn 18
+ * units long - 7.8 m, longer than the 7 m SUMO actually gives it - so
+ * every stopped queue overlapped by construction.
+ *
+ * WIDTH stays exaggerated: the lanes themselves are drawn ~11x wider
+ * than real (36 units for 3.2 m) so twelve of them fit legibly, and a
+ * true-width motorcycle would be under a pixel. Size still carries the
+ * type - a motorcycle is visibly small, a bus visibly long - because on
+ * this plate colour already means signal state.
  */
 export function plateSize(shape: VehicleShape): { length: number; width: number } {
+  const length = Math.round(shape.length * PLATE_UNITS_PER_METRE * 10) / 10
   switch (shape.kind) {
     case 'motorcycle':
-      return { length: 11, width: 6 }
+      return { length, width: 4 }
     case 'rickshaw':
-      return { length: 13, width: 8 }
+      return { length, width: 6 }
     case 'bus':
-      return { length: 30, width: 11 }
     case 'truck':
-      return { length: 25, width: 11 }
-    case 'emergency':
-      return { length: 20, width: 10 }
+      return { length, width: 9 }
     default:
-      return { length: 18, width: 10 }
+      return { length, width: 7 }
   }
 }

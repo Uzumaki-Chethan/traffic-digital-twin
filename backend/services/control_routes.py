@@ -42,7 +42,6 @@ normal clean TraCI/SUMO shutdown rather than leaving orphaned sumo.exe
 processes behind. A hard kill() is only the last-resort fallback.
 """
 
-import glob
 import logging
 import os
 import signal
@@ -57,12 +56,12 @@ from pydantic import BaseModel
 
 from config import Config
 from performance.evaluator import BASELINE_CONTROLLERS
+from performance.scenarios import is_known_scenario, known_scenario_names
 from services.live_state import LiveStateStore
 
 logger = logging.getLogger(__name__)
 
 _BACKEND_DIR = os.path.join(Config.PROJECT_ROOT, "backend")
-_SCENARIO_DIR = os.path.join(Config.PROJECT_ROOT, "sumo", "config", "scenarios")
 
 # How long to wait for a graceful CTRL_BREAK_EVENT shutdown before
 # escalating to a hard kill. SUMO + TraCI teardown is normally
@@ -80,9 +79,22 @@ class StartSimulationRequest(BaseModel):
     """
     gui=False launches headless `sumo` - the console draws the junction
     itself, so a SUMO window is optional rather than the only way to
-    watch. gui=True opens sumo-gui alongside it.
+    watch. gui=True opens sumo-gui alongside it. scenario_name picks a
+    scenario from the library (performance.scenarios); omitted, the run
+    is the production route.
     """
     gui: bool = False
+    scenario_name: Optional[str] = None
+
+
+class StartEvaluationRequest(BaseModel):
+    """
+    Trinetra vs a baseline on the SAME scenario, two SUMO instances in
+    lockstep, run in-process by the supervisor so the top bar's
+    pause/stop/speed drive it. Always headless. The UI sends "vac".
+    """
+    scenario_name: str
+    baseline: str = "vac"
 
 
 class SpeedRequest(BaseModel):
@@ -91,13 +103,6 @@ class SpeedRequest(BaseModel):
     run the scenario as fast as the machine manages.
     """
     multiplier: Optional[float] = None
-
-
-def _known_scenario_names() -> set:
-    return {
-        os.path.splitext(os.path.basename(path))[0]
-        for path in glob.glob(os.path.join(_SCENARIO_DIR, "*.sumocfg"))
-    }
 
 
 class _TrackedRun:
@@ -235,8 +240,46 @@ def build_control_router(store: LiveStateStore, run_control=None,
                 detail="This dashboard cannot start a simulation: it is running "
                        "inside one. Use server.py for a console that can.",
             )
+        if body.scenario_name is not None and not is_known_scenario(body.scenario_name):
+            raise HTTPException(
+                status_code=400,
+                detail="Unknown scenario {!r}.".format(body.scenario_name),
+            )
         try:
-            return supervisor.start(gui=body.gui)
+            return supervisor.start(gui=body.gui, scenario_name=body.scenario_name)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @router.post("/api/control/start-evaluation")
+    async def start_evaluation(body: StartEvaluationRequest):
+        """
+        Start Trinetra-vs-baseline in-process (see
+        SimulationSupervisor.start_evaluation). One run at a time: a 409
+        names what is in the way. Distinct from /start-evaluator below,
+        which launches a separate process for terminal / app.py use.
+        """
+        if supervisor is None:
+            raise HTTPException(
+                status_code=409,
+                detail="This dashboard cannot start an evaluation: it is running "
+                       "inside a simulation. Use server.py for a console that can.",
+            )
+        if not is_known_scenario(body.scenario_name) or body.scenario_name == "default":
+            raise HTTPException(
+                status_code=400,
+                detail="Unknown scenario {!r}.".format(body.scenario_name),
+            )
+        if body.baseline not in ("vac", "fixed_timer"):
+            raise HTTPException(
+                status_code=400,
+                detail="Unknown baseline {!r}; expected 'vac' or 'fixed_timer'.".format(body.baseline),
+            )
+        try:
+            return supervisor.start_evaluation(body.scenario_name, baseline=body.baseline)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         except RuntimeError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -277,7 +320,7 @@ def build_control_router(store: LiveStateStore, run_control=None,
                 status_code=409,
                 detail="An evaluator run is already active - stop it first.",
             )
-        if body.scenario_name not in _known_scenario_names():
+        if body.scenario_name not in known_scenario_names():
             raise HTTPException(
                 status_code=400,
                 detail="Unknown scenario_name {!r} (no matching .sumocfg under "

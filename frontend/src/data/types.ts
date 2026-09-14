@@ -132,6 +132,10 @@ export interface PhaseHistoryEntry {
 }
 
 export interface LiveSnapshot {
+  /** Which run this frame belongs to. A demo run says "demo"; an older
+   * backend omits it. Evaluation frames are a different shape entirely
+   * (EvaluationSnapshot). Added 2026-09-14. */
+  kind?: 'demo'
   sim_time: number
   signal: SignalView | null
   metrics: MetricsView
@@ -150,13 +154,43 @@ export interface WaitingSnapshot {
   status: 'waiting_for_simulation'
 }
 
-export type Snapshot = LiveSnapshot | WaitingSnapshot
+/** One controller's junction inside an evaluation frame — built by the
+ * same backend view builders as a demo snapshot (services/snapshot_views.py),
+ * so a JunctionPlate draws it identically. No prediction: the baseline has
+ * none, and the Performance page shows the model nowhere. */
+export interface SideView {
+  signal: SignalView | null
+  metrics: MetricsView
+  lanes: LaneView[]
+  vehicles: VehicleView[]
+  decision: DecisionView
+  phase_history: PhaseHistoryEntry[]
+}
+
+/** Trinetra vs a baseline on the identical scenario, in lockstep —
+ * what performance/evaluator.py publishes when the console runs an
+ * evaluation (2026-09-14). `comparison.final` is true on the last frame
+ * only, so verdicts can lock. */
+export interface EvaluationSnapshot {
+  kind: 'evaluation'
+  sim_time: number
+  scenario: string
+  baseline_controller: 'vac' | 'fixed_timer' | string
+  ai: SideView
+  baseline: SideView
+  comparison: { rows: ComparisonRow[]; final: boolean }
+}
+
+export type Snapshot = LiveSnapshot | EvaluationSnapshot | WaitingSnapshot
 
 export function isWaiting(s: Snapshot | null): s is WaitingSnapshot {
   return s !== null && 'status' in s
 }
+export function isEvaluation(s: Snapshot | null): s is EvaluationSnapshot {
+  return s !== null && 'kind' in s && s.kind === 'evaluation'
+}
 export function isLive(s: Snapshot | null): s is LiveSnapshot {
-  return s !== null && 'sim_time' in s
+  return s !== null && 'sim_time' in s && !isEvaluation(s)
 }
 
 export function approachOf(laneId: string): Approach {

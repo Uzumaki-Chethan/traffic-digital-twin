@@ -5,6 +5,8 @@ import { useRunStatePoll } from '@/data/runState'
 import { OverviewPage } from '@/pages/OverviewPage'
 import { AnalyticsPage } from '@/pages/AnalyticsPage'
 import { NotBuiltPage } from '@/pages/NotBuiltPage'
+import { SettingsPage } from '@/pages/SettingsPage'
+import { PerformancePage } from '@/pages/PerformancePage'
 
 export default function App() {
   useSocket()
@@ -16,8 +18,9 @@ export default function App() {
       <Routes>
         <Route path="/" element={<OverviewPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="/performance" element={<NotBuiltPage title="Performance" iteration={3} />} />
+        <Route path="/performance" element={<PerformancePage />} />
         <Route path="/decisions" element={<NotBuiltPage title="Decisions" iteration={3} />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Routes>
     </Shell>
   )

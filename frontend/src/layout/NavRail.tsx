@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import clsx from 'clsx'
-import { Activity, BarChart3, ChartColumnIncreasing, ListTree, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Activity, BarChart3, ChartColumnIncreasing, ListTree, PanelLeftClose, PanelLeftOpen, SlidersHorizontal } from 'lucide-react'
 import { useSim } from '@/data/store'
 
 const NAV = [
@@ -9,6 +9,7 @@ const NAV = [
   { to: '/analytics', label: 'Analytics', icon: ChartColumnIncreasing },
   { to: '/performance', label: 'Performance', icon: BarChart3 },
   { to: '/decisions', label: 'Decisions', icon: ListTree },
+  { to: '/settings', label: 'Simulation Settings', icon: SlidersHorizontal },
 ]
 
 /**

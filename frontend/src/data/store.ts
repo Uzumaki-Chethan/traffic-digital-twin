@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { LiveSnapshot, Snapshot } from './types'
-import { isLive } from './types'
+import { isEvaluation, isLive } from './types'
 
 export type LinkState = 'connecting' | 'open' | 'closed'
 
@@ -52,7 +52,12 @@ export const useSim = create<SimState>((set) => ({
   ingest: (snapshot) =>
     set((prev) => {
       const now = performance.now()
-      if (!isLive(snapshot)) return { latest: snapshot, receivedAt: now }
+      // Both a demo frame and an evaluation frame carry sim_time and
+      // tick once a second; the clock, the measured rate and the plate's
+      // interpolation window need all of them. Only a demo frame becomes
+      // lastLive - that is Overview's "keep the last picture" fallback.
+      const ticking = isLive(snapshot) || isEvaluation(snapshot)
+      if (!ticking) return { latest: snapshot, receivedAt: now }
 
       let { rate, tickSim, tickAt, tickInterval } = prev
       if (snapshot.sim_time !== tickSim) {
@@ -68,6 +73,9 @@ export const useSim = create<SimState>((set) => ({
         tickSim = snapshot.sim_time
         tickAt = now
       }
-      return { latest: snapshot, receivedAt: now, lastLive: snapshot, rate, tickSim, tickAt, tickInterval }
+      return {
+        latest: snapshot, receivedAt: now, rate, tickSim, tickAt, tickInterval,
+        lastLive: isLive(snapshot) ? snapshot : prev.lastLive,
+      }
     }),
 }))

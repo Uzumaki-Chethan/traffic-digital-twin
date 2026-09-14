@@ -1,6 +1,10 @@
 import { useSim } from '@/data/store'
 import { useRunStore } from '@/data/runState'
-import { isLive, type LiveSnapshot } from '@/data/types'
+import { Link } from 'react-router-dom'
+import { SlidersHorizontal } from 'lucide-react'
+import { isEvaluation, isLive, type LiveSnapshot } from '@/data/types'
+import { scenarioName } from '@/data/scenarios'
+import { useSettings } from '@/data/settings'
 import { Panel } from '@/ui/Panel'
 import { Reveal } from '@/ui/Reveal'
 import { TwinViewport } from '@/overview/TwinViewport'
@@ -36,6 +40,13 @@ export function OverviewPage() {
   const run = useRunStore((s) => s.state)
 
   const live = isLive(latest) ? latest : lastLive
+  // Frames on the wire belong to an evaluation (Trinetra vs VAC, two
+  // junctions): that lives on the Performance page, not here.
+  const evaluating = isEvaluation(latest) || (run?.running === true && run.kind === 'evaluation')
+  const demoScenario = useSettings((s) => s.demoScenario)
+  // The chip names what is running when a run is up, else what Start
+  // would run (the Settings choice).
+  const chipScenario = run?.running && run.kind === 'demo' && run.scenario ? run.scenario : demoScenario
   // A STOPPED run is not a paused one: the traffic it was showing no
   // longer exists, so the junction goes dark and clears rather than
   // holding a frozen last frame that looks live. Pausing deliberately
@@ -59,7 +70,11 @@ export function OverviewPage() {
           <Panel
             title="Digital Twin"
             meta={
-              powered ? (
+              evaluating ? (
+                <Link to="/performance" className="underline decoration-[var(--rule-strong)] underline-offset-2">
+                  an evaluation is running — watch it on Performance
+                </Link>
+              ) : powered ? (
                 <span className="flex items-center gap-3">
                   <span className="flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full bg-signal-green" /> green {greens}
@@ -73,8 +88,26 @@ export function OverviewPage() {
             }
             bodyClassName="px-2 pb-2"
           >
-            <TwinViewport lanes={snap.lanes} emergencyLanes={snap.emergency_lanes} vehicles={snap.vehicles} powered={powered} />
+            {evaluating ? (
+              <div className="flex aspect-[920/540] w-full items-center justify-center rounded-control bg-inset text-[13px] text-ink">
+                <p className="max-w-sm text-center">
+                  An evaluation is running — Trinetra and vehicle-actuated control side by side.
+                  <br />
+                  <Link to="/performance" className="underline decoration-[var(--rule-strong)] underline-offset-2">Watch it on Performance</Link>
+                </p>
+              </div>
+            ) : (
+              <TwinViewport lanes={snap.lanes} emergencyLanes={snap.emergency_lanes} vehicles={snap.vehicles} powered={powered} />
+            )}
           </Panel>
+          <Link
+            to="/settings"
+            className="flex w-fit items-center gap-1.5 rounded-control border border-rule bg-plate px-2.5 py-1 text-[12px] text-ink"
+            title="Change the scenario on the Simulation Settings page"
+          >
+            <SlidersHorizontal size={12} aria-hidden />
+            Scenario: <span className="text-ink-strong">{scenarioName(chipScenario)}</span>
+          </Link>
 
           <Reveal index={3}>
             <PredictionPanel prediction={snap.prediction} powered={powered} />

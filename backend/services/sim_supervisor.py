@@ -33,6 +33,7 @@ import tempfile
 import threading
 from datetime import datetime, timezone
 
+from performance.scenarios import DEFAULT_SCENARIO, is_known_scenario, scenario_sumocfg_path
 from services.run_control import RunControl
 
 logger = logging.getLogger(__name__)
@@ -47,11 +48,22 @@ class SimulationSupervisor:
     and must keep pointing at whatever is currently running.
     """
 
-    def __init__(self, store, runner=None):
+    def __init__(self, store, runner=None, evaluation_runner=None):
         self._store = store
-        # Injected for tests; the real runner imports the whole SUMO
+        # Injected for tests; the real runners import the whole SUMO
         # pipeline, which a unit test has no reason to pull in.
         self._runner = runner
+        # An evaluation (Trinetra vs a baseline, two SUMO instances in
+        # lockstep) runs on the SAME worker slot as a demo run, with the
+        # same RunControl and the same store - which is what makes the
+        # console's one top bar drive either. Signature:
+        # evaluation_runner(store, control, scenario_name, baseline).
+        self._evaluation_runner = evaluation_runner
+        # What the worker is running: "demo" | "evaluation" | None, and
+        # which scenario. Reported by run-state so the pages know whose
+        # frames are on the wire.
+        self._kind = None
+        self._scenario = None
         self._lock = threading.Lock()
         self._thread = None
         self._gui = False
@@ -80,6 +92,8 @@ class SimulationSupervisor:
             "managed": True,
             "running": running,
             "can_start": not running,
+            "kind": self._kind if running else None,
+            "scenario": self._scenario,
             "gui": self._gui,
             "started_at": self._started_at,
             "ended_at": None if running else self._ended_at,
@@ -92,26 +106,68 @@ class SimulationSupervisor:
 
     # ---- control --------------------------------------------------------
 
-    def start(self, gui: bool = False) -> dict:
+    def _refuse_if_busy(self) -> None:
+        if self.is_running():
+            raise RuntimeError(
+                "An evaluation is active — stop it first."
+                if self._kind == "evaluation" else
+                "A demo run is active — stop it first."
+            )
+
+    def start(self, gui: bool = False, scenario_name=None) -> dict:
         """
-        Launch a simulation. Raises RuntimeError if one is already up -
-        the caller turns that into a 409.
+        Launch a demo simulation. `scenario_name` picks a scenario from
+        the library (performance.scenarios); None runs the production
+        route. Raises RuntimeError if anything is already up - the caller
+        turns that into a 409 - and ValueError for an unknown scenario.
         """
+        scenario = scenario_name or DEFAULT_SCENARIO
+        if not is_known_scenario(scenario):
+            raise ValueError("Unknown scenario {!r}".format(scenario))
+        sumocfg = None if scenario == DEFAULT_SCENARIO else scenario_sumocfg_path(scenario)
         with self._lock:
-            if self.is_running():
-                raise RuntimeError("A simulation is already running.")
+            self._refuse_if_busy()
 
             self.run_control.reset()
+            self._kind = "demo"
+            self._scenario = scenario
             self._gui = bool(gui)
             self._started_at = datetime.now(timezone.utc).isoformat()
             self._ended_at = None
             self._error = None
             self._thread = threading.Thread(
-                target=self._run, args=(bool(gui), None),
+                target=self._run, args=(bool(gui), None, sumocfg),
                 name="live-simulation", daemon=True,
             )
             self._thread.start()
-            logger.info("Started live simulation (gui=%s).", gui)
+            logger.info("Started live simulation (gui=%s, scenario=%s).", gui, scenario)
+            return self.status_dict()
+
+    def start_evaluation(self, scenario_name: str, baseline: str = "vac") -> dict:
+        """
+        Launch Trinetra-vs-baseline on this worker, headless, with the
+        same RunControl the top bar holds. Same refusals as start().
+        """
+        if not is_known_scenario(scenario_name) or scenario_name == DEFAULT_SCENARIO:
+            raise ValueError("Unknown scenario {!r}".format(scenario_name))
+        if baseline not in ("vac", "fixed_timer"):
+            raise ValueError("Unknown baseline {!r}".format(baseline))
+        with self._lock:
+            self._refuse_if_busy()
+
+            self.run_control.reset()
+            self._kind = "evaluation"
+            self._scenario = scenario_name
+            self._gui = False
+            self._started_at = datetime.now(timezone.utc).isoformat()
+            self._ended_at = None
+            self._error = None
+            self._thread = threading.Thread(
+                target=self._run_evaluation, args=(scenario_name, baseline),
+                name="live-evaluation", daemon=True,
+            )
+            self._thread.start()
+            logger.info("Started evaluation (scenario=%s, baseline=%s).", scenario_name, baseline)
             return self.status_dict()
 
     def open_gui(self) -> dict:
@@ -124,6 +180,8 @@ class SimulationSupervisor:
         """
         if not self.is_running():
             raise RuntimeError("No simulation is running to open a window for.")
+        if self._kind == "evaluation":
+            raise RuntimeError("Only a demo run can be opened in a SUMO window.")
         if self._gui:
             raise RuntimeError("This run already has a SUMO window.")
         path = os.path.join(tempfile.gettempdir(), "trinetra_handover_state.xml")
@@ -152,7 +210,34 @@ class SimulationSupervisor:
 
     # ---- worker ---------------------------------------------------------
 
-    def _run(self, gui: bool, load_state) -> None:
+    def _run_evaluation(self, scenario_name: str, baseline: str) -> None:
+        runner = self._evaluation_runner
+        if runner is None:
+            # Lazy for the same reason as the demo runner below.
+            from performance.evaluator import PerformanceEvaluator
+
+            def runner(store, control, scenario_name, baseline):
+                evaluator = PerformanceEvaluator(scenario_name, use_gui=False, baseline=baseline)
+                result = evaluator.run(live_store=store, control=control)
+                # Same artefact a terminal run leaves behind - but only
+                # for a run that reached its natural end. One stopped
+                # from the browser is a partial result and must never
+                # replace the completed run's CSV that README.md cites.
+                if not control.stop_requested:
+                    PerformanceEvaluator.save_csv(result)
+                else:
+                    logger.info("Evaluation stopped early; results CSV left untouched.")
+
+        try:
+            runner(self._store, self.run_control, scenario_name, baseline)
+        except BaseException as exc:  # noqa: BLE001 - reported, never swallowed
+            self._error = "{}: {}".format(type(exc).__name__, exc)
+            logger.exception("Evaluation ended with an error.")
+        finally:
+            self._ended_at = datetime.now(timezone.utc).isoformat()
+            logger.info("Evaluation thread finished.")
+
+    def _run(self, gui: bool, load_state, sumocfg=None) -> None:
         runner = self._runner
         if runner is None:
             # Imported here, not at module scope: this pulls in the
@@ -168,7 +253,8 @@ class SimulationSupervisor:
             # which is what makes it read as one continuous run.
             while True:
                 try:
-                    runner(self._store, self.run_control, gui=gui, load_state=load_state)
+                    runner(self._store, self.run_control, gui=gui, load_state=load_state,
+                           sumocfg=sumocfg)
                 except BaseException as exc:  # noqa: BLE001 - reported, never swallowed
                     # Includes SystemExit/KeyboardInterrupt deliberately:
                     # this is a worker thread, and whatever ends it must
