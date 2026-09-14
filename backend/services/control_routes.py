@@ -42,7 +42,6 @@ normal clean TraCI/SUMO shutdown rather than leaving orphaned sumo.exe
 processes behind. A hard kill() is only the last-resort fallback.
 """
 
-import glob
 import logging
 import os
 import signal
@@ -57,12 +56,12 @@ from pydantic import BaseModel
 
 from config import Config
 from performance.evaluator import BASELINE_CONTROLLERS
+from performance.scenarios import is_known_scenario, known_scenario_names
 from services.live_state import LiveStateStore
 
 logger = logging.getLogger(__name__)
 
 _BACKEND_DIR = os.path.join(Config.PROJECT_ROOT, "backend")
-_SCENARIO_DIR = os.path.join(Config.PROJECT_ROOT, "sumo", "config", "scenarios")
 
 # How long to wait for a graceful CTRL_BREAK_EVENT shutdown before
 # escalating to a hard kill. SUMO + TraCI teardown is normally
@@ -91,13 +90,6 @@ class SpeedRequest(BaseModel):
     run the scenario as fast as the machine manages.
     """
     multiplier: Optional[float] = None
-
-
-def _known_scenario_names() -> set:
-    return {
-        os.path.splitext(os.path.basename(path))[0]
-        for path in glob.glob(os.path.join(_SCENARIO_DIR, "*.sumocfg"))
-    }
 
 
 class _TrackedRun:
@@ -277,7 +269,7 @@ def build_control_router(store: LiveStateStore, run_control=None,
                 status_code=409,
                 detail="An evaluator run is already active - stop it first.",
             )
-        if body.scenario_name not in _known_scenario_names():
+        if body.scenario_name not in known_scenario_names():
             raise HTTPException(
                 status_code=400,
                 detail="Unknown scenario_name {!r} (no matching .sumocfg under "
