@@ -55,18 +55,24 @@ export function shapeOf(typeId: string | undefined): VehicleShape {
   return VEHICLE_TYPES[typeId] ?? DEFAULT_SHAPE
 }
 
-/** Plate units per network metre along an arm: the plate is 920 wide
- * for the 400 m network (plateGeometry.ts). */
-export const PLATE_UNITS_PER_METRE = 920 / 400
+import { ARM_UNITS_PER_METRE } from './plateGeometry'
+
+/** Plate units per metre ALONG AN ARM - where queues form - not the
+ * plate-wide average (920 / 400 m = 2.3), which over-drew lengths by 23 %
+ * and let a bus (10.5 m) overlap an aggressive follower parked 1.8 m
+ * behind it. See plateGeometry.ARM_UNITS_PER_METRE. */
+export const PLATE_UNITS_PER_METRE = ARM_UNITS_PER_METRE
 
 /**
  * Plate-view marker size for a type, in drawn units.
  *
- * LENGTH is true to scale: SUMO length x PLATE_UNITS_PER_METRE, so a
- * queue draws exactly as SUMO spaces it (4.5 m car + 2.5 m gap = 7 m
- * between fronts = 16.1 units). Before 2026-09-14 a car was drawn 18
- * units long - 7.8 m, longer than the 7 m SUMO actually gives it - so
- * every stopped queue overlapped by construction.
+ * LENGTH is true to the arm's scale: SUMO length x PLATE_UNITS_PER_METRE,
+ * so a queue draws exactly as SUMO spaces it (front-to-front spacing =
+ * leader length + the FOLLOWER's minGap, which vehicle_types.add.xml
+ * sets between 0.6 m for an aggressive motorcycle and 3.5 m for a truck).
+ * Before 2026-09-14 a car was drawn 18 units long - 9.6 m at this scale,
+ * longer than any spacing SUMO gives it - so every stopped queue
+ * overlapped by construction.
  *
  * WIDTH stays exaggerated: the lanes themselves are drawn ~11x wider
  * than real (36 units for 3.2 m) so twelve of them fit legibly, and a

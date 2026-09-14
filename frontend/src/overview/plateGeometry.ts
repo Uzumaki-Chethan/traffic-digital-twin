@@ -45,6 +45,16 @@ export interface LaneGeom {
 const STOP_N = BOX.y - 18 // 144
 const STOP_S = BOX.y + BOX.h + 18 // 396
 const STOP_W = BOX.x - 18 // 334
+
+/** Inbound lane length in the network (intersection.net.xml): 200 m arm
+ * minus the 21.6 m to the stop line. */
+export const ARM_METRES = 178.4
+/** Drawn units per metre ALONG AN ARM: the 178.4 m of approach are
+ * compressed into the 334 units between the plate edge and the stop
+ * line. The junction box uses a coarser scale (5 units/m) - the plate is
+ * a schematic, not a map - so anything that must line up with real
+ * spacing (vehicle lengths in a queue) uses this arm scale. */
+export const ARM_UNITS_PER_METRE = STOP_W / ARM_METRES // 1.87
 const STOP_E = BOX.x + BOX.w + 18 // 586
 export const CROSSING = 8
 
