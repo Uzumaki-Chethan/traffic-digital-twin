@@ -99,6 +99,15 @@ frontend replaced it; the dead fallback code path was cleaned up 2026-09-06).
 
 ## Key subsystems
 
+- **Traffic Adapter** (`backend/traffic_adapter/adapter.py`): the only traci caller. Since
+  2026-09-14 it reads through TraCI **subscriptions** (one message per step for the whole
+  fleet, type/class cached per vehicle) and the pipeline runs at the **1 Hz decision
+  cadence** (`TraCIManager.run(callback_interval_seconds=...)`) rather than every 0.05 s
+  step — a 9x speed-up that left training rows byte-identical. Two rules that follow:
+  anything that reads state less often than every step must call `adapter.observe_step()`
+  after EVERY step (it accumulates SUMO's last-step-only departed/arrived/stop lists), and
+  decision ticks must stay on the same simulated times (0.05, 1.05, …) or the AI's
+  decisions change. Section 28.
 - **Digital Twin** (`backend/digital_twin/`): current `SimulationState` + bounded rolling
   history. Nothing else stores its own copy of traffic state.
 - **Decision Engine** (`backend/decision_engine/decision_engine.py`): all tunables (green

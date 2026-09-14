@@ -398,7 +398,13 @@ def run_simulation(store, control=None, *, gui=None, base_config=Config,
                 "phase_history": list(phase_history),
             })
 
-        manager.run(update_twin, control=control)
+        # State is read and the pipeline run once per decision tick, not
+        # per 0.05 s step; the adapter watches every step for the event
+        # lists that would otherwise be lost (Section 28).
+        manager.run(
+            update_twin, control=control, on_step=adapter.observe_step,
+            callback_interval_seconds=Config.DECISION_INTERVAL_SECONDS,
+        )
     finally:
         # Runs whether the simulation finished normally, was interrupted,
         # or raised an exception above, so the TraCI connection and the

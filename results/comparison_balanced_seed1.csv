@@ -1,8 +1,8 @@
 metric,ai,baseline,improvement_pct
-Avg Waiting Time (s),2.8991,3.5560,18.47
-Avg Travel Time (s),48.5523,49.0810,1.08
-Worst Travel Time (s),95.2000,97.0500,1.91
-Avg Queue Length (veh),6.2766,6.5363,3.97
+Avg Waiting Time (s),3.0142,3.6646,17.75
+Avg Travel Time (s),48.5032,49.0410,1.10
+Worst Travel Time (s),95.0000,97.0000,2.06
+Avg Queue Length (veh),6.3857,6.6368,3.78
 Max Queue Length (veh),31.0000,31.0000,0.00
-Avg Speed (m/s),8.1966,8.0689,1.58
+Avg Speed (m/s),8.1818,8.0533,1.60
 Throughput (veh completed),456.0000,456.0000,0.00
