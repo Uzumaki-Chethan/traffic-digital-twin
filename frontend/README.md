@@ -21,7 +21,16 @@ colour and typography over about fifteen rounds (`docs/design/` has the brief).
   donut, phase share, green-duration histogram, speed-vs-wait scatter, peak
   windows. All derived from the live stream (`data/liveHistory.ts` →
   `analytics/series.ts`), never from the database — see below.
-- **Performance**, **Decisions** — honest placeholders.
+- **Performance** (`/performance`) — Trinetra vs VAC on the identical scenario,
+  live: two `JunctionPlate`s fed from `snapshot.ai` / `snapshot.baseline` of an
+  evaluation frame, then seven `MetricBlock`s (two-line SVG time series, both
+  current values, a verdict badge from `data/verdict.ts` — "Even" inside
+  ±0.5 %). History accumulates in `data/evalHistory.ts`, the sibling of
+  `liveHistory.ts`; the verdicts lock when `comparison.final` arrives.
+- **Simulation Settings** (`/settings`) — scenario cards for the demo and for the
+  evaluation (`data/scenarios.ts` holds the plain-language names; ids never
+  render), selection kept in `localStorage` via `data/settings.ts`.
+- **Decisions** — honest placeholder.
 - App shell: status bar (sim clock, run controls, link state with staleness,
   emergency slot), nav rail, footer.
 

@@ -2618,3 +2618,147 @@ Section 22.3, a literal "every seed of every scenario" guarantee is not claimed.
   runs made today.
 - The model file grew from 388 MB to 654 MB (75 % more rows, deeper trees). It is tracked
   through Git LFS (`.gitattributes`), as before.
+
+---
+
+## SECTION 27 — The Performance page, Simulation Settings, and honest vehicles (CURRENT STATE)
+
+Dated 2026-09-14. Two new pages, one evaluator that now runs under the console, and three
+rendering defects the user reported the moment they saw the 3D view up close. The written
+design is `docs/superpowers/specs/2026-09-14-performance-and-settings-design.md`; the plan
+it was built from is beside it under `docs/superpowers/plans/`.
+
+### 27.1 What the user asked for
+
+Two side-by-side windows — Trinetra and VAC — like the digital twin on Overview, and below
+them every evaluation metric with a graph and "who is winning"; plus a Simulation Settings
+page with scenario cards for the demo and for the evaluation, so that "if the user just
+wants to see how the extreme scenario would be, he does that; when he wants to see how our
+system behaves at extreme traffic in comparison with VAC, he sees that too". Decisions taken
+in the design conversation, in the order they were asked: two live junction plates (plan
+view only); the same Pause/Play/Stop/speed bar as Overview; time series with a running
+verdict; thirteen cards, seed 1 fixed, the production route as a fourteenth "Everyday
+junction traffic" card for the demo; one run at a time.
+
+### 27.2 The evaluation runs on the console's own worker thread
+
+The evaluator was a batch job — `python -m performance.evaluator` from a terminal, or a
+child process the console launched and talked to over HTTP (Section 18). Neither could be
+paused, and neither drew anything: the live feed carried one side's summary numbers and no
+vehicles. Three approaches were weighed; the one taken is the one Section 23.2 already
+argued for the demo run: **in-process, on the supervisor's single worker slot**.
+`SimulationSupervisor.start_evaluation(scenario_name, baseline)` hands
+`PerformanceEvaluator.run(live_store, control)` the very `RunControl` the pause/speed/stop
+endpoints hold and the very `LiveStateStore` the WebSocket serves. Pause is instant, there
+is no cross-process state, and the top bar needed no second set of buttons.
+
+What the evaluator gained is additive and gated on `control` being passed, so the batch
+paths (the CSV sweep, `performance.evaluate`, the terminal) are byte-for-byte unchanged —
+verified by re-running `light_seed1` and diffing its CSV against the sweep's. Each lockstep
+iteration now calls `lockstep_gate(control)` (block while paused; break on stop) and
+`pace_after_step(control, step_seconds)` after stepping both SUMOs. The live payload is
+built by `services/snapshot_views.py`, a new module holding the demo run's own view
+builders (`signal_view`, `lanes_view`, `vehicles_view`, `decision_view`, `side_view`),
+moved out of `simulation_runner.py` so both publishers share one implementation — which is
+what lets a `JunctionPlate` be fed `snapshot.ai` or `snapshot.baseline` unchanged. The last
+publish carries `comparison.final = true` so the page can lock its verdicts. A run that
+reaches its natural end writes `results/comparison_<scenario>.csv` exactly as a terminal run
+does; one stopped from the browser does not — the first end-to-end pass overwrote the
+sweep's full-run `extreme` CSV with a 213 s partial before that guard existed.
+
+Scenario ids became a registry (`performance/scenarios.py`): one `known_scenario_names()`
+every start route validates against, one `scenario_sumocfg_path()`, and `"default"` for
+the production route. `start-simulation` gained `scenario_name`; `resolve_config()` gained a
+`sumocfg` override on the same throwaway-subclass mechanism it uses for `gui`, so a chosen
+scenario never leaks into the process-wide `Config`. `run-state` reports `kind`
+(`demo | evaluation | null`) and `scenario`; a second start of either kind while anything
+runs is a 409 whose detail is a sentence the UI shows verbatim ("A demo run is active —
+stop it first."). Opening a SUMO window is refused for an evaluation. FastAPI's TestClient
+now covers these routes (`tests/test_control_routes.py`; `httpx` added to
+`requirements.txt` for it).
+
+One older gap surfaced on the first Playwright pass and was fixed alongside: the dashboard
+served `dist/` but had no SPA fallback, so a deep link or a reload on `/analytics` was a
+404. `create_app()` now serves `index.html` for any non-API path.
+
+### 27.3 The frontend
+
+- **One WebSocket, one shape, plus `kind`.** A demo frame is today's `LiveSnapshot` with
+  `kind: "demo"`; an evaluation frame is `{kind, sim_time, scenario, baseline_controller,
+  ai, baseline, comparison}` with each side a `SideView` (signal, metrics, lanes, vehicles,
+  decision, phase history) and no `prediction`. `isLive()` was narrowed so nothing that
+  reads demo frames sees an evaluation by accident; `isEvaluation()` is the new guard.
+- **Simulation Settings** (`/settings`): two `Panel`s of `ScenarioCard`s. The card table
+  (`data/scenarios.ts`) is where "rush_hour_seed1" becomes "Rush hour — demand ramps up,
+  peaks, then eases"; the id travels only in the start request. Selection lives in
+  `localStorage` (`data/settings.ts`) and applies the next time that page's Start is
+  pressed; while a run of that kind is up, the section says "Stop the current run to
+  change" and its cards are inert.
+- **Performance** (`/performance`): two `ControllerWindow`s (each a `TwinViewport` with
+  `allow3d={false}`), a summary line ("Trinetra ahead or even on 7 of 7 metrics"), then
+  seven `MetricBlock`s from an `evalHistory` accumulator built like `liveHistory` — one
+  sample per evaluation tick, a once-a-second revision gate. The verdict rule
+  (`data/verdict.ts`) calls anything inside ±0.5 % *Even*, so the single-instant extremes
+  and throughput do not get dressed up as wins. Both pure modules have Vitest tests — the
+  first frontend unit tests in the project; nothing else is rendered in tests, the UI is
+  verified live.
+- **The top bar** starts an evaluation when the route is `/performance` and a demo
+  elsewhere; the SUMO-window buttons are hidden for evaluations. Overview shows "An
+  evaluation is running — watch it on Performance" in place of its junction when the
+  frames on the wire are an evaluation, and carries a scenario chip that links to Settings.
+- The store's tick bookkeeping (measured rate, interpolation window, clock) now runs for
+  either kind of frame; `lastLive` stays demo-only, since it is Overview's "keep the last
+  picture" fallback.
+
+### 27.4 Vehicles, honestly drawn
+
+Three defects, all real, all reported by the user from the 3D view and a stopped queue:
+
+- **Plan-view vehicles overlapped in a queue.** A measurement error, not a rendering one: a
+  car was drawn 18 units long = 7.8 m, but SUMO parks stopped cars 7 m apart (4.5 m body +
+  2.5 m gap), so a drawn car was longer than the space it occupies and a queue *had* to
+  overlap. Lengths are now true to scale (`PLATE_UNITS_PER_METRE = 920/400`: car 10.4,
+  motorcycle 4.6, auto 6.0, bus 24.2, truck 18.4 units); widths keep the lane-width
+  exaggeration but were narrowed (car 7, bike 4, auto 6, bus/truck 9) so a true-length car
+  does not read as a square. Verified: 5.7 units of clear gap between stopped cars, and a
+  close-up screenshot of a queue.
+- **3D motorcycles looked like small cars, autos could not be seen.** Every non-slab type
+  was one box at its SUMO dimensions with a lowered body — a 2.0 × 0.7 m box is a shrunken
+  car. `Junction3D` now builds a motorcycle from a narrow frame, tank, two wheels, a rider
+  and a helmet, and an auto-rickshaw from a short tall cab, a nose, three wheels, a canopy
+  and a windscreen — at true SUMO dimensions, in the vType's colour, with the part
+  geometries cached per type like the car bodies. Verified by close-up screenshot.
+- **Lane ids on screen.** `N_in_0` and friends were painted on the plate and led every lane
+  table. They are SUMO's names; the user's rule is "explain it or cut it". Every lane is
+  now "North · Left" (`utils/signal.laneLabel`), the tables have one Lane column, and the
+  N/S plate labels stack as a three-line legend per arm (which also removed the
+  overlapping-labels defect from the 2026-09-13 visual check; the arrows moved 22 units
+  inward to make room). The plate labels use Barlow, not the mono face: the vendored
+  JetBrains Mono subset has no middle dot, which the first pass rendered as a box. They
+  carry a road-coloured halo so vehicles spawning under them at the arm ends never merge
+  with the text.
+
+### 27.5 Verified, and what it cost to run
+
+The end-to-end pass, on the console with the built frontend: Settings → Extreme for
+Performance (stored) → Performance → Start → both plates animating, seven blocks filling,
+the clock running → Pause (simulated time frozen after the in-flight tick) → Resume → Stop →
+`comparison.final = true`, seven "· final" badges, the summary line; then Settings → Rush
+hour for Overview → Overview → Start → chip reads "Rush hour" and `run-state.scenario` is
+`rush_hour_seed1`. Zero console errors throughout.
+
+One honest number: with two SUMO instances of the **extreme** scenario, two feature
+pipelines and the forest, this laptop runs the evaluation at **0.9× real time
+unthrottled** — the speed control is applied (it can only slow, never accelerate a
+CPU-bound loop), and lighter scenarios reach 5× with room to spare (`light` runs at ~7×
+flat out). The bar shows the measured rate ("×0.9 real time") rather than the requested
+one, so this is visible rather than surprising.
+
+**Tests:** backend 94/94 (new: `test_scenarios`, `test_snapshot_views`,
+`test_evaluation_gate`, `test_control_routes`, supervisor cases); frontend Vitest 7/7;
+`tsc`, lint and build clean.
+
+**Still open:** the Decisions page (placeholder); the three cosmetic items from
+Section 26's visual check that were outside this work (the 3D zoom is orbit-centred, the
+idle "Green held 3s", Analytics peak windows on short runs); and the auto-rickshaw could
+still read more clearly as a three-wheeler from some angles.

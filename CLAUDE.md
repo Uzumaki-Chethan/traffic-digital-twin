@@ -195,6 +195,18 @@ frontend replaced it; the dead fallback code path was cleaned up 2026-09-06).
   `RemoteLiveStatePublisher`, non-blocking/threaded so a slow network call can never stall
   the simulation loop). This exists specifically so a demo needs no terminal command beyond
   `python server.py` itself — which since 2026-09-12 includes starting the live simulation.
+  **Since 2026-09-14 the console runs evaluations in-process too:** `POST
+  /api/control/start-evaluation {scenario_name, baseline}` hands `PerformanceEvaluator.run()`
+  to the supervisor's single worker thread with the SAME `RunControl` and `LiveStateStore`
+  as a demo run (Section 27) — so the top bar's pause/stop/speed drive it and no IPC
+  exists. `start-simulation` gained `scenario_name`; `run-state` reports `kind`
+  (`demo | evaluation | null`) and `scenario`; starting either kind while anything runs is a
+  409 with a plain sentence. Scenario ids are validated in ONE place,
+  `performance/scenarios.py`, by every start route. The child-process `start-evaluator`
+  route still exists for terminal/`app.py` use; the console UI no longer calls it. The
+  WebSocket carries one shape with `kind`: an evaluation frame has `ai` and `baseline`
+  sides built by the same `services/snapshot_views.py` builders the demo uses (and no
+  `prediction`).
 - **Performance Evaluation** (`backend/performance/`): `evaluator.py` runs two PARALLEL,
   lockstep-synchronized SUMO instances (separate TraCI connections, labeled `"ai"`/
   `"baseline"`) of the identical scenario for a fair comparison; `baseline_controllers.py`
@@ -264,8 +276,10 @@ unprompted, but do keep this section current if that changes:
   was emptied on 2026-09-08. On 2026-09-11 the user supplied a Stitch (Google) export whose
   **layout** they approved (colours not) and the palette has since been iterated to the
   user's own choices: red rail, traffic-yellow ground (`#F4B31D`), pale-green cards, real
-  signal-colour lamps, Orbitron/Barlow/JetBrains Mono. Overview and Analytics are built;
-  Performance and Decisions are still honest placeholders. The design contract is
+  signal-colour lamps, Orbitron/Barlow/JetBrains Mono. Overview, Analytics, Performance
+  (two live junctions + seven metric verdicts) and Simulation Settings (scenario cards) are
+  built; Decisions is still an honest placeholder. Lane ids (`N_in_0`) no longer render
+  anywhere — every lane is "North · Left" (`utils/signal.laneLabel`). The design contract is
   `docs/design/TRINETRA_UI_DESIGN_BRIEF.md` (its reference-kit process was dropped by the
   user; its data rules, banned-defaults list and page plan still apply). Two standing rules
   from the user: **never show prediction confidence anywhere in the UI**, and do NOT

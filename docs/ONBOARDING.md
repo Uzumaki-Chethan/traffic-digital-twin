@@ -69,8 +69,10 @@ python server.py                    # http://127.0.0.1:8000
 
 Open that URL, press **Start** in the top bar, and you have a live
 simulation drawn in the browser (Plan and 3D views, Analytics page). Stop
-it from the same bar. `python app.py` is the older one-run alternative
-(opens sumo-gui directly).
+it from the same bar. **Simulation Settings** picks the scenario for the
+Overview demo and for the Performance page; **Performance** runs Trinetra
+against vehicle-actuated control side by side with a verdict per metric.
+`python app.py` is the older one-run alternative (opens sumo-gui directly).
 
 `server.py` serves whatever is in `frontend/dist` (built in step 1). While
 you change anything under `frontend/src`:

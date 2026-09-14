@@ -50,7 +50,7 @@ always-on console) both just call it.
 | Final optimization + demo polish | ⬜ |
 
 Full engineering context and history: see `PROJECT_ARCHITECTURE_REPORT.md`
-(read the highest-numbered `SECTION N ... (CURRENT STATE)` first — Section 26
+(read the highest-numbered `SECTION N ... (CURRENT STATE)` first — Section 27
 as of 2026-09-13).
 
 ---
@@ -204,7 +204,7 @@ confirmation window, a round-robin tie-break) is recorded in Section 26.4b with 
 http://127.0.0.1:8000. `python app.py` serves the same UI from inside
 the simulation process.
 
-Two pages are built:
+Four pages are built:
 
 - **Overview** — the junction itself, in a to-scale plan view or an
   interactive 3D miniature (drag to orbit, scroll to zoom), both drawing
@@ -220,7 +220,23 @@ Two pages are built:
   when there is not (with a Start button). The database is still being
   written throughout; it is just not what this page reads.
 
-**Performance** and **Decisions** are honest placeholders for now.
+- **Performance** — Trinetra against vehicle-actuated control on the
+  *identical* scenario, live: two junctions side by side, each driven by
+  its own simulation in lockstep, and below them one block per evaluation
+  metric — a line of each controller over simulated time, both current
+  values, and a verdict ("Trinetra ahead 62 %", "Even", "VAC ahead 3 %")
+  that reads "so far" while running and "final" when the run ends. The
+  same Pause / Stop / speed bar drives it. An evaluation that runs to its
+  end also writes `results/comparison_<scenario>.csv`, exactly as a
+  terminal run does; one stopped early does not.
+- **Simulation Settings** — which scenario Overview runs and which one
+  Performance runs, as cards with plain-language names ("Rush hour",
+  "Stalled truck on East") and one-line descriptions. The choice persists
+  in the browser and applies the next time that page's Start is pressed.
+  The console runs one thing at a time: starting an evaluation while a
+  demo is up (or the reverse) is refused with a sentence saying so.
+
+**Decisions** is the one remaining placeholder.
 
 For the AI-vs-baseline comparison panel during evaluation runs:
 
