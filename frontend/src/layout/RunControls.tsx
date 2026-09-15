@@ -6,6 +6,7 @@ import { useLocation } from 'react-router-dom'
 import { runControl, useRunStore } from '@/data/runState'
 import { useSettings } from '@/data/settings'
 import { scenarioName } from '@/data/scenarios'
+import { DUR, EASE_OUT } from '@/ui/motion'
 
 /**
  * Start / pause / stop / speed for the simulation, in the top bar, wired
@@ -101,7 +102,7 @@ export function RunControls() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: DUR.tick, ease: EASE_OUT }}
           >
             <Button
               onClick={() => void (state.paused ? runControl.resume() : runControl.pause())}
@@ -174,7 +175,7 @@ function SpeedControl({ speed, disabled }: { speed: number | null; disabled?: bo
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: DUR.tick, ease: EASE_OUT }}
             className="absolute right-0 top-full z-20 mt-1.5 flex items-center gap-2 rounded-control border border-rule bg-plate px-3 py-2 shadow-[var(--shadow-panel)]"
           >
             <span className="num text-[11px] text-ink-mute">0.25×</span>

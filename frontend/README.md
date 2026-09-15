@@ -54,6 +54,29 @@ The database is still written exactly as before. It is the audit trail and the
 source of the report's figures; the Performance and Decisions pages will read it.
 See `PROJECT_ARCHITECTURE_REPORT.md` Section 23.4 before changing this back.
 
+## Motion
+
+One vocabulary, in `src/ui/motion.ts`, in step with the `--dur-*` / `--ease-*` tokens in
+`src/styles/tokens.css` - change them together. Duration follows distance (`tick` 120ms
+for a state flip, `phase` 900ms for the signal choreography); exits run at 65% of their
+enter. It is spent in four places, in priority order:
+
+1. **The release** - on the confirmed green, light runs once along the painted arrow in
+   the direction of travel and a ring blooms out of the green lens. Triggered by
+   `utils/signal.phaseKey()`, a *derived* key (the simulated second the phase began), so
+   there is no previous-state tracking and the Performance page's two plates cannot
+   trigger each other.
+2. **Data in motion** - numbers and bars tween over `--dur-value`; the clocks are
+   extrapolated against `performance.now()` between packets.
+3. **An answer to every pointer** - sliding nav indicator, `.grow-rule` hairlines, accent
+   bars that scale from the leading edge, 0.97 press scales.
+4. **Arrival, once per page** - `Reveal`, 14px over 420ms, 70ms apart, on mount only.
+
+Still banned: anything looping in the periphery (the amber lamp excepted), glow pulses,
+spinners past 300ms, and any code whose correctness depends on an animation finishing.
+Everything honours `prefers-reduced-motion`. See `PROJECT_ARCHITECTURE_REPORT.md`
+Section 29 and section 5.4 of the design brief.
+
 ## Things verified against source, not assumed
 
 - Junction geometry: `sumo/network/intersection.net.xml` has `lefthand="true"`;

@@ -300,7 +300,15 @@ unprompted, but do keep this section current if that changes:
   true scale (`overview/plateGeometry.ts` is in metres, transcribed from the net file;
   vehicles at their vType length × width; sumo-gui-style zoom with 1× = whole network) —
   the user asked for it after the schematic's exaggerated lane widths made heavy traffic
-  look light. Keep the drafting look; do not go back to a schematic scale (Section 28.5). Analytics reads the LIVE stream only, by
+  look light. Keep the drafting look; do not go back to a schematic scale (Section 28.5).
+  **Motion has one vocabulary (2026-09-15, Section 29):** `src/ui/motion.ts` plus the
+  `--dur-*`/`--ease-*` tokens, spent on the signal release (the arrow sweep and lamp bloom
+  on a confirmed green, triggered by the derived `utils/signal.phaseKey`), data tweens,
+  pointer answers, and a once-per-page arrival. The design brief's blanket motion ban was
+  lifted BY THE USER and the brief amended to match - read its status header before
+  treating any of it as binding, because several parts are superseded by his later
+  choices. Still banned: looping in the periphery, glow pulses, and depending on an
+  animation finishing for correctness. Analytics reads the LIVE stream only, by
   explicit instruction — see PROJECT_ARCHITECTURE_REPORT.md Section 23.4 before pointing it
   back at the database. See `frontend/README.md` for what's verified vs. still open (logo
   asset lost, no visual verification in the build environment).

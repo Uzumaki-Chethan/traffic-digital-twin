@@ -25,9 +25,9 @@ export function Panel({
       className={clsx('flex min-h-0 flex-col overflow-hidden rounded-panel border border-rule bg-plate', className)}
       style={{ boxShadow: 'var(--shadow-panel)' }}
     >
-      <header className="flex h-9 shrink-0 items-center justify-between px-3.5 pt-1">
+      <header className="flex h-9 shrink-0 items-center justify-between gap-2 px-3.5 pt-1">
         <h2 className="panel-title">{title}</h2>
-        {meta && <div className="num text-[12px] text-ink-mute">{meta}</div>}
+        {meta && <div className="num min-w-0 text-right text-[12px] text-ink-mute">{meta}</div>}
       </header>
       <div className={clsx('min-h-0 flex-1', bodyClassName ?? 'px-3.5 pb-3.5 pt-1')}>{children}</div>
     </section>

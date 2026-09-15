@@ -2,7 +2,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import clsx from 'clsx'
 import { Check } from 'lucide-react'
 import { DEMAND_LABEL, type ScenarioInfo } from '@/data/scenarios'
-import { DUR, EASE_OUT, EASE_SPRING } from '@/ui/motion'
+import { DUR, EASE_OUT, EASE_SPRING, STAGGER, enter } from '@/ui/motion'
 
 /**
  * One scenario, as a card to pick: its name, one line on what happens,
@@ -21,11 +21,15 @@ export function ScenarioCard({
   selected,
   disabled,
   onSelect,
+  index = 0,
 }: {
   scenario: ScenarioInfo
   selected: boolean
   disabled: boolean
   onSelect: () => void
+  /** Place in the grid, so the cards arrive as a staircase rather than
+   * a slab. Capped in motion.ts so card thirteen is not left waiting. */
+  index?: number
 }) {
   const reduced = useReducedMotion()
   return (
@@ -34,9 +38,11 @@ export function ScenarioCard({
       onClick={onSelect}
       disabled={disabled}
       aria-pressed={selected}
+      initial={reduced ? false : { opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
       whileHover={reduced || disabled ? undefined : { y: -2 }}
       whileTap={reduced || disabled ? undefined : { scale: 0.985, y: 0 }}
-      transition={{ duration: DUR.fast, ease: EASE_SPRING }}
+      transition={{ ...enter, delay: Math.min(index * STAGGER * 0.45, 0.45) }}
       className={clsx(
         'group relative flex min-h-[96px] flex-col gap-1.5 overflow-hidden rounded-control border-2 px-3 py-2.5 text-left transition-colors',
         selected ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : 'border-rule bg-plate hover:border-[var(--rule-strong)]',

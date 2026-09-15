@@ -2893,3 +2893,99 @@ fit"* — and keep the look. So:
   baseline are always framed identically — a comparison at two zooms is not a comparison.
 - Verified in the browser on `extreme_seed1`: queues now read as queues, in Overview and in
   both Performance windows.
+
+---
+
+## SECTION 29 - The interface learns a motion vocabulary (CURRENT STATE)
+
+Dated 2026-09-15. Chethan's report: *"you havent even used the ui ux pro max skills and
+the framer motions and all, because i cannot see them anywhere on the screen, and you are
+not doing a good job in the ui styling"* - set against a portfolio page he had liked and
+still had deployed.
+
+### 29.1 What the comparison actually showed
+
+The portfolio was read rather than admired: 416 lines of CSS, **two** keyframes (`blink`,
+`fadeUp`) and 17 transitions. Nothing in it is expensive. What made it read as designed
+was four habits:
+
+1. **Everything answers the pointer** - a nav underline growing 0 -> 100%, a card lifting
+   4px and warming its border, an accent bar scaling in from the left, a link widening its
+   own gap.
+2. **An arrival staircase** - `fadeUp` at 0 / 0.1 / 0.2 / 0.3 / 0.5s, not a fade.
+3. **Constant background texture** - a fixed 60px grid at 3% over the whole page.
+4. **Micro-label typography** - uppercase captions at 0.12-0.18em, a marker before every
+   heading.
+
+Trinetra had framer-motion in eight files and spent it on a 34ms page fade nobody could
+perceive, a number tween and a bar growth. Everything else answered with
+`transition-colors` or nothing; `MetricBlock` had no transition at all.
+
+### 29.2 The conflict, and who resolved it
+
+`docs/design/TRINETRA_UI_DESIGN_BRIEF.md` section 5.4 banned all four habits by name -
+*"peripheral motion on an operations screen is a defect, not a flourish"* - and spent the
+whole motion budget on a phase-transition choreography whose step 3 (**the release**: lamp
+bloom, lane saturation, one sweep of the painted arrow) had never been implemented.
+
+That conflict was put to Chethan rather than resolved unilaterally, and he chose to relax
+the bans. The brief was then **amended, not ignored**: 5.4 is rewritten around the four
+places motion is now spent, section 12's overruled items are struck with the reason, and a
+status header records every part of the brief that later decisions have superseded (IBM
+Plex, the asphalt palette, the reference-kit process, the middle-dot ban that
+`North - Left` overrules). What stayed banned: looping in the periphery, glow pulses,
+spinners past 300ms, motion that gates information, and any code that depends on an
+animation finishing.
+
+### 29.3 What was built
+
+**One rhythm.** `frontend/src/ui/motion.ts` is the single source for duration and easing,
+in step with the `--dur-*` / `--ease-*` tokens. Duration follows distance (`tick` 120ms ->
+`phase` 900ms); exits run at 65% of their enter.
+
+**The release.** On the confirmed green, light runs once along the painted arrow in the
+direction of travel - drawn as the path's own `pathLength`, so it follows a turn instead
+of cutting across it - and a ring blooms out of the green lens. The trigger is
+`utils/signal.phaseKey(simTime, heldSeconds)`: the simulated second the phase began,
+constant through a green and changing exactly once on the switch. That is a **derived**
+key, so there is no previous-state tracking, no effect, and no cache to get out of step
+between the Performance page's two simultaneous plates - and a switch arriving mid-sweep
+replaces the element rather than waiting for it. Measured in the browser on a live run:
+six separate sweeps in 30s, each peaking at 0.95 opacity and fading to nothing.
+
+**Answers.** The nav rail's active pill slides between destinations on a shared
+`layoutId`; scenario cards lift 2px under the pointer, press to 0.985 and draw an accent
+bar from the leading edge when chosen; lane rows grow a 3px accent marker; every control
+has press feedback.
+
+**Arrival.** `Reveal` now travels 14px over 420ms at 70ms apart (was 10px / 340ms / 55ms,
+which measured as present and read as nothing). Scenario cards carry their own grid index,
+so thirteen cards arrive as a staircase.
+
+**Surface.** A drafting grid (40px minor, 200px major) sits under the page as a fixed
+background on the scroll region - `background-attachment: fixed` anchors it to the
+viewport but clips it to that box, which a fixed-position pseudo-element did not: the
+first attempt painted over the status bar and the footer. Panel titles gained a leading
+accent tick, and `.eyebrow` is now a real typographic role.
+
+### 29.4 Defects found by looking at the screen
+
+Four, all fixed, none of them about motion:
+
+- **Plate lane names collided** with the traffic and with each other - three 11px labels
+  on lanes 9px apart. They now sit on the verge outside the carriageway, staggered
+  26 / 52 / 78m back, and appear only once an approach is zoomed in far enough to earn
+  them (`MIN_LABEL_LANE_PX`).
+- **The junction framing had no orientation label at all**: approach names were pinned to
+  the ends of the arms, which are off screen at the default view. They now pin to the
+  edges of the current window, like the compass.
+- **Metric panel headers wrapped to two lines** because the verdict badge read "Trinetra
+  ahead 21.8 % - so far". `Verdict` gained a `short` form ("Trinetra +21.8%"); "so far /
+  final" moved to the footer where there is room.
+- **A badge that was usually invisible.** `AnimatePresence mode="wait"` was keyed on the
+  badge's text, so it re-ran the crossfade every tick as the percentage moved a decimal
+  and spent most of its life mid-exit. It is keyed on the leader now; the figure updates
+  in place.
+
+Verified: 94 backend tests, 8 Vitest (two new, pinning the badge's length), `tsc -b`,
+oxlint clean, and a live `balanced_seed1` demo plus a VAC evaluation driven in the browser.

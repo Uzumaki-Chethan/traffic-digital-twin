@@ -83,17 +83,25 @@ export function MetricBlock({
     <Panel
       title={title}
       meta={
+        /* Keyed on WHO is ahead, not on the number. Keying it on the text
+           re-ran the crossfade every tick as the percentage moved a
+           decimal, and with mode="wait" the badge spent most of its life
+           mid-exit — it read as missing. The figure inside updates in
+           place; only a change of leader is worth animating. */
         <AnimatePresence mode="wait" initial={false}>
           <motion.span
-            key={`${verdict.side}-${verdict.label}-${final}`}
+            key={verdict.side}
             initial={reduced ? false : { opacity: 0, y: 3 }}
             animate={{ opacity: 1, y: 0 }}
             exit={reduced ? undefined : { opacity: 0, y: -3 }}
             transition={{ duration: DUR.fast, ease: EASE_OUT }}
-            className={clsx('inline-block rounded-full border px-2 py-0.5 text-[11.5px] font-medium', badgeTone)}
+            className={clsx(
+              'inline-block whitespace-nowrap rounded-full border px-2 py-0.5 text-[11.5px] font-medium',
+              badgeTone,
+            )}
             aria-label={`${title}: ${verdict.label}, ${final ? 'final' : 'so far'}`}
           >
-            {verdict.label} · {final ? 'final' : 'so far'}
+            {verdict.short}
           </motion.span>
         </AnimatePresence>
       }
@@ -146,16 +154,21 @@ export function MetricBlock({
       ) : (
         <div className="py-4 text-center text-[12.5px] text-ink-mute">Waiting for a second tick.</div>
       )}
-      <div className="mt-1 flex justify-between text-[11.5px] text-ink-mute">
-        <span className="num">{Math.round(t0)}s</span>
-        <span>
+      {/* Whether these are running totals or the settled result belongs
+          here rather than in the badge, which has to stay short enough to
+          sit beside the title on one line. */}
+      <div className="mt-1 flex items-baseline justify-between gap-2 text-[11.5px] text-ink-mute">
+        <span className="num shrink-0">{Math.round(t0)}s</span>
+        <span className="min-w-0 text-center">
           {tied
             ? final
-              ? 'equal by construction — both controllers served the same vehicles'
-              : 'trips completed so far — equal once both finish, since they serve the same vehicles'
-            : 'simulated time · running totals'}
+              ? 'equal by construction — both served the same vehicles'
+              : 'trips completed so far — equal once both finish'
+            : final
+              ? 'simulated time · final'
+              : 'simulated time · running totals'}
         </span>
-        <span className="num">{Math.round(t1)}s</span>
+        <span className="num shrink-0">{Math.round(t1)}s</span>
       </div>
     </Panel>
   )

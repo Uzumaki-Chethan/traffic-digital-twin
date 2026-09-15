@@ -39,10 +39,13 @@ export function LaneTable({ lanes, powered }: { lanes: LaneView[]; powered: bool
                 onMouseEnter={() => setHoverLane(id)}
                 onMouseLeave={() => setHoverLane(null)}
                 className={clsx(
-                  'h-7 border-t border-rule-soft transition-colors duration-150',
+                  'h-7 border-t border-rule-soft transition-[background-color,box-shadow] duration-150',
                   active && 'bg-hover',
                 )}
-                style={active ? { boxShadow: 'inset 2px 0 0 var(--accent)' } : undefined}
+                style={{
+                  boxShadow: active ? 'inset 3px 0 0 var(--accent)' : 'inset 0 0 0 var(--accent)',
+                  transitionTimingFunction: 'var(--ease-out)',
+                }}
               >
                 <td className="px-2 font-medium text-ink-strong">{laneLabel(id)}</td>
                 <td className="px-2">

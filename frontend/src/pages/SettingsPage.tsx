@@ -39,10 +39,11 @@ export function SettingsPage() {
             when you press Start — one controller, Trinetra, watched live.
           </p>
           <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
-            {DEMO_SCENARIOS.map((s) => (
+            {DEMO_SCENARIOS.map((s, i) => (
               <ScenarioCard
                 key={s.id}
                 scenario={s}
+                index={i}
                 selected={s.id === demoScenario}
                 disabled={demoLocked}
                 onSelect={() => setDemo(s.id)}
@@ -67,10 +68,11 @@ export function SettingsPage() {
             the same scenario twice, side by side — Trinetra on one, vehicle-actuated control on the other — scored on seven metrics.
           </p>
           <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
-            {EVAL_SCENARIOS.map((s) => (
+            {EVAL_SCENARIOS.map((s, i) => (
               <ScenarioCard
                 key={s.id}
                 scenario={s}
+                index={i}
                 selected={s.id === evalScenario}
                 disabled={evalLocked}
                 onSelect={() => setEval(s.id)}
