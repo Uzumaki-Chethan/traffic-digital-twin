@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 import type { LaneView, VehicleView } from '@/data/types'
 import { useSim } from '@/data/store'
 import { lampOf, lampLit, lampColor, isPermissive, laneLabel } from '@/utils/signal'
@@ -13,7 +14,6 @@ import {
   LANES,
   NET,
   ROAD_HALF,
-  approachLabelPoint,
   arrowPath,
   junctionOutline,
   laneTransform,
@@ -22,6 +22,7 @@ import {
 } from './plateGeometry'
 import { placeVehicles, type Placed } from './vehiclePlacement'
 import { shapeOf } from './vehicleTypes'
+import { DUR, EASE_OUT } from '@/ui/motion'
 
 interface Props {
   lanes: LaneView[]
@@ -36,14 +37,25 @@ interface Props {
    * Labels, signal heads and the north arrow are drawn at a constant
    * pixel size. */
   pxPerMetre: number
+  /** Identity of the phase being served (utils/signal.phaseKey). When it
+   * changes, the release plays once on the lanes that just went green. */
+  releaseKey?: number
 }
 
 /** The stop line is the junction edge; the crossing band lies just inside it. */
 const CROSSING_IN = 0.6
 const CROSSING_W = 3
 
-/** Per-lane labels and heads need a lane at least this wide on screen. */
+/** Fixed order, so the four names are never re-keyed by object iteration. */
+const APPROACH_ORDER: Arm[] = ['N', 'S', 'W', 'E']
+
+/** A signal head needs its lane about this wide on screen to be worth drawing. */
 const MIN_LANE_PX = 8
+/** A lane NAME needs far more room than a head: it is 11px of text laid
+ * along a lane that also carries traffic, so it only appears once the
+ * viewer has zoomed into an approach. At the default framing the four
+ * approach names carry the orientation instead. */
+const MIN_LABEL_LANE_PX = 26
 
 /**
  * The hero. A top-down map of junction C at true scale — one SVG unit is
@@ -54,7 +66,15 @@ const MIN_LANE_PX = 8
  * its real length and width, so a queue looks exactly as it does in
  * sumo-gui. One channel per variable.
  */
-export function JunctionPlate({ lanes, emergencyLanes, vehicles, powered, viewBox, pxPerMetre }: Props) {
+export function JunctionPlate({
+  lanes,
+  emergencyLanes,
+  vehicles,
+  powered,
+  viewBox,
+  pxPerMetre,
+  releaseKey = 0,
+}: Props) {
   const placed: Placed[] = useMemo(
     () => (powered && vehicles ? placeVehicles(vehicles) : []),
     [vehicles, powered],
@@ -67,9 +87,14 @@ export function JunctionPlate({ lanes, emergencyLanes, vehicles, powered, viewBo
   const tickInterval = useSim((s) => s.tickInterval)
   const byId = useMemo(() => Object.fromEntries(lanes.map((l) => [l.lane_id, l])), [lanes])
   const emergency = useMemo(() => new Set(emergencyLanes), [emergencyLanes])
+  const reduced = useReducedMotion()
+  // The release plays while the phase is young, keyed on the phase's own
+  // identity so it runs once per switch (see utils/signal.phaseKey).
+  const release = powered && !reduced ? releaseKey : 0
   // Screen-space scale: inside a group scaled by this, one unit is one pixel.
   const px = 1 / Math.max(pxPerMetre, 1e-6)
   const laneDetail = LANE_W * pxPerMetre >= MIN_LANE_PX
+  const laneNames = LANE_W * pxPerMetre >= MIN_LABEL_LANE_PX
 
   const vb = useMemo(() => {
     const [x, y, w, h] = viewBox.split(' ').map(Number)
@@ -174,32 +199,68 @@ export function JunctionPlate({ lanes, emergencyLanes, vehicles, powered, viewBo
         ))}
       </g>
 
-      {/* lane names, painted on the road under the traffic like sumo-gui's
-          lane ids, only once a lane is wide enough on screen to carry one.
-          Barlow, not the mono face: the vendored JetBrains Mono subset has
-          no middle dot, and "North · Left" is words now, not a code. */}
-      {laneDetail && (
+      {/* THE RELEASE. On the confirmed green, light runs once along the
+          painted arrow in the direction of travel — drawn as the path's
+          own length, so it tracks the turn instead of crossing it. This
+          is the one choreographed moment in the product: it says "this
+          movement has just been given the junction", which is the single
+          thing the whole system exists to decide. It does not loop, and a
+          switch arriving mid-sweep replaces the element rather than
+          waiting for it. */}
+      {release !== 0 && (
+        <g fill="none" strokeLinecap="round">
+          {LANES.map((g) => {
+            const lane = byId[g.id]
+            if (!lane || lampOf(lane.signal) !== 'green') return null
+            return (
+              <motion.path
+                key={`${g.id}-${release}`}
+                d={arrowPath(g.index)}
+                transform={laneTransform(g)}
+                stroke="var(--lamp-green)"
+                strokeWidth={0.9}
+                initial={{ pathLength: 0, pathOffset: 0, opacity: 0.95 }}
+                animate={{ pathLength: [0, 0.55, 0], pathOffset: [0, 0.3, 1], opacity: [0.95, 0.95, 0] }}
+                transition={{ duration: DUR.phase, ease: EASE_OUT, times: [0, 0.55, 1] }}
+              />
+            )
+          })}
+        </g>
+      )}
+
+      {/* Lane names, set OUTSIDE the carriageway on the verge, reading
+          along the lane. On the road they collided with the traffic and
+          with each other — three 11px labels on lanes 9px apart — which
+          is why they only appear once an approach is zoomed in far enough
+          to give each lane real width, and why they sit on the grass
+          rather than under the cars. Barlow, not the mono face: the
+          vendored JetBrains Mono subset has no middle dot, and
+          "North · Left" is words now, not a code. */}
+      {laneNames && (
         <g
-          fill="var(--plate-marking)"
+          fill="var(--ink-strong)"
           fontFamily="var(--font-ui)"
           fontSize="11"
-          fontWeight="500"
+          fontWeight="600"
           opacity="0.9"
-          stroke="var(--plate-road)"
-          strokeWidth="2.5"
+          stroke="var(--plate-ground)"
+          strokeWidth="3"
           strokeLinejoin="round"
           paintOrder="stroke"
         >
           {LANES.map((g) => {
             const p = stopLinePoint(g)
-            // Staggered along the lane - 20, 52 and 84 m back from the line
-            // for lanes 0, 1, 2 - because three 11 px labels on lanes 9 px
-            // apart would sit on top of each other. Reads left-to-right or
-            // top-to-bottom whichever way the traffic runs.
-            const back = 20 + g.index * 32
-            const x = g.axis === 'v' ? p.x : p.x - g.dir * back
-            const y = g.axis === 'v' ? p.y - g.dir * back : p.y
-            const rotate = g.axis === 'v' ? 90 : 0
+            // Out past the kerb on the side this carriageway faces, and
+            // staggered ALONG the verge by lane index — 26 / 52 / 78 m
+            // back from the line. All three at one distance would land on
+            // the same point now that they share an outward offset.
+            const back = 26 + g.index * 26
+            const outward = ROAD_HALF + 5
+            const side = g.approach === 'N' || g.approach === 'E' ? 1 : -1
+            const x = g.axis === 'v' ? CENTRE + outward * side : p.x - g.dir * back
+            const y = g.axis === 'v' ? p.y - g.dir * back : CENTRE + outward * side
+            // Vertical arms read top-to-bottom; horizontal ones stay level.
+            const rotate = g.axis === 'v' ? 90 * g.dir : 0
             return (
               <g key={g.id} transform={`translate(${x} ${y}) rotate(${rotate}) scale(${px})`}>
                 <text textAnchor="middle" dominantBaseline="middle">
@@ -211,14 +272,25 @@ export function JunctionPlate({ lanes, emergencyLanes, vehicles, powered, viewBo
         </g>
       )}
 
-      {/* approach names at the ends of the arms */}
-      <g fill="var(--ink-strong)" fontFamily="var(--font-ui)" fontSize="12" fontWeight="600" opacity="0.85">
-        {(Object.keys(APPROACH_NAMES) as Arm[]).map((arm) => {
-          const p = approachLabelPoint(arm)
-          const anchor = arm === 'S' || arm === 'E' ? 'end' : 'start'
-          const baseline = arm === 'N' || arm === 'W' ? 'hanging' : 'auto'
+      {/* Approach names, pinned to the edges of the CURRENT window rather
+          than to the ends of the arms — at the default junction framing
+          the arm ends are off screen, which left the plate with no
+          orientation label at all except the compass. Each sits on the
+          verge beside its own inbound carriageway, so it names the side
+          the traffic arrives from. */}
+      <g fill="var(--ink-strong)" fontFamily="var(--font-ui)" fontSize="12" fontWeight="600" opacity="0.8">
+        {APPROACH_ORDER.map((arm) => {
+          const inset = 16 * px
+          const verge = ROAD_HALF + 4
+          const along = arm === 'N' || arm === 'E' ? 1 : -1
+          const x =
+            arm === 'N' ? CENTRE + verge : arm === 'S' ? CENTRE - verge : arm === 'W' ? vb.x + inset : vb.x + vb.w - inset
+          const y =
+            arm === 'W' ? CENTRE - verge : arm === 'E' ? CENTRE + verge : arm === 'N' ? vb.y + inset : vb.y + vb.h - inset
+          const anchor = arm === 'W' ? 'start' : arm === 'E' ? 'end' : along === 1 ? 'start' : 'end'
+          const baseline = arm === 'N' ? 'hanging' : arm === 'S' ? 'auto' : 'middle'
           return (
-            <g key={arm} transform={`translate(${p.x} ${p.y}) scale(${px})`}>
+            <g key={arm} transform={`translate(${x} ${y}) scale(${px})`}>
               <text textAnchor={anchor} dominantBaseline={baseline}>
                 {APPROACH_NAMES[arm]}
               </text>
@@ -270,7 +342,15 @@ export function JunctionPlate({ lanes, emergencyLanes, vehicles, powered, viewBo
         LANES.map((g) => {
           const lane = byId[g.id]
           const lamp = powered && lane ? lampOf(lane.signal) : 'off'
-          return <SignalHead key={g.id} g={g} lamp={lamp} px={px} />
+          return (
+            <SignalHead
+              key={g.id}
+              g={g}
+              lamp={lamp}
+              px={px}
+              bloom={release !== 0 && lamp === 'green' ? release : undefined}
+            />
+          )
         })}
     </svg>
   )
@@ -350,8 +430,23 @@ function Lane({
  * reads the same at any zoom. Unlit lamps stay visible — a real head
  * shows all three lenses — so position, not just hue, says which is lit.
  * It stands on the junction side of the line, red nearest the driver.
+ *
+ * `bloom` is the release token from useSignalMoment: when it changes, a
+ * ring expands out of the green lens once and fades. A lamp coming on is
+ * the most important state change on the screen and it was previously
+ * indistinguishable from any other repaint.
  */
-function SignalHead({ g, lamp, px }: { g: LaneGeom; lamp: ReturnType<typeof lampOf>; px: number }) {
+function SignalHead({
+  g,
+  lamp,
+  px,
+  bloom,
+}: {
+  g: LaneGeom
+  lamp: ReturnType<typeof lampOf>
+  px: number
+  bloom?: number
+}) {
   const p = stopLinePoint(g)
   const housingLen = 22
   const housingW = 8
@@ -364,16 +459,31 @@ function SignalHead({ g, lamp, px }: { g: LaneGeom; lamp: ReturnType<typeof lamp
       <rect x={2} y={-housingW / 2} width={housingLen} height={housingW} fill="var(--lamp-housing)" />
       {lamps.map((l, i) => {
         const lit = l === lamp
+        const cx = 2 + 4 + i * 7
         return (
-          <circle
-            key={l}
-            cx={2 + 4 + i * 7}
-            cy={0}
-            r="2.4"
-            fill={lit ? lampLit(l) : 'var(--lamp-unlit)'}
-            className={lit && l === 'amber' ? 'amber-breathe' : undefined}
-            style={{ transition: 'fill var(--dur-tick) var(--ease-out)' }}
-          />
+          <g key={l}>
+            {l === 'green' && bloom !== undefined && (
+              <motion.circle
+                key={bloom}
+                cx={cx}
+                cy={0}
+                fill="none"
+                stroke="var(--lamp-green)"
+                strokeWidth={1.4}
+                initial={{ r: 2.4, opacity: 0.9 }}
+                animate={{ r: 9, opacity: 0 }}
+                transition={{ duration: DUR.value * 1.6, ease: EASE_OUT }}
+              />
+            )}
+            <circle
+              cx={cx}
+              cy={0}
+              r="2.4"
+              fill={lit ? lampLit(l) : 'var(--lamp-unlit)'}
+              className={lit && l === 'amber' ? 'amber-breathe' : undefined}
+              style={{ transition: 'fill var(--dur-tick) var(--ease-out)' }}
+            />
+          </g>
         )
       })}
     </g>

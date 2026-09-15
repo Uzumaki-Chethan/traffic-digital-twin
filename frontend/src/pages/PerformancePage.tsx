@@ -68,10 +68,16 @@ export function PerformancePage() {
 
       <div className="grid grid-cols-2 gap-2">
         <Reveal index={0}>
-          <ControllerWindow title="Trinetra" side={frame?.ai ?? null} powered={powered} sharedView={sharedView} />
+          <ControllerWindow title="Trinetra" side={frame?.ai ?? null} powered={powered} sharedView={sharedView} simTime={frame?.sim_time} />
         </Reveal>
         <Reveal index={1}>
-          <ControllerWindow title="Vehicle-actuated control" side={frame?.baseline ?? null} powered={powered} sharedView={sharedView} />
+          <ControllerWindow
+            title="Vehicle-actuated control"
+            side={frame?.baseline ?? null}
+            powered={powered}
+            sharedView={sharedView}
+            simTime={frame?.sim_time}
+          />
         </Reveal>
       </div>
 

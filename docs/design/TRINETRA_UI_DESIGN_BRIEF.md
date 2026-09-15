@@ -7,6 +7,26 @@
 
 ---
 
+> **Status, 2026-09-15 — read this first.** This brief is the original design
+> contract and most of it still stands: the data contract (§2), the
+> no-invented-data rule, the measured contrast work, the anti-generic
+> instinct, the state and empty-state matrices. Several parts have since
+> been **superseded by Chethan's own decisions** and are marked inline
+> where they appear:
+>
+> | Superseded | By |
+> |---|---|
+> | IBM Plex as the type voice (§5.3) | Orbitron / Barlow / JetBrains Mono, chosen after iteration |
+> | The asphalt-and-cream palette (§5.2) | The traffic-light palette: red rail, `#F4B31D` ground, pale-green cards |
+> | The reference-kit process (§4) | Dropped by Chethan |
+> | The motion bans (§5.4, §12) | The motion vocabulary now in §5.4, approved 2026-09-15 |
+> | "No middle dots" (§12) | `North · Left` lane labels, asked for by name |
+>
+> The rule that survives all of it: **a choice must be a decision, not a
+> default.** Where this brief and a later decision disagree, the later
+> decision wins — and gets recorded here.
+
+
 ## 0. How to use this document
 
 Read it end to end before writing a single line of code. Then follow the process in §14 — plan first, self-critique against §12, build second.
@@ -388,19 +408,60 @@ Rules:
 /* countdown and other clocks: linear only */
 ```
 
-**The one orchestrated moment.** Spend all motion budget on the **phase transition**, because it is the moment the system's whole claim becomes visible. When `signal.phase` or `signal.is_yellow` changes:
+**Motion vocabulary (revised 2026-09-15).** The original version of this
+section spent the entire motion budget on the phase transition and banned
+everything else outright — entrance sequences, hover answers, staggered
+reveals — on the grounds that peripheral motion on an operations screen
+is a defect. That was half right. The half that was wrong showed up when
+the built console was set beside a page Chethan had liked: a screen where
+nothing ever answers the pointer does not read as disciplined, it reads
+as unfinished. Motion is now spent in four places, in this order of
+priority.
+
+**1. The signal moment — the one orchestrated thing.** When `signal.phase`
+or `signal.is_yellow` changes:
 
 1. `0ms` — the outgoing movement's lamp dims and its lane fills on the plate desaturate (`--dur-tick`).
-2. `120ms` — the amber lamp lights; the affected stop bars on the plate take an amber edge; a slow 1.6 s breathing pulse runs on the amber lamp only (nothing else pulses, anywhere, ever).
-3. On the confirmed green — the new movement's lamp blooms in over `--dur-fast`, its lane fills saturate, and the stop bar releases: a single short sweep of the painted arrow in the direction of travel. Once. It does not loop.
-4. The phase ribbon (§7.4) appends the completed segment with a `--dur-value` width ease.
+2. `120ms` — the amber lamp lights; the affected stop bars take an amber edge; a 1.6 s breathing pulse runs on the amber lamp only (nothing else pulses, anywhere, ever).
+3. On the confirmed green — the new movement's lamp blooms in over `--dur-fast`, its lane fills saturate, and the stop bar releases: a single sweep of light along the painted arrow, in the direction of travel. **Once.** It does not loop.
+4. The phase ribbon appends the completed segment with a `--dur-value` width ease.
 
-That is the entire non-user-triggered motion vocabulary. Everything else:
+This is the moment the system's whole claim becomes visible, so it gets
+the largest budget (`--dur-phase`) and is the only choreography in the
+product.
 
-- Numeric values **tween** between packets over `--dur-value` instead of snapping. Bar widths and lane fills ease over the same duration.
-- **Extrapolate the countdown between packets.** Data arrives at 2 Hz but `signal.countdown` decreases continuously. Interpolate against a monotonic client clock (`performance.now()`) and re-sync on each packet, so the countdown reads smoothly at 60 fps instead of stepping twice a second. Do the same for the sim clock. This one detail does more for perceived quality than any visual effect.
-- **Banned:** section entrance fade-and-slide-ups, card hover lifts, staggered list reveals, animated gradients, glow pulses on anything but the amber lamp, spinners that outlive 300 ms, anything looping in the periphery of a live display. Peripheral motion on an operations screen is a defect, not a flourish.
-- Respect `prefers-reduced-motion: reduce` — drop all tweens and the pulse; state changes become instant. Never gate information behind an animation.
+**2. Data in motion.** Numbers tween between packets over `--dur-value`
+rather than snapping; bar widths and lane fills ease over the same
+duration; the countdown and sim clock are **extrapolated against
+`performance.now()`** between packets and re-synced on arrival, so they
+read at 60 fps instead of stepping twice a second. That last detail does
+more for perceived quality than any visual effect.
+
+**3. An answer to every pointer.** Anything interactive responds within
+`--dur-fast`: a hairline that grows from the leading edge (`.grow-rule`),
+an accent bar that scales in from the left, a 0.97 press scale, an active
+indicator that *slides* between nav items rather than jumping. These
+carry information — what is hoverable, what is selected, where you are —
+so they are not decoration. What is still banned: a hover state that
+moves anything *other* than the element under the pointer.
+
+**4. Arrival, once per page.** A page's panels rise 14px and fade in over
+`--dur-enter`, `--stagger` apart, in reading order. This runs on mount
+and on navigation, **never on data update** — a panel that re-animates
+every packet is unreadable. The sequence is what tells the eye the order
+to read a page in.
+
+**Still banned, and not negotiable:** anything looping in the periphery of
+a live display (the amber lamp is the single exception); glow pulses;
+animated gradient borders; spinners that outlive 300 ms; motion that
+gates information; any animation whose completion the code depends on for
+correctness (rapid state changes must cancel and set the final state
+directly). Respect `prefers-reduced-motion: reduce` — drop every tween
+and pulse and render the final state.
+
+Implementation: `src/ui/motion.ts` holds the durations and easings as the
+one source for the framer-motion side; `styles/tokens.css` holds the
+`--dur-*` / `--ease-*` tokens for the CSS side. They must stay in step.
 
 ### 5.5 Layout shell
 
@@ -628,17 +689,22 @@ Run this list before you declare anything finished. Each item is a specific thin
 - Numbered `01 / 02 / 03` markers on content that is not actually a sequence.
 
 **Type and chrome**
-- Tracked-out ALL-CAPS eyebrow labels above headings.
-- Meta strings joined with middle dots (`A · B · C`).
 - `WORD — fragment` labels built with a spaced em dash.
 - A monospace face used for small *labels* (mono is for values and identifiers only).
 - `→` appended to button and link text.
 - Inter / Poppins / Montserrat / bare `system-ui` as the primary voice.
 - Emoji used as icons or status indicators.
+- *(Struck 2026-09-15: tracked-out caps micro-labels and middle-dot meta
+  strings were on this list. Both are now deliberate — the `.eyebrow` role
+  and `North · Left`, the latter asked for by name. A device is only a
+  generic tell when it arrived without a reason.)*
 
 **Motion**
-- Fade-and-slide-up entrances on every section; staggered reveals; hover lift on every card.
-- Anything looping in the periphery.
+- Anything looping in the periphery (the amber lamp excepted).
+- Glow pulses, animated gradient borders, spinners past 300 ms.
+- A hover state that moves anything other than the element under the pointer.
+- *(Struck 2026-09-15: entrance sequences, staggered reveals and hover
+  responses were banned here. See §5.4 for what replaced the ban.)*
 
 **Content**
 - Fabricated demo numbers, lorem ipsum, or fake sparklines.

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
+import { motion, useReducedMotion } from 'framer-motion'
 import clsx from 'clsx'
 import { Activity, BarChart3, ChartColumnIncreasing, ListTree, PanelLeftClose, PanelLeftOpen, SlidersHorizontal } from 'lucide-react'
 import { useSim } from '@/data/store'
+import { DUR, EASE_OUT, EASE_SPRING } from '@/ui/motion'
 
 const NAV = [
   { to: '/', label: 'Overview', icon: Activity, end: true },
@@ -15,9 +17,16 @@ const NAV = [
 /**
  * The rail, on the dark chrome. Collapses to an icon strip so the plate
  * gets the full width; the choice persists.
+ *
+ * The active item is marked by a pill that SLIDES between destinations
+ * (one shared `layoutId`, so framer-motion animates the one element from
+ * its old box to its new one) plus a hairline that grows under the label
+ * on hover. Both carry information — where you are, what is clickable —
+ * which is the test any motion here has to pass.
  */
 export function NavRail() {
   const link = useSim((s) => s.link)
+  const reduced = useReducedMotion()
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem('trinetra.rail') === 'collapsed'
@@ -52,14 +61,37 @@ export function NavRail() {
             title={collapsed ? label : undefined}
             className={({ isActive }) =>
               clsx(
-                'flex items-center rounded-control py-2.5 text-[13.5px] transition-colors',
+                'group relative flex items-center rounded-control py-2.5 text-[13.5px] transition-colors',
                 collapsed ? 'justify-center px-0' : 'gap-3 px-3',
-                isActive ? 'bg-chrome-rule/70 font-semibold text-chrome-ink' : 'text-chrome-mute hover:bg-chrome-rule/40 hover:text-chrome-ink',
+                isActive ? 'font-semibold text-chrome-ink' : 'text-chrome-mute hover:text-chrome-ink',
               )
             }
           >
-            <Icon size={17} strokeWidth={1.75} aria-hidden />
-            {!collapsed && <span>{label}</span>}
+            {({ isActive }) => (
+              <>
+                {isActive &&
+                  (reduced ? (
+                    <span className="absolute inset-0 rounded-control bg-chrome-rule/70" />
+                  ) : (
+                    <motion.span
+                      layoutId="nav-active"
+                      className="absolute inset-0 rounded-control bg-chrome-rule/70"
+                      transition={{ duration: DUR.enter * 0.8, ease: EASE_SPRING }}
+                    />
+                  ))}
+                {/* Hover answer for everything that is not current. */}
+                {!isActive && (
+                  <span className="absolute inset-0 rounded-control bg-chrome-ink/0 transition-colors duration-150 group-hover:bg-chrome-ink/10" />
+                )}
+                <Icon
+                  size={17}
+                  strokeWidth={1.75}
+                  aria-hidden
+                  className="relative z-10 transition-transform duration-150 group-hover:translate-x-px"
+                />
+                {!collapsed && <span className="relative z-10">{label}</span>}
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
@@ -71,11 +103,13 @@ export function NavRail() {
             <span className="num text-chrome-ink">{link === 'open' ? 'ONLINE' : link === 'connecting' ? 'CONNECTING' : 'OFFLINE'}</span>
           </div>
         )}
-        <button
+        <motion.button
           type="button"
           onClick={() => setCollapsed((c) => !c)}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-expanded={!collapsed}
+          whileTap={reduced ? undefined : { scale: 0.97 }}
+          transition={{ duration: DUR.tick, ease: EASE_OUT }}
           className={clsx(
             'flex w-full items-center rounded-control py-2 text-[12.5px] text-chrome-mute transition-colors hover:bg-chrome-rule/40 hover:text-chrome-ink',
             collapsed ? 'justify-center' : 'gap-2 px-2',
@@ -83,7 +117,7 @@ export function NavRail() {
         >
           {collapsed ? <PanelLeftOpen size={16} aria-hidden /> : <PanelLeftClose size={16} aria-hidden />}
           {!collapsed && <span>Collapse</span>}
-        </button>
+        </motion.button>
       </div>
     </aside>
   )

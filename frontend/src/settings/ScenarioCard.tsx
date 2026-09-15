@@ -1,11 +1,20 @@
+import { motion, useReducedMotion } from 'framer-motion'
 import clsx from 'clsx'
 import { Check } from 'lucide-react'
 import { DEMAND_LABEL, type ScenarioInfo } from '@/data/scenarios'
+import { DUR, EASE_OUT, EASE_SPRING } from '@/ui/motion'
 
 /**
  * One scenario, as a card to pick: its name, one line on what happens,
  * and how much traffic it carries. The id never appears — the request
  * carries it, the viewer reads the name.
+ *
+ * This is the one genuinely card-shaped surface in the product, and the
+ * one place a hover lift is honest: these cards exist to be chosen, so
+ * the card under the pointer rising 2px and its rule warming is an
+ * answer to "can I click this", not decoration. Selection draws an
+ * accent bar across the top from the leading edge — a line being drawn,
+ * which reads as a decision being recorded.
  */
 export function ScenarioCard({
   scenario,
@@ -18,34 +27,60 @@ export function ScenarioCard({
   disabled: boolean
   onSelect: () => void
 }) {
+  const reduced = useReducedMotion()
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onSelect}
       disabled={disabled}
       aria-pressed={selected}
+      whileHover={reduced || disabled ? undefined : { y: -2 }}
+      whileTap={reduced || disabled ? undefined : { scale: 0.985, y: 0 }}
+      transition={{ duration: DUR.fast, ease: EASE_SPRING }}
       className={clsx(
-        'group flex min-h-[96px] flex-col gap-1.5 rounded-control border-2 px-3 py-2.5 text-left transition-colors',
+        'group relative flex min-h-[96px] flex-col gap-1.5 overflow-hidden rounded-control border-2 px-3 py-2.5 text-left transition-colors',
         selected ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : 'border-rule bg-plate hover:border-[var(--rule-strong)]',
         disabled && 'cursor-not-allowed opacity-60',
       )}
+      style={{ boxShadow: selected ? 'var(--shadow-panel)' : undefined }}
     >
+      {/* Selection bar, drawn from the leading edge. */}
+      <span
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-[3px] origin-left bg-[var(--accent)] transition-transform duration-200"
+        style={{
+          transform: `scaleX(${selected ? 1 : 0})`,
+          transitionTimingFunction: 'var(--ease-out)',
+        }}
+      />
       <div className="flex items-start justify-between gap-2">
         <span className="text-[15px] font-medium leading-tight text-ink-strong">{scenario.name}</span>
         {selected ? (
-          <Check size={16} className="mt-0.5 shrink-0 text-[var(--accent)]" aria-hidden />
+          <motion.span
+            initial={reduced ? false : { scale: 0.4, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: DUR.fast, ease: EASE_SPRING }}
+            className="mt-0.5 shrink-0"
+          >
+            <Check size={16} className="text-[var(--accent)]" aria-hidden />
+          </motion.span>
         ) : (
           <DemandChip demand={scenario.demand} />
         )}
       </div>
       <span className="text-[12.5px] leading-[1.45] text-ink">{scenario.blurb}</span>
       {selected && (
-        <span className="mt-auto flex items-center gap-2 pt-1">
+        <motion.span
+          initial={reduced ? false : { opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: DUR.fast, ease: EASE_OUT }}
+          className="mt-auto flex items-center gap-2 pt-1"
+        >
           <DemandChip demand={scenario.demand} />
-          <span className="num text-[11px] text-ink-mute">selected</span>
-        </span>
+          <span className="eyebrow">selected</span>
+        </motion.span>
       )}
-    </button>
+    </motion.button>
   )
 }
 

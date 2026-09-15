@@ -75,6 +75,33 @@ body {
   overscroll-behavior: none;
 }
 
+/* Graph paper under the scrolling page: a 40px minor grid with a 200px
+   major, both at an opacity that is felt rather than read. A flat amber
+   field was the single biggest reason the page looked unfinished next to
+   a designed one — texture is what says "drawn", and this product is
+   literally a signal plan.
+
+   Painted as this element's own background with `background-attachment:
+   fixed`, which anchors the grid to the VIEWPORT (so it holds still while
+   content scrolls over it, the way paper would) but clips it to this box —
+   so it cannot bleed over the status bar or the footer the way a
+   fixed-position pseudo-element did. Static, and not in the layer above
+   anything, so it never moves and never eats a pointer event. */
+.ground-grid {
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid-minor) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-minor) 1px, transparent 1px);
+  background-size:
+    var(--grid-major-size) var(--grid-major-size),
+    var(--grid-major-size) var(--grid-major-size),
+    var(--grid-minor-size) var(--grid-minor-size),
+    var(--grid-minor-size) var(--grid-minor-size);
+  background-attachment: fixed;
+  background-position: center center;
+}
+
 /* Nothing on screen goes below 12px — it is read from across a room. */
 small {
   font-size: 12px;
@@ -100,14 +127,66 @@ small {
   letter-spacing: 0.02em;
 }
 
-/* Panel title. Titles are the only place caps appear. */
+/* Panel title. Titles are the only place caps appear. The leading tick is
+   a drawing convention, not decoration: it marks where a titled region
+   begins, and repeating it on every panel is most of what makes a set of
+   cards read as one system. */
 .panel-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   font-family: var(--font-display);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-mute);
+}
+
+.panel-title::before {
+  content: '';
+  width: 3px;
+  height: 11px;
+  flex: none;
+  border-radius: 1px;
+  background: var(--accent);
+  opacity: 0.55;
+}
+
+/* The micro-label: a small uppercase caption above or beside a value.
+   Tracked wide, because at 10.5px caps need the air to stay legible. */
+.eyebrow {
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+/* A hairline that grows from its leading edge when the row it belongs to
+   is hovered or focused — the one hover idiom used throughout, because it
+   answers the pointer without moving anything else on the page. Set
+   --underline-color to override. */
+.grow-rule {
+  position: relative;
+}
+
+.grow-rule::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  height: 1.5px;
+  width: 0;
+  background: var(--underline-color, var(--accent));
+  transition: width var(--dur-fast) var(--ease-out);
+}
+
+.grow-rule:hover::after,
+.grow-rule:focus-visible::after,
+.grow-rule[data-grown='true']::after {
+  width: 100%;
 }
 
 .hatch-alert {

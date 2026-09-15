@@ -1,9 +1,11 @@
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import clsx from 'clsx'
 import { Panel } from '@/ui/Panel'
 import type { ComparisonRow } from '@/data/types'
 import type { EvalSample } from '@/data/evalHistory'
 import { verdictFor } from '@/data/verdict'
-import { f1 } from '@/utils/format'
+import { Num } from '@/ui/Num'
+import { DUR, EASE_OUT } from '@/ui/motion'
 
 /**
  * One evaluation metric: Trinetra and VAC over simulated time, the two
@@ -54,6 +56,7 @@ export function MetricBlock({
   samples: readonly EvalSample[]
   final: boolean
 }) {
+  const reduced = useReducedMotion()
   const verdict = verdictFor(row.improvement)
   const unit = UNIT[row.key] ?? ''
   const title = TITLE[row.key] ?? row.label
@@ -80,23 +83,45 @@ export function MetricBlock({
     <Panel
       title={title}
       meta={
-        <span
-          className={clsx('rounded-full border px-2 py-0.5 text-[11.5px] font-medium', badgeTone)}
-          aria-label={`${title}: ${verdict.label}, ${final ? 'final' : 'so far'}`}
-        >
-          {verdict.label} · {final ? 'final' : 'so far'}
-        </span>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={`${verdict.side}-${verdict.label}-${final}`}
+            initial={reduced ? false : { opacity: 0, y: 3 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduced ? undefined : { opacity: 0, y: -3 }}
+            transition={{ duration: DUR.fast, ease: EASE_OUT }}
+            className={clsx('inline-block rounded-full border px-2 py-0.5 text-[11.5px] font-medium', badgeTone)}
+            aria-label={`${title}: ${verdict.label}, ${final ? 'final' : 'so far'}`}
+          >
+            {verdict.label} · {final ? 'final' : 'so far'}
+          </motion.span>
+        </AnimatePresence>
       }
       bodyClassName="px-3 pb-2.5"
     >
+      {/* The two readings. Each tweens to its new value over --dur-value
+          instead of snapping, and the one ahead carries the weight — a
+          comparison should be legible without reading the badge. */}
       <div className="mb-1 flex items-baseline gap-4 text-[12.5px]">
-        <span className="flex items-center gap-1.5 text-ink">
-          <span className="h-[3px] w-4 rounded-full" style={{ background: TRINETRA }} />
-          Trinetra <span className="num text-ink-strong">{f1(row.ai)}</span> {unit}
+        <span className={clsx('flex items-center gap-1.5', verdict.side === 'trinetra' ? 'text-ink-strong' : 'text-ink')}>
+          <span
+            className="h-[3px] rounded-full transition-[width] duration-200"
+            style={{ background: TRINETRA, width: verdict.side === 'trinetra' ? 22 : 16 }}
+          />
+          Trinetra{' '}
+          <Num
+            value={row.ai}
+            digits={1}
+            className={clsx('num', verdict.side === 'trinetra' ? 'font-semibold text-ink-strong' : 'text-ink-strong')}
+          />{' '}
+          {unit}
         </span>
-        <span className="flex items-center gap-1.5 text-ink">
-          <span className="h-[3px] w-4 rounded-full" style={{ background: VAC }} />
-          VAC <span className="num text-ink-strong">{f1(row.baseline)}</span> {unit}
+        <span className={clsx('flex items-center gap-1.5', verdict.side === 'vac' ? 'text-ink-strong' : 'text-ink')}>
+          <span
+            className="h-[3px] rounded-full transition-[width] duration-200"
+            style={{ background: VAC, width: verdict.side === 'vac' ? 22 : 16 }}
+          />
+          VAC <Num value={row.baseline} digits={1} className="num text-ink-strong" /> {unit}
         </span>
       </div>
       {samples.length >= 2 ? (

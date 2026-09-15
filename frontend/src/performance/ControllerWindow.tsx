@@ -2,7 +2,7 @@ import { Panel } from '@/ui/Panel'
 import { TwinViewport } from '@/overview/TwinViewport'
 import type { SideView } from '@/data/types'
 import type { ViewState } from '@/overview/usePanZoom'
-import { phaseLabel } from '@/utils/signal'
+import { phaseKey, phaseLabel } from '@/utils/signal'
 import { f1 } from '@/utils/format'
 
 /**
@@ -15,10 +15,13 @@ export function ControllerWindow({
   side,
   powered,
   sharedView,
+  simTime,
 }: {
   title: string
   side: SideView | null
   powered: boolean
+  /** The frame's simulated time, for the plate's release timing. */
+  simTime?: number
   /** Both windows share one pan/zoom so the two are always framed alike. */
   sharedView: ViewState
 }) {
@@ -42,7 +45,15 @@ export function ControllerWindow({
       }
       bodyClassName="px-2 pb-2"
     >
-      <TwinViewport lanes={lanes} emergencyLanes={[]} vehicles={side?.vehicles} powered={powered} allow3d={false} sharedView={sharedView} />
+      <TwinViewport
+        lanes={lanes}
+        emergencyLanes={[]}
+        vehicles={side?.vehicles}
+        powered={powered}
+        allow3d={false}
+        sharedView={sharedView}
+        releaseKey={phaseKey(simTime, side?.decision.duration)}
+      />
     </Panel>
   )
 }

@@ -145,10 +145,37 @@
   --s-6: 24px;
   --s-8: 32px;
 
-  /* Motion */
+  /* Motion — ONE rhythm for the whole product; the framer-motion side of
+     it is src/ui/motion.ts, and the two must stay in step. Durations are
+     chosen by how far a thing travels, not copied from each other:
+
+       tick   state flips: lamps, chips, signal fills        120ms
+       fast   an answer to the pointer: hover, expand         180ms
+       value  a number or a bar easing to a new reading       300ms (ceiling)
+       enter  a panel arriving on page mount                  420ms
+       phase  the signal-change choreography, once per switch 900ms
+
+     Exits run at ~65% of their enter — leaving should feel quicker than
+     arriving. --stagger is the step between neighbours in a sequence. */
   --dur-tick: 120ms;
   --dur-fast: 180ms;
   --dur-value: 300ms;
+  --dur-enter: 420ms;
+  --dur-phase: 900ms;
+  --stagger: 70ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-mid: cubic-bezier(0.65, 0, 0.35, 1);
+  /* Overshoots by ~4%: for things the user just pressed, where a little
+     physics reads as responsiveness. Never for data. */
+  --ease-spring: cubic-bezier(0.22, 1.18, 0.36, 1);
+
+  /* Ground texture — a drafting grid on the amber, 40px minor / 200px
+     major, at an opacity that is felt rather than seen. The product IS a
+     signal plan; graph paper under it is the right substrate, and a
+     completely flat colour field is what made the page read as unfinished.
+     Static: nothing in the periphery of a live display may move. */
+  --grid-minor: rgb(36 26 16 / 0.07);
+  --grid-major: rgb(36 26 16 / 0.12);
+  --grid-minor-size: 40px;
+  --grid-major-size: 200px;
 }

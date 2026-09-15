@@ -26,6 +26,7 @@ export function TwinViewport({
   powered,
   allow3d = true,
   sharedView,
+  releaseKey,
 }: {
   lanes: LaneView[]
   emergencyLanes: string[]
@@ -36,6 +37,8 @@ export function TwinViewport({
   allow3d?: boolean
   /** Lifted pan/zoom state, so two viewports frame the same window. */
   sharedView?: ViewState
+  /** Phase identity, for the plate's one-shot release (utils/signal.phaseKey). */
+  releaseKey?: number
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const stage = useRef<HTMLDivElement>(null)
@@ -95,6 +98,7 @@ export function TwinViewport({
             powered={powered}
             viewBox={pan.viewBox}
             pxPerMetre={pan.pxPerMetre}
+            releaseKey={releaseKey}
           />
         ) : (
           <Suspense

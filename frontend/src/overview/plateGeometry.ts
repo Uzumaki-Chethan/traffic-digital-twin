@@ -180,21 +180,3 @@ export const ARM_RECTS: Array<[number, number, number, number]> = [
 ]
 
 export const APPROACH_NAMES: Record<Arm, string> = { N: 'North', S: 'South', E: 'East', W: 'West' }
-
-/** Where an approach's name sits, beside the outer end of its arm on the
- * inbound side - a little way in, so it clears the viewport's edge and
- * the controls that sit over the bottom-left corner. */
-export function approachLabelPoint(arm: Arm): Point {
-  const along = 30
-  const beside = 4
-  switch (arm) {
-    case 'N':
-      return { x: CENTRE + ROAD_HALF + beside, y: along }
-    case 'S':
-      return { x: CENTRE - ROAD_HALF - beside, y: NET - along }
-    case 'W':
-      return { x: along, y: CENTRE - ROAD_HALF - beside }
-    default:
-      return { x: NET - along, y: CENTRE + ROAD_HALF + beside }
-  }
-}

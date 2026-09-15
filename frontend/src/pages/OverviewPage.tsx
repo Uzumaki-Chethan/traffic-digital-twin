@@ -13,7 +13,7 @@ import { LaneTable } from '@/overview/LaneTable'
 import { RingBarrierHistory } from '@/overview/RingBarrierHistory'
 import { MetricsStrip } from '@/overview/MetricsStrip'
 import { PredictionPanel } from '@/overview/PredictionPanel'
-import { lampOf } from '@/utils/signal'
+import { lampOf, phaseKey } from '@/utils/signal'
 
 const EMPTY: LiveSnapshot = {
   sim_time: 0,
@@ -97,7 +97,13 @@ export function OverviewPage() {
                 </p>
               </div>
             ) : (
-              <TwinViewport lanes={snap.lanes} emergencyLanes={snap.emergency_lanes} vehicles={snap.vehicles} powered={powered} />
+              <TwinViewport
+                lanes={snap.lanes}
+                emergencyLanes={snap.emergency_lanes}
+                vehicles={snap.vehicles}
+                powered={powered}
+                releaseKey={phaseKey(snap.sim_time, snap.decision.duration)}
+              />
             )}
           </Panel>
           <Link

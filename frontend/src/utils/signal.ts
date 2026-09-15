@@ -130,3 +130,19 @@ export function laneLabel(laneId: string): string {
   if (!approach) return laneId
   return `${approach} · ${movementOf(laneId)}`
 }
+
+/**
+ * An identity for the signal phase currently being served, derived rather
+ * than remembered: the simulated second the phase began (`sim_time` minus
+ * the seconds it has been held). It is constant for the whole of one
+ * green and changes exactly once, on the switch.
+ *
+ * That makes it the right React key for a one-shot release animation —
+ * the plate replays the arrow sweep when the key changes and never
+ * otherwise, with no previous-value tracking, no effect and nothing that
+ * breaks if a switch arrives mid-animation.
+ */
+export function phaseKey(simTime: number | null | undefined, heldSeconds: number | null | undefined): number {
+  if (simTime == null || heldSeconds == null) return 0
+  return Math.round(simTime - heldSeconds)
+}
