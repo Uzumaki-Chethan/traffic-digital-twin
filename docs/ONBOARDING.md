@@ -110,6 +110,11 @@ Rules of the road:
 - The rules the whole project follows are in `CLAUDE.md` at the repo root
   (architecture boundaries, what "done" means, the known deviations). Read
   it once; Claude Code reads it automatically every session.
+- **For UI work, `docs/UI_CHANGE_RULES.md` is the contract:** restyle,
+  recolour, move or add anything; never drop an item of its content
+  inventory without the owner saying so in writing. Tick the inventory for
+  every page you touched before you push. `git tag prototype-1` is the state
+  it describes and the point everything can be taken back to.
 
 ## 5. Working with Claude Code on this repo
 

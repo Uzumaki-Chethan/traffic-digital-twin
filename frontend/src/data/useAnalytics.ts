@@ -8,16 +8,10 @@ export interface Async<T> {
 }
 
 /**
- * Mount-once fetch for the read-only history endpoints (`data/api.ts`),
- * which read SQLite and the saved evaluator CSVs.
- *
- * CURRENTLY UNUSED. Analytics moved to the live stream on 2026-09-12 (see
- * data/liveHistory.ts for why), so nothing fetches history today. Kept
- * because the Performance and Decisions pages are exactly what these
- * endpoints are for: past evaluation runs and a decision audit trail that
- * outlives the run that produced it. Note that under `python app.py` these
- * endpoints die with the simulation — `python server.py` is what keeps them
- * served afterwards.
+ * Mount-once fetch for a read-only endpoint (`data/api.ts`) — used by the
+ * prediction panel for the model's static training metadata. Analytics
+ * itself reads the live stream, not these endpoints (data/liveHistory.ts
+ * says why), and the Decisions page has its own polling hook.
  *
  * Deliberately fires exactly once per mount: the fetcher is held in a ref
  * so a fresh closure on re-render can't retrigger it, and the request is

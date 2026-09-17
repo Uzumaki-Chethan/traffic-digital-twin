@@ -1,10 +1,14 @@
 /**
- * Typed clients for the backend's read-only history endpoints.
+ * Typed clients for the backend endpoints the UI actually calls: the
+ * model's training metadata (Overview's prediction panel) and the
+ * run-scoped decision log (the Decisions page). Every shape was verified
+ * against a live server, not transcribed from a document; where the
+ * backend does not carry a field, it is absent here too.
  *
- * Every shape below was verified against a live server reading the real
- * recorded database (2026-09-12) — not transcribed from a document. Where
- * the backend does not carry a field, it is absent here too; nothing is
- * invented to fill a gap.
+ * The backend also serves /api/logs/performance, /api/logs/predictions,
+ * /api/analytics/* and /api/results; nothing in the UI reads them today
+ * (Analytics reads the live stream by instruction — data/liveHistory.ts),
+ * so they have no client here. Add one when a page needs it.
  */
 
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
@@ -33,25 +37,6 @@ export interface ModelInfo {
   held_out_metrics: Record<string, number>
 }
 
-/**
- * One evaluated prediction. NOTE: the table has no lane_id column
- * (verified against the schema), so a row cannot be attributed to a
- * lane — these are usable for aggregate accuracy over time only. Live
- * per-lane pairs come from the snapshot's `prediction.rows` instead.
- */
-export interface PredictionLogRow {
-  id: number
-  time: number
-  predicted_values: { vehicle_count: number; average_waiting_time: number }
-  actual_values: { vehicle_count: number; average_waiting_time: number }
-  confidence: number
-}
-
-/** One decision of a run (`decision_log`). Since 2026-09-17 a row also
- * carries the TraCI-confirmed actual state, the run it belongs to, the
- * four phase scores and the margin of that tick (so the score ledger can
- * redraw a past decision), and the scenario; rows written before that
- * have those as null. */
 export interface DecisionLogRow {
   id: number
   time: number
@@ -79,50 +64,8 @@ export interface RunSummary {
   switches: number
 }
 
-export interface PerformanceLogRow {
-  id: number
-  time: number
-  avg_wait: number
-  avg_speed: number
-  queue_length: number
-  stopped: number
-}
-
-export interface LaneWaitTimes {
-  group_by: 'lane'
-  lanes: Record<string, { average_wait_seconds: number; sample_count: number }>
-}
-
-export interface CongestionBucket {
-  bucket_start: number
-  bucket_end: number
-  avg_congestion_score: number
-  sample_count: number
-}
-
-/** Same endpoint with group_by=lane: one row per (bucket, lane) pair. */
-export interface CongestionLaneBucket extends CongestionBucket {
-  lane_id: string
-}
-
-export interface PeakPeriod {
-  start_time: number
-  end_time: number
-  peak_congestion_score: number
-  sample_count: number
-  scenario: string | null
-}
-
-/** A saved evaluator run, parsed from results/*.csv. `improvement_pct` is
- * already signed — positive is better, direction accounted for. */
-export interface ResultsSummary {
-  scenario: string
-  rows: { metric: string; ai: number; baseline: number; improvement_pct: number }[]
-}
-
 export const api = {
   modelInfo: (signal?: AbortSignal) => getJson<ModelInfo | Record<string, never>>('/api/model-info', signal),
-  predictionLogs: (limit = 200, signal?: AbortSignal) => getJson<PredictionLogRow[]>(`/api/logs/predictions?limit=${limit}`, signal),
   /** One run's decisions, newest first; or with `afterId`, only rows newer than it, oldest first. */
   decisionLogs: (limit = 200, run?: string, afterId?: number, signal?: AbortSignal) =>
     getJson<DecisionLogRow[]>(
@@ -132,13 +75,6 @@ export const api = {
       signal,
     ),
   runs: (signal?: AbortSignal) => getJson<RunSummary[]>('/api/logs/runs', signal),
-  performanceLogs: (limit = 200, signal?: AbortSignal) => getJson<PerformanceLogRow[]>(`/api/logs/performance?limit=${limit}`, signal),
-  laneWaitTimes: (signal?: AbortSignal) => getJson<LaneWaitTimes>('/api/analytics/wait-times?group_by=lane', signal),
-  congestionTrend: (bucketSeconds = 60, signal?: AbortSignal) => getJson<CongestionBucket[]>(`/api/analytics/congestion-trend?bucket_seconds=${bucketSeconds}`, signal),
-  congestionByLane: (bucketSeconds = 60, signal?: AbortSignal) => getJson<CongestionLaneBucket[]>(`/api/analytics/congestion-trend?bucket_seconds=${bucketSeconds}&group_by=lane`, signal),
-  networkWaitTime: (signal?: AbortSignal) => getJson<{ group_by: 'network'; average_wait_seconds: number | null; sample_count: number }>('/api/analytics/wait-times?group_by=network', signal),
-  peakPeriods: (topN = 5, signal?: AbortSignal) => getJson<PeakPeriod[]>(`/api/analytics/peak-periods?top_n=${topN}`, signal),
-  results: (signal?: AbortSignal) => getJson<ResultsSummary[]>('/api/results', signal),
 }
 
 export function hasModelInfo(m: ModelInfo | Record<string, never> | null): m is ModelInfo {

@@ -17,5 +17,3 @@ export const MAX_GREEN: Record<string, number> = {
   NS_right: 20,
   EW_right: 20,
 }
-/** signal_controller.py: YELLOW_DURATION_SECONDS */
-export const YELLOW_SECONDS = 3

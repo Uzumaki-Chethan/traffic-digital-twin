@@ -3380,3 +3380,34 @@ body with a dark window band along both sides, a windscreen and four large wheel
 car as its lower body, glazed cabin and four wheels. Geometry is still cached per
 (kind, dimensions) and shared, so the cost per vehicle is unchanged. The fire engine
 (9 m) takes the truck build, the ambulance and police car the car build.
+
+### 30.16 `prototype-1`, the UI change rules, and a sweep for dead code (2026-09-17)
+
+Chethan asked for three things once the Decisions page and the motion work were in: push
+everything as the first prototype with a point to come back to; write down the rule for
+whoever works on the interface next; and sweep the codebase for junk.
+
+- **`prototype-1`** is commit `d9afd01` on `main`, tagged and pushed. `git checkout
+  prototype-1` shows it; `git revert` or a `reset --hard` to it takes `main` back. The
+  `.claude/` folder (installed Claude Code skills and machine-local permissions) is
+  gitignored rather than pushed — tooling, not project.
+- **`docs/UI_CHANGE_RULES.md`** is the contract for UI work from here: *change how it
+  looks, never how much it says.* Recolour, restyle, move, merge, split, add — freely;
+  remove an item of its **content inventory** (every fact each page shows, as of the tag)
+  only on the owner's explicit written instruction naming the item. An item lost as a
+  side effect of a redesign is a defect. Linked from `CLAUDE.md`, `docs/ONBOARDING.md`
+  and the README.
+- **The sweep.** The backend came out clean — every function is referenced, apart from
+  three one-line documented helpers left alone in validated code. The frontend had the
+  leftovers of the last two weeks' rewrites: the old position-delta heading derivations
+  (`laneHeading`, `laneHeading3D`, the `MOVEMENTS` table and its parser — SUMO's own angle
+  replaced all of it), `toSvg`, `LANE_BY_ID`, `ARM_METRES`, an unused `DrawnRule`
+  component, `conf0` (a confidence formatter — confidence is never shown), `f0`,
+  `YELLOW_SECONDS`, `scenarioInfo`, `isWaiting`, and seven typed API clients for
+  endpoints no page reads (`api.ts` now carries only what the UI calls, and says which
+  endpoints exist without a client). `useAnalytics.ts` lost a note that had been wrong
+  since the prediction panel started using it. The two superseded design-process
+  documents moved to `docs/design/archive/` with a README saying why; `frontend/.gitkeep`
+  (from when the folder was emptied) and three empty untracked folders went. Nothing in
+  the pipeline, the model, the datasets, the scenarios or the evaluation was touched:
+  99/99 backend tests, 18/18 frontend, build clean.

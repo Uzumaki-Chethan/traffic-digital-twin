@@ -64,10 +64,6 @@ export function scenarioName(id: string | null | undefined): string {
   return BY_ID.get(id)?.name ?? id
 }
 
-export function scenarioInfo(id: string): ScenarioInfo | undefined {
-  return BY_ID.get(id)
-}
-
 export const DEMAND_LABEL: Record<Demand, string> = {
   light: 'Light',
   moderate: 'Moderate',

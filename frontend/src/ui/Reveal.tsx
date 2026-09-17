@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { DUR, EASE_OUT, STAGGER, arrive } from './motion'
+import { EASE_OUT, arrive } from './motion'
 
 /**
  * Staggered entrance for a page's panels.
@@ -55,26 +55,6 @@ export function GrowBar({
       initial={vertical ? { height: 0 } : { width: 0 }}
       animate={vertical ? { height: pct } : { width: pct }}
       transition={{ duration: 0.55, delay, ease: EASE_OUT }}
-    />
-  )
-}
-
-/**
- * An accent rule that draws itself across the top of a panel as the panel
- * arrives — the one flourish borrowed wholesale from a design the user
- * approved elsewhere. It scales from the leading edge, so it reads as a
- * line being drawn rather than a box appearing.
- */
-export function DrawnRule({ delay = 0, className }: { delay?: number; className?: string }) {
-  const reduced = useReducedMotion()
-  if (reduced) return <div className={className} />
-  return (
-    <motion.div
-      className={className}
-      style={{ transformOrigin: 'left center' }}
-      initial={{ scaleX: 0 }}
-      animate={{ scaleX: 1 }}
-      transition={{ duration: DUR.enter, delay: delay + STAGGER, ease: EASE_OUT }}
     />
   )
 }

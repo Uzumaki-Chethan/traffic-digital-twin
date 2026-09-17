@@ -51,7 +51,9 @@ always-on console) both just call it.
 
 Full engineering context and history: see `PROJECT_ARCHITECTURE_REPORT.md`
 (read the highest-numbered `SECTION N ... (CURRENT STATE)` first — Section 30
-as of 2026-09-15).
+as of 2026-09-17). The tag **`prototype-1`** (2026-09-17) is the first complete
+prototype and the revert point; UI work from here follows
+`docs/UI_CHANGE_RULES.md` (restyle and move freely, never lose information).
 
 ---
 

@@ -9,11 +9,3 @@ export function clock(totalSeconds: number): string {
 export function f1(n: number | null | undefined): string {
   return n == null || Number.isNaN(n) ? '—' : n.toFixed(1)
 }
-export function f0(n: number | null | undefined): string {
-  return n == null || Number.isNaN(n) ? '—' : Math.round(n).toString()
-}
-/** Prediction confidence is a 0–100 score (ml_predictor.py::_confidence),
- * not a 0–1 fraction. Do not multiply. */
-export function conf0(n: number | null | undefined): string {
-  return n == null || Number.isNaN(n) ? '—' : `${Math.round(n)}%`
-}

@@ -23,7 +23,7 @@
  * viewport zooms instead (usePanZoom).
  */
 
-import { MOVEMENTS, parseArmLane, type Arm } from './junctionTopology'
+import type { Arm } from './junctionTopology'
 
 export const NET = 400
 export const CENTRE = 200
@@ -38,8 +38,6 @@ export const JUNCTION_HALF = 21.6
  * vehicle keeps ~1.7 m clear of it.
  */
 export const KERB_R = 11
-/** Inbound lane length: the 200 m arm minus the 21.6 m to the stop line. */
-export const ARM_METRES = CENTRE - JUNCTION_HALF // 178.4
 
 /** The plate's own aspect - the viewport box it is drawn into. */
 export const PLATE_ASPECT = 920 / 540
@@ -47,11 +45,6 @@ export const PLATE_ASPECT = 920 / 540
 export interface Point {
   x: number
   y: number
-}
-
-/** SUMO coordinates -> plan-view coordinates (north up). */
-export function toSvg(p: Point): Point {
-  return { x: p.x, y: NET - p.y }
 }
 
 export type Axis = 'v' | 'h'
@@ -85,9 +78,6 @@ function lateral(arm: Arm, index: number, inbound: boolean): number {
   return out * side * (inbound ? 1 : -1)
 }
 
-const HEADING_IN: Record<Arm, number> = { N: 90, S: -90, E: 180, W: 0 }
-const HEADING_OUT: Record<Arm, number> = { N: -90, S: 90, E: 0, W: 180 }
-
 function inboundLane(arm: Arm, index: number): LaneGeom {
   const id = `${arm}_in_${index}`
   const off = lateral(arm, index, true)
@@ -110,25 +100,10 @@ export const LANES: LaneGeom[] = (['N', 'S', 'W', 'E'] as Arm[]).flatMap((arm) =
   [0, 1, 2].map((i) => inboundLane(arm, i)),
 )
 
-export const LANE_BY_ID: Record<string, LaneGeom> = Object.fromEntries(LANES.map((l) => [l.id, l]))
-
 /** Centre of the lane at the stop line, plan coordinates. */
 export function stopLinePoint(l: LaneGeom): Point {
   const mid = (l.lo + l.hi) / 2
   return l.axis === 'v' ? { x: mid, y: l.stop } : { x: l.stop, y: mid }
-}
-
-/**
- * Heading, in plan degrees, for traffic on any lane the network names —
- * the first heading a vehicle gets before it has moved. Mid-junction it
- * faces the way it came in; the movement delta sweeps it round.
- */
-export function laneHeading(lane: string): number | null {
-  const movement = MOVEMENTS[lane]
-  if (movement) return HEADING_IN[movement.from]
-  const parsed = parseArmLane(lane)
-  if (!parsed) return null
-  return parsed.inbound ? HEADING_IN[parsed.arm] : HEADING_OUT[parsed.arm]
 }
 
 /**

@@ -198,9 +198,6 @@ export interface EvaluationSnapshot {
 
 export type Snapshot = LiveSnapshot | EvaluationSnapshot | WaitingSnapshot
 
-export function isWaiting(s: Snapshot | null): s is WaitingSnapshot {
-  return s !== null && 'status' in s
-}
 export function isEvaluation(s: Snapshot | null): s is EvaluationSnapshot {
   return s !== null && 'kind' in s && s.kind === 'evaluation'
 }

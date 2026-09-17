@@ -354,6 +354,12 @@ unprompted, but do keep this section current if that changes:
 
 ## Working with this project
 
+- **UI work: change how it looks, never how much it says.** `docs/UI_CHANGE_RULES.md` is
+  binding for any interface change (recolouring, repositioning, new panels, new pages are
+  all free; removing any item of its content inventory needs the owner's explicit written
+  instruction naming the item — an item lost as a side effect of a redesign is a defect).
+  Read it at the start of any UI task and tick its inventory afterwards. `prototype-1`
+  (commit d9afd01, 2026-09-17) is the tagged state it describes.
 - **Explain before implementing.** If you (Claude) come up with an idea or feature beyond
   what was literally asked — even something clearly beneficial — explain it and get
   explicit approval before writing code. Things the user explicitly asks for (including
