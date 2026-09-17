@@ -1,7 +1,7 @@
 import { Panel } from '@/ui/Panel'
 import { TwinViewport } from '@/overview/TwinViewport'
 import type { SideView } from '@/data/types'
-import type { ViewState } from '@/overview/usePanZoom'
+import type { View, ViewState } from '@/overview/usePanZoom'
 import { phaseKey, phaseLabel } from '@/utils/signal'
 import { f1 } from '@/utils/format'
 
@@ -14,16 +14,25 @@ export function ControllerWindow({
   title,
   side,
   powered,
-  sharedView,
+  view,
+  matchView,
   simTime,
+  note,
+  motionSide,
 }: {
   title: string
   side: SideView | null
   powered: boolean
+  /** One line for the header while there is nothing to show. */
+  note?: string
+  /** Which evaluation fleet this window draws. */
+  motionSide: 'ai' | 'baseline'
   /** The frame's simulated time, for the plate's release timing. */
   simTime?: number
-  /** Both windows share one pan/zoom so the two are always framed alike. */
-  sharedView: ViewState
+  /** This window's own pan/zoom, owned by the page so the other window can read it. */
+  view: ViewState
+  /** The other window's framing, offered as a one-press "Match". */
+  matchView: { label: string; view: View }
 }) {
   const lanes = side?.lanes ?? []
   return (
@@ -41,7 +50,9 @@ export function ControllerWindow({
               wait <span className="text-ink-strong">{f1(side.metrics.avg_wait)}</span> s
             </span>
           </span>
-        ) : undefined
+        ) : (
+          note
+        )
       }
       bodyClassName="px-2 pb-2"
     >
@@ -51,7 +62,9 @@ export function ControllerWindow({
         vehicles={side?.vehicles}
         powered={powered}
         allow3d={false}
-        sharedView={sharedView}
+        sharedView={view}
+        matchView={matchView}
+        motionSide={motionSide}
         releaseKey={phaseKey(simTime, side?.decision.duration)}
       />
     </Panel>

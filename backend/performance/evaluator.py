@@ -87,7 +87,7 @@ from performance.metrics_collector import MetricsCollector
 from performance.scenarios import scenario_sumocfg_path
 from services.live_state import DEFAULT_STORE as LIVE_STATE, RemoteLiveStatePublisher
 from services.dashboard_server import start_dashboard_server
-from services.snapshot_views import _INDEX_TO_PHASE, side_view
+from services.snapshot_views import _INDEX_TO_PHASE, MOTION_FRAME_INTERVAL_SECONDS, motion_frame, side_view
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +131,9 @@ def evaluation_snapshot(scenario, baseline_controller, sim_time, ai_side, base_s
     """
     return {
         "kind": "evaluation",
+        # A decision tick; the motion frames between them (see
+        # snapshot_views.motion_frame) carry tick: False.
+        "tick": True,
         "sim_time": sim_time,
         "scenario": scenario,
         "baseline_controller": baseline_controller,
@@ -377,6 +380,8 @@ class PerformanceEvaluator:
                 return state
 
             last_live_publish = [None]
+            last_live_snapshot = [None]
+            motion_every = max(1, int(round(MOTION_FRAME_INTERVAL_SECONDS / step_seconds)))
 
             while True:
                 # Pause / stop from the console's top bar (see
@@ -397,6 +402,21 @@ class PerformanceEvaluator:
                     conn_base.simulationStep()
                     adapter_base.observe_step()
                 step_index += 1
+
+                # Motion frames between ticks for the Performance page's
+                # two plates (see snapshot_views.motion_frame): the last
+                # tick's snapshot with both fleets' fresh positions.
+                if (live_store is not None and last_live_snapshot[0] is not None
+                        and step_index % every != 1 % every
+                        and step_index % motion_every == 1 % motion_every):
+                    try:
+                        live_store.publish(motion_frame(
+                            last_live_snapshot[0],
+                            max(adapter_ai.get_simulation_time(), adapter_base.get_simulation_time()),
+                            {"ai": adapter_ai.get_vehicles(), "baseline": adapter_base.get_vehicles()},
+                        ))
+                    except Exception:
+                        logger.debug("Motion frame skipped.", exc_info=True)
                 # Same tick times as before the cadence change: the first
                 # step, then every full second after it (0.05, 1.05, ...).
                 on_tick = step_index % every == 1 % every
@@ -508,10 +528,11 @@ class PerformanceEvaluator:
                 if live_store is not None and latest["state_ai"] is not None and latest["state_base"] is not None:
                     now = latest["features_ai"].simulation_time
                     if last_live_publish[0] is None or now - last_live_publish[0] >= Config.DECISION_INTERVAL_SECONDS - 1e-6:
-                        live_store.publish(self._live_snapshot(
+                        last_live_snapshot[0] = self._live_snapshot(
                             latest, phase_history_ai, phase_history_base,
                             collector_ai, collector_base, final=False,
-                        ))
+                        )
+                        live_store.publish(last_live_snapshot[0])
                         last_live_publish[0] = now
 
             # Arrivals (and stops) that landed on the steps after the

@@ -2,10 +2,9 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Gauge, Monitor, Pause, Play, Square } from 'lucide-react'
 import clsx from 'clsx'
-import { useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { runControl, useRunStore } from '@/data/runState'
-import { useSettings } from '@/data/settings'
-import { scenarioName } from '@/data/scenarios'
+import { usePageContext } from '@/data/pageContext'
 import { DUR, EASE_OUT } from '@/ui/motion'
 
 /**
@@ -20,6 +19,14 @@ import { DUR, EASE_OUT } from '@/ui/motion'
  *   python app.py               Pause/Play, Stop — nothing to start,
  *                               because this dashboard IS the run
  *   evaluator dashboard         nothing at all
+ *
+ * The bar belongs to the PAGE (data/pageContext.ts): on Performance it
+ * starts and drives the evaluation, on Overview and Analytics the demo,
+ * on Simulation Settings whichever page its dropdown names — and then
+ * goes there. If the other kind of run is up, the bar still offers
+ * Start: pressing it ends that run and starts this page's, because a
+ * reader on Performance who finds Pause/Stop for a demo they cannot see
+ * has no idea what they are pausing.
  *
  * SPEED is here because it has to be: a headless run has no sumo-gui
  * Delay slider of its own and would otherwise step at roughly a hundred
@@ -43,27 +50,33 @@ function speedIndex(speed: number | null): number {
 export function RunControls() {
   const state = useRunStore((s) => s.state)
   const busy = useRunStore((s) => s.busy)
-  const demoScenario = useSettings((s) => s.demoScenario)
-  const evalScenario = useSettings((s) => s.evalScenario)
-  // On Performance the bar starts an EVALUATION (Trinetra vs VAC on the
-  // scenario picked in Settings); everywhere else it starts a demo run.
-  // Same bar, same pause/stop/speed - the backend runs either on the
-  // same worker with the same controls.
-  const onPerformance = useLocation().pathname.startsWith('/performance')
+  const page = usePageContext()
+  const navigate = useNavigate()
 
   if (!state?.available) return null
 
-  // Idle console: the only thing worth offering is a way to begin.
-  if (state.can_start) {
-    if (onPerformance) {
+  // Nothing of this page's kind is running: offer a way to begin. If the
+  // OTHER kind is up, Start ends it first (runState.replace*) and the
+  // tooltip says so. From Settings, Start also goes to the page it runs.
+  if (state.managed && !page.running) {
+    const goHome = () => {
+      if (page.path.startsWith('/settings')) navigate(page.home)
+    }
+    const other = page.otherRunning
+    const ending = other ? (page.kind === 'evaluation' ? ' — ends the demo run first' : ' — ends the evaluation first') : ''
+    const disabled = busy || state.stopping
+    if (page.kind === 'evaluation') {
       return (
         <div className="flex items-center gap-1.5">
           <Button
             primary
-            onClick={() => void runControl.startEvaluation(evalScenario)}
-            disabled={busy}
-            label="Start"
-            title={`Start the evaluation — Trinetra vs VAC on ${scenarioName(evalScenario)}`}
+            onClick={() => {
+              goHome()
+              void (other ? runControl.replaceWithEvaluation(page.scenario) : runControl.startEvaluation(page.scenario))
+            }}
+            disabled={disabled}
+            label={state.stopping ? 'Stopping' : 'Start'}
+            title={`Start the evaluation — Trinetra vs VAC on ${page.scenarioLabel}${ending}`}
             icon={<Play size={13} aria-hidden />}
           />
         </div>
@@ -73,22 +86,32 @@ export function RunControls() {
       <div className="flex items-center gap-1.5">
         <Button
           primary
-          onClick={() => void runControl.start(false, demoScenario)}
-          disabled={busy}
-          label="Start"
-          title={`Start a simulation of ${scenarioName(demoScenario)} (headless — watch it on this page)`}
+          onClick={() => {
+            goHome()
+            void (other ? runControl.replaceWithDemo(false, page.scenario) : runControl.start(false, page.scenario))
+          }}
+          disabled={disabled}
+          label={state.stopping ? 'Stopping' : 'Start'}
+          title={`Start a simulation of ${page.scenarioLabel} (headless — watch it on Overview)${ending}`}
           icon={<Play size={13} aria-hidden />}
         />
         <Button
-          onClick={() => void runControl.start(true, demoScenario)}
-          disabled={busy}
+          onClick={() => {
+            goHome()
+            void (other ? runControl.replaceWithDemo(true, page.scenario) : runControl.start(true, page.scenario))
+          }}
+          disabled={disabled}
           label=""
-          title="Start a simulation and open the SUMO window as well"
+          title={`Start a simulation and open the SUMO window as well${ending}`}
           icon={<Monitor size={13} aria-hidden />}
         />
       </div>
     )
   }
+
+  // python app.py hosts one run and can start nothing; with it over,
+  // there is nothing left to drive.
+  if (state.can_start || !state.running) return null
 
   const stopping = state.stopping
   const handing = state.handing_over === true

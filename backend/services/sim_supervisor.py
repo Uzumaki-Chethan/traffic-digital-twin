@@ -129,6 +129,7 @@ class SimulationSupervisor:
             self._refuse_if_busy()
 
             self.run_control.reset()
+            self._forget_last_run()
             self._kind = "demo"
             self._scenario = scenario
             self._gui = bool(gui)
@@ -156,6 +157,7 @@ class SimulationSupervisor:
             self._refuse_if_busy()
 
             self.run_control.reset()
+            self._forget_last_run()
             self._kind = "evaluation"
             self._scenario = scenario_name
             self._gui = False
@@ -169,6 +171,17 @@ class SimulationSupervisor:
             self._thread.start()
             logger.info("Started evaluation (scenario=%s, baseline=%s).", scenario_name, baseline)
             return self.status_dict()
+
+    def _forget_last_run(self) -> None:
+        """
+        A new run must not start under the previous run's last snapshot:
+        the dashboard would show that picture - stopped vehicles included -
+        until the new run's first tick, 4-6 s later. Not called for a GUI
+        handover, which is the same run continuing.
+        """
+        clear = getattr(self._store, "clear", None)
+        if callable(clear):
+            clear()
 
     def open_gui(self) -> dict:
         """
@@ -254,7 +267,7 @@ class SimulationSupervisor:
             while True:
                 try:
                     runner(self._store, self.run_control, gui=gui, load_state=load_state,
-                           sumocfg=sumocfg)
+                           sumocfg=sumocfg, run_id=self._started_at)
                 except BaseException as exc:  # noqa: BLE001 - reported, never swallowed
                     # Includes SystemExit/KeyboardInterrupt deliberately:
                     # this is a worker thread, and whatever ends it must

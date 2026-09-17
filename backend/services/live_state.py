@@ -46,11 +46,20 @@ class LiveStateStore:
     def __init__(self):
         self._lock = threading.Lock()
         self._snapshot = None
+        # Bumped on every publish() and clear(), so a reader can tell a
+        # NEW frame from the one it already sent without comparing dicts.
+        self._version = 0
 
     def publish(self, snapshot: dict) -> None:
         """Atomically replace the latest snapshot (simulation side)."""
         with self._lock:
             self._snapshot = snapshot
+            self._version += 1
+
+    def latest_versioned(self):
+        """(snapshot or None, version) - one atomic read for a broadcaster."""
+        with self._lock:
+            return self._snapshot, self._version
 
     def latest(self):
         """
@@ -59,6 +68,16 @@ class LiveStateStore:
         """
         with self._lock:
             return self._snapshot
+
+    def clear(self) -> None:
+        """
+        Forget the last snapshot. Called when a NEW run starts, so the
+        dashboard is not shown the previous run's final picture (and its
+        vehicles) for the seconds until the new run's first tick.
+        """
+        with self._lock:
+            self._snapshot = None
+            self._version += 1
 
 
 # Module-level default store so any component (app.py, evaluator,

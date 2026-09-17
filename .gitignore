@@ -256,3 +256,6 @@ ml/trained_models/*.joblib
 datasets/*.csv
 # Playwright MCP session artefacts (screenshots, snapshots, console logs)
 .playwright-mcp/
+
+# Claude Code tooling (installed skills, machine-local permissions)
+.claude/

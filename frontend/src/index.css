@@ -199,6 +199,18 @@ small {
   outline-offset: 2px;
 }
 
+/* Anything that answers a click shows the hand. Tailwind v4's preflight
+   dropped the pointer from buttons (v3 set it), so without this every
+   control in the product read as an arrow. Disabled controls keep the
+   not-allowed cursor their own classes set. */
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']),
+select:not(:disabled),
+summary,
+label[for] {
+  cursor: pointer;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

@@ -44,7 +44,8 @@ def test_evaluation_snapshot_shape():
     side = {"signal": None, "metrics": {}, "lanes": [], "vehicles": [], "decision": {}, "phase_history": []}
     rows = [{"key": "avg_waiting_time_seconds", "label": "Avg Waiting Time (s)", "ai": 1.0, "baseline": 2.0, "improvement": 50.0}]
     snap = evaluation_snapshot("light_seed1", "vac", 12.0, side, side, rows, final=False)
-    assert set(snap) == {"kind", "sim_time", "scenario", "baseline_controller", "ai", "baseline", "comparison"}
+    assert set(snap) == {"kind", "tick", "sim_time", "scenario", "baseline_controller", "ai", "baseline", "comparison"}
+    assert snap["tick"] is True
     assert snap["kind"] == "evaluation" and snap["scenario"] == "light_seed1"
     assert snap["baseline_controller"] == "vac" and snap["sim_time"] == 12.0
     assert snap["comparison"] == {"rows": rows, "final": False}

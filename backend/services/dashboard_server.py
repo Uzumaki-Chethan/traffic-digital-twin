@@ -49,6 +49,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from analytics import average_wait_times, congestion_trend, detect_peak_periods
+from analytics.congestion_analytics import latest_run_id
 from config import Config
 from services.live_state import LiveStateStore
 
@@ -61,9 +62,19 @@ logger = logging.getLogger(__name__)
 _FRONTEND_DIST = os.path.join(Config.PROJECT_ROOT, "frontend", "dist")
 _FRONTEND_INDEX = os.path.join(_FRONTEND_DIST, "index.html")
 
-# Push cadence for WebSocket clients. The store updates at 1 Hz; polling
-# slightly faster than that is harmless and keeps the countdown smooth.
-_BROADCAST_INTERVAL_SECONDS = 0.5
+# WebSocket push: a frame goes out as soon as the store holds a NEW one
+# (checked every _BROADCAST_POLL_SECONDS - 10 ms, so a frame is at most
+# that late, which also caps the rate at ~100 frames/s), and unchanged
+# state is re-sent every
+# _BROADCAST_HEARTBEAT_SECONDS so a client can tell "paused" from "gone".
+# It used to be a flat 0.5 s: at 1x that is one frame per simulated
+# second either way, but at "max" (8-16x) a frame then spanned 4-8
+# simulated seconds, and no interpolation between two positions that far
+# apart stays on the road - the page had to choose between smooth and
+# correct. Per-tick frames make every frame ~1 simulated second at any
+# speed.
+_BROADCAST_POLL_SECONDS = 0.01
+_BROADCAST_HEARTBEAT_SECONDS = 0.5
 
 _RESULTS_DIR = os.path.join(Config.PROJECT_ROOT, "results")
 
@@ -116,42 +127,106 @@ def create_app(store: LiveStateStore, extra_router: Optional[APIRouter] = None) 
         # blocked; same read-only snapshot.
         return store.latest() or {"status": "waiting_for_simulation"}
 
-    @app.get("/api/logs/decisions")
-    async def decision_logs(limit: int = 200):
-        limit = max(1, min(limit, _LOG_LIMIT_MAX))
+    # Every log row belongs to a run (db_logger.run_id, 2026-09-17), and
+    # these endpoints answer for ONE run - the newest unless ?run= names
+    # another - so a list ordered by simulated time is one run's story,
+    # never several runs shuffled together. ?run=all is the old
+    # behaviour, kept for a legacy file with no run ids.
+    def _run_clause(conn, run):
+        if run == "all":
+            return "", ()
+        if run is None or run == "latest":
+            run = latest_run_id(conn)
+            if run is None:
+                return "", ()
+        return " WHERE run_id = ?", (run,)
+
+    @app.get("/api/logs/runs")
+    async def log_runs():
+        """The runs the database holds, newest first, from decision_log."""
         try:
             conn = _read_only_connection()
         except sqlite3.OperationalError:
             return JSONResponse([])
         try:
             cur = conn.execute(
-                "SELECT id, time, phase, duration, mode, reason "
-                "FROM decision_log ORDER BY time DESC LIMIT ?",
-                (limit,),
+                "SELECT run_id, COUNT(*), MIN(time), MAX(time), MAX(scenario), "
+                "SUM(CASE WHEN duration = 0 THEN 1 ELSE 0 END) FROM decision_log "
+                "WHERE run_id IS NOT NULL GROUP BY run_id ORDER BY run_id DESC"
             )
-            rows = [
+            return [
                 {
-                    "id": r[0], "time": r[1], "phase": r[2],
-                    "duration": r[3], "mode": r[4], "reason": r[5],
+                    "run_id": r[0], "decisions": r[1], "first_time": r[2], "last_time": r[3],
+                    "scenario": r[4], "switches": r[5],
                 }
                 for r in cur.fetchall()
             ]
+        except sqlite3.OperationalError:
+            return JSONResponse([])
+        finally:
+            conn.close()
+
+    @app.get("/api/logs/decisions")
+    async def decision_logs(limit: int = 200, run: str = None, after_id: int = None):
+        """
+        One run's decisions, newest first (`limit` ≤ 1000). With
+        `after_id`, only rows newer than that id, OLDEST first — how the
+        Decisions page follows a live run without refetching the lot.
+        """
+        import json
+
+        limit = max(1, min(limit, _LOG_LIMIT_MAX))
+        try:
+            conn = _read_only_connection()
+        except sqlite3.OperationalError:
+            return JSONResponse([])
+        try:
+            where, params = _run_clause(conn, run)
+            if after_id is not None:
+                where = (where + " AND " if where else " WHERE ") + "id > ?"
+                params = params + (after_id,)
+                order = " ORDER BY id ASC LIMIT ?"
+            else:
+                order = " ORDER BY id DESC LIMIT ?"
+            cur = conn.execute(
+                "SELECT id, time, phase, duration, mode, reason, actual_phase, actual_is_yellow, "
+                "run_id, phase_scores, margin, scenario "
+                "FROM decision_log" + where + order,
+                params + (limit,),
+            )
+            rows = []
+            for r in cur.fetchall():
+                try:
+                    scores = json.loads(r[9]) if r[9] else None
+                except (TypeError, ValueError):
+                    scores = None
+                rows.append({
+                    "id": r[0], "time": r[1], "phase": r[2],
+                    "duration": r[3], "mode": r[4], "reason": r[5],
+                    "actual_phase": r[6],
+                    "actual_is_yellow": None if r[7] is None else bool(r[7]),
+                    "run_id": r[8],
+                    "phase_scores": scores,
+                    "margin": r[10],
+                    "scenario": r[11],
+                })
         finally:
             conn.close()
         return rows
 
     @app.get("/api/logs/performance")
-    async def performance_logs(limit: int = 200):
+    async def performance_logs(limit: int = 200, run: str = None):
         limit = max(1, min(limit, _LOG_LIMIT_MAX))
         try:
             conn = _read_only_connection()
         except sqlite3.OperationalError:
             return JSONResponse([])
         try:
+            where, params = _run_clause(conn, run)
             cur = conn.execute(
                 "SELECT id, time, avg_wait, avg_speed, queue_length, stopped "
-                "FROM performance_log ORDER BY time DESC LIMIT ?",
-                (limit,),
+                "FROM performance_log" + where + " ORDER BY time DESC LIMIT ?",
+                params + (limit,),
             )
             rows = [
                 {
@@ -165,7 +240,7 @@ def create_app(store: LiveStateStore, extra_router: Optional[APIRouter] = None) 
         return rows
 
     @app.get("/api/logs/predictions")
-    async def prediction_logs(limit: int = 200):
+    async def prediction_logs(limit: int = 200, run: str = None):
         import json
 
         limit = max(1, min(limit, _LOG_LIMIT_MAX))
@@ -174,10 +249,11 @@ def create_app(store: LiveStateStore, extra_router: Optional[APIRouter] = None) 
         except sqlite3.OperationalError:
             return JSONResponse([])
         try:
+            where, params = _run_clause(conn, run)
             cur = conn.execute(
                 "SELECT id, time, predicted_values, actual_values, confidence "
-                "FROM prediction_log ORDER BY time DESC LIMIT ?",
-                (limit,),
+                "FROM prediction_log" + where + " ORDER BY time DESC LIMIT ?",
+                params + (limit,),
             )
             rows = []
             for r in cur.fetchall():
@@ -273,15 +349,26 @@ def create_app(store: LiveStateStore, extra_router: Optional[APIRouter] = None) 
         await websocket.accept()
         logger.info("Dashboard client connected")
         try:
+            loop = asyncio.get_running_loop()
+            sent_version = None
+            sent_at = float("-inf")
             while True:
-                snapshot = store.latest()
-                if snapshot is None:
-                    await websocket.send_json(
-                        {"status": "waiting_for_simulation"}
-                    )
-                else:
-                    await websocket.send_json(snapshot)
-                await asyncio.sleep(_BROADCAST_INTERVAL_SECONDS)
+                if hasattr(store, "latest_versioned"):
+                    snapshot, version = store.latest_versioned()
+                else:  # a bare store in tests
+                    snapshot, version = store.latest(), None
+                now = loop.time()
+                fresh = version is None or version != sent_version
+                if fresh or now - sent_at >= _BROADCAST_HEARTBEAT_SECONDS:
+                    if snapshot is None:
+                        await websocket.send_json(
+                            {"status": "waiting_for_simulation"}
+                        )
+                    else:
+                        await websocket.send_json(snapshot)
+                    sent_version = version
+                    sent_at = now
+                await asyncio.sleep(_BROADCAST_POLL_SECONDS)
         except WebSocketDisconnect:
             logger.info("Dashboard client disconnected")
         except Exception:

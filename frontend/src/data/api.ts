@@ -47,6 +47,11 @@ export interface PredictionLogRow {
   confidence: number
 }
 
+/** One decision of a run (`decision_log`). Since 2026-09-17 a row also
+ * carries the TraCI-confirmed actual state, the run it belongs to, the
+ * four phase scores and the margin of that tick (so the score ledger can
+ * redraw a past decision), and the scenario; rows written before that
+ * have those as null. */
 export interface DecisionLogRow {
   id: number
   time: number
@@ -54,6 +59,24 @@ export interface DecisionLogRow {
   duration: number
   mode: string
   reason: string
+  actual_phase: string | null
+  actual_is_yellow: boolean | null
+  run_id: string | null
+  phase_scores: Record<string, number> | null
+  margin: number | null
+  scenario: string | null
+}
+
+/** A run the database holds (`/api/logs/runs`), summarised from its decisions. */
+export interface RunSummary {
+  /** The run's ISO UTC start time — also its id. */
+  run_id: string
+  decisions: number
+  first_time: number
+  last_time: number
+  scenario: string | null
+  /** Ticks on which the phase changed (duration 0). */
+  switches: number
 }
 
 export interface PerformanceLogRow {
@@ -100,7 +123,15 @@ export interface ResultsSummary {
 export const api = {
   modelInfo: (signal?: AbortSignal) => getJson<ModelInfo | Record<string, never>>('/api/model-info', signal),
   predictionLogs: (limit = 200, signal?: AbortSignal) => getJson<PredictionLogRow[]>(`/api/logs/predictions?limit=${limit}`, signal),
-  decisionLogs: (limit = 200, signal?: AbortSignal) => getJson<DecisionLogRow[]>(`/api/logs/decisions?limit=${limit}`, signal),
+  /** One run's decisions, newest first; or with `afterId`, only rows newer than it, oldest first. */
+  decisionLogs: (limit = 200, run?: string, afterId?: number, signal?: AbortSignal) =>
+    getJson<DecisionLogRow[]>(
+      `/api/logs/decisions?limit=${limit}` +
+        (run ? `&run=${encodeURIComponent(run)}` : '') +
+        (afterId != null ? `&after_id=${afterId}` : ''),
+      signal,
+    ),
+  runs: (signal?: AbortSignal) => getJson<RunSummary[]>('/api/logs/runs', signal),
   performanceLogs: (limit = 200, signal?: AbortSignal) => getJson<PerformanceLogRow[]>(`/api/logs/performance?limit=${limit}`, signal),
   laneWaitTimes: (signal?: AbortSignal) => getJson<LaneWaitTimes>('/api/analytics/wait-times?group_by=lane', signal),
   congestionTrend: (bucketSeconds = 60, signal?: AbortSignal) => getJson<CongestionBucket[]>(`/api/analytics/congestion-trend?bucket_seconds=${bucketSeconds}`, signal),

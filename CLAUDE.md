@@ -110,6 +110,11 @@ frontend replaced it; the dead fallback code path was cleaned up 2026-09-06).
   decisions change. Section 28.
 - **Digital Twin** (`backend/digital_twin/`): current `SimulationState` + bounded rolling
   history. Nothing else stores its own copy of traffic state.
+- **ML model loading** (`backend/ml/ml_predictor.py`): `MLPredictor.from_path` caches the
+  deserialised 258 MB forest + calibrators + metadata per process, keyed on all three
+  files' path/size/mtime; `server.py` warms it on a thread at start so a console Start
+  reaches its first tick in ~1.4 s instead of 5-7. The forest is read-only at inference,
+  so sharing it across runs (and the evaluator's two sides) is safe.
 - **Decision Engine** (`backend/decision_engine/decision_engine.py`): all tunables (green
   clamps, hysteresis margin, starvation limits, emergency windows, normalization ceilings,
   `switch_confirmation_seconds`) live in `decision_config.py`'s `DecisionConfig` dataclass,
@@ -157,7 +162,11 @@ frontend replaced it; the dead fallback code path was cleaned up 2026-09-06).
   the TraCI-confirmed Actual State, alongside the Decision Engine's Desired State),
   `performance_log` (network-wide), `prediction_log` (predicted-vs-actual pairs),
   `lane_state_log` (per-lane, 12 rows/tick, feeds analytics). Older DB files are migrated
-  in place via `ALTER TABLE` on startup, not replaced.
+  in place via `ALTER TABLE` on startup, not replaced. Since 2026-09-17 every row carries
+  `run_id` (the run's ISO start time; the console passes `started_at`), a new run prunes
+  runs older than `Config.DB_KEEP_RUNS` (10) + `VACUUM`, and every reader (`/api/logs/*`
+  with `?run=`, `/api/logs/runs`, the analytics functions' `run_id="latest"`) answers for
+  ONE run (Section 30.13). Evaluations never write the DB.
 - **Analytics** (`backend/analytics/congestion_analytics.py`): read-only, no FastAPI
   dependency, takes a plain `db_path`. `average_wait_times`, `congestion_trend`,
   `detect_peak_periods` — peaks are detected statistically from recorded congestion
@@ -165,7 +174,18 @@ frontend replaced it; the dead fallback code path was cleaned up 2026-09-06).
 - **Dashboard** (`backend/services/dashboard_server.py`): FastAPI, strictly read-only in
   itself — zero endpoints of its own that can send a command into the simulation; sourced
   from `LiveStateStore` (in-process, live) or the SQLite/CSV files the simulation already
-  wrote. Two hosts build the identical app: `app.py` via `start_dashboard_server()` (daemon
+  wrote. The WebSocket pushes a frame whenever the store's version changes (one per
+  simulation tick, ≤ 30/s, 0.5 s heartbeat) — NOT on a fixed 0.5 s timer; that timer is
+  what made "max" speed unrenderable (Section 30.10). A new run `clear()`s the store.
+  Since 2026-09-16 the run also publishes **motion frames** every 0.2 s simulated between
+  decision ticks (`snapshot_views.motion_frame`, `tick: false`): fresh vehicle positions
+  only, nothing the pipeline sees — anything that samples per tick must skip
+  `tick === false` (Section 30.11). The drawn kerb fillet is 11 m, deliberately 1 m
+  tighter than the net polygon's 12 (`plateGeometry.KERB_R`). Vehicles carry SUMO's
+  `angle` (VAR_ANGLE, dashboard-only) and both views draw from `frontend/src/data/motion.ts`
+  — a frame buffer + display clock 250 ms behind the newest frame, rAF-driven, never CSS
+  tweens (30.15): that is what removed the periodic hitch, so don't reintroduce
+  per-frame tweening. Two hosts build the identical app: `app.py` via `start_dashboard_server()` (daemon
   thread inside the simulation process — dies with the run, which is why every page used to
   502 when SUMO closed), and `server.py` via `create_app()` in the foreground of a process
   that outlives any run. Never launched directly as a script; it has no `main()`.
@@ -287,8 +307,13 @@ unprompted, but do keep this section current if that changes:
   user's own choices: red rail, traffic-yellow ground (`#F4B31D`), pale-green cards, real
   signal-colour lamps, Orbitron/Barlow/JetBrains Mono. Overview, Analytics, Performance
   (two live junctions + seven metric verdicts) and Simulation Settings (scenario cards) are
-  built; Decisions is still an honest placeholder. Lane ids (`N_in_0`) no longer render
-  anywhere — every lane is "North · Left" (`utils/signal.laneLabel`). The design contract is
+  built; **Decisions was built 2026-09-17** (Section 30.14) as the brief's §8.4 audit
+  trail over the run-scoped database — the only page that reads the DB. Overview gained
+  the §7.5 score ledger ("Why this phase", `decision.margin` is the engine's effective
+  hysteresis margin) and "Recent switches" (30.12). `decision_log` rows now store
+  `phase_scores`, `margin` and `scenario` for it. No placeholder pages remain. Lane ids
+  (`N_in_0`) no longer render anywhere — every lane is "North · Left"
+  (`utils/signal.laneLabel`). The design contract is
   `docs/design/TRINETRA_UI_DESIGN_BRIEF.md` (its reference-kit process was dropped by the
   user; its data rules, banned-defaults list and page plan still apply). Two standing rules
   from the user: **never show prediction confidence anywhere in the UI**, and do NOT
@@ -301,6 +326,17 @@ unprompted, but do keep this section current if that changes:
   vehicles at their vType length × width; sumo-gui-style zoom with 1× = whole network) —
   the user asked for it after the schematic's exaggerated lane widths made heavy traffic
   look light. Keep the drafting look; do not go back to a schematic scale (Section 28.5).
+  Since 2026-09-15 (Section 30): the wheel zooms only with Ctrl/⌘ held (a plain wheel
+  scrolls the page — the user's call; nothing printed on the map about it), the plate
+  opens at 3.5×, the two Performance windows zoom independently with a one-shot Match
+  button (the shared frame of 28.5 was overruled), Settings is ONE scenario grid with a
+  "Choose for" dropdown, and the production-route card is gone (Balanced is the demo
+  default; the backend's `default` id still works, it just has no card). **The top bar
+  is per page** (`data/pageContext.ts`): Performance's bar drives the evaluation,
+  Overview/Analytics' the demo, Settings' whichever its dropdown names (and navigates
+  there); when the other kind is running, Start ends it first
+  (`runState.replaceWith*`). Performance idle is the full dark layout, never a
+  placeholder card (Section 30.6–30.7).
   **Motion has one vocabulary (2026-09-15, Section 29):** `src/ui/motion.ts` plus the
   `--dur-*`/`--ease-*` tokens, spent on the signal release (the arrow sweep and lamp bloom
   on a confirmed green, triggered by the derived `utils/signal.phaseKey`), data tweens,

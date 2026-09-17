@@ -46,6 +46,13 @@ class VehicleState:
         are the types defined in sumo/vehicles/vehicle_types.add.xml.
         Defaults to "" so a VehicleState can still be built without one
         (tests, and any caller that predates this field).
+    angle : float
+        The vehicle's heading in SUMO's convention - degrees clockwise
+        from north - as reported by traci.vehicle.getAngle(): the
+        heading SUMO itself computed along the lane's real shape, so it
+        turns smoothly through a junction's curve (2026-09-17). Read for
+        the dashboard only; nothing in the pipeline uses it. Defaults to
+        0.0 for callers that predate it.
     """
 
     id: str
@@ -54,6 +61,7 @@ class VehicleState:
     waiting_time: float
     position: Tuple[float, float]
     type_id: str = ""
+    angle: float = 0.0
 
 
 @dataclass(frozen=True)

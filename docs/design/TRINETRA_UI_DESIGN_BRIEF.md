@@ -70,7 +70,7 @@ Job 3 deserves emphasis. The project's whole architectural claim is the Desired-
 
 This section was read directly out of `backend/app.py`, `backend/services/dashboard_server.py`, `backend/services/control_routes.py`, `backend/performance/evaluator.py`, `backend/performance/metrics_collector.py` and `backend/decision_engine/decision_engine.py` on the `main` branch. **Treat it as the authority over any older doc, but re-verify field names against the running server before you ship** — `GET /api/latest` while `python app.py` runs is the fastest check.
 
-### 2.1 Live snapshot — `WS /ws` (pushed every 0.5 s) and `GET /api/latest`
+### 2.1 Live snapshot — `WS /ws` (pushed once per simulation tick since 2026-09-16; was every 0.5 s) and `GET /api/latest`
 
 ```jsonc
 {

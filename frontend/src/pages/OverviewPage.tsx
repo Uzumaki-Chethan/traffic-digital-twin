@@ -1,10 +1,6 @@
 import { useSim } from '@/data/store'
 import { useRunStore } from '@/data/runState'
-import { Link } from 'react-router-dom'
-import { SlidersHorizontal } from 'lucide-react'
-import { isEvaluation, isLive, type LiveSnapshot } from '@/data/types'
-import { scenarioName } from '@/data/scenarios'
-import { useSettings } from '@/data/settings'
+import { isLive, type LiveSnapshot } from '@/data/types'
 import { Panel } from '@/ui/Panel'
 import { Reveal } from '@/ui/Reveal'
 import { TwinViewport } from '@/overview/TwinViewport'
@@ -13,6 +9,8 @@ import { LaneTable } from '@/overview/LaneTable'
 import { RingBarrierHistory } from '@/overview/RingBarrierHistory'
 import { MetricsStrip } from '@/overview/MetricsStrip'
 import { PredictionPanel } from '@/overview/PredictionPanel'
+import { ScoreLedger } from '@/overview/ScoreLedger'
+import { RecentSwitches } from '@/overview/RecentSwitches'
 import { lampOf, phaseKey } from '@/utils/signal'
 
 const EMPTY: LiveSnapshot = {
@@ -32,6 +30,10 @@ const EMPTY: LiveSnapshot = {
  * on the right, history and metrics as low bands below. Before the first
  * tick the plate renders unpowered with one line of instruction — never
  * a spinner. On a link drop the last live snapshot stays on screen.
+ *
+ * An evaluation running on Performance is not this page's run: the page
+ * sits idle and dark exactly as it does when nothing runs, rather than
+ * pointing elsewhere or replaying the last demo frame.
  */
 export function OverviewPage() {
   const latest = useSim((s) => s.latest)
@@ -40,19 +42,13 @@ export function OverviewPage() {
   const run = useRunStore((s) => s.state)
 
   const live = isLive(latest) ? latest : lastLive
-  // Frames on the wire belong to an evaluation (Trinetra vs VAC, two
-  // junctions): that lives on the Performance page, not here.
-  const evaluating = isEvaluation(latest) || (run?.running === true && run.kind === 'evaluation')
-  const demoScenario = useSettings((s) => s.demoScenario)
-  // The chip names what is running when a run is up, else what Start
-  // would run (the Settings choice).
-  const chipScenario = run?.running && run.kind === 'demo' && run.scenario ? run.scenario : demoScenario
   // A STOPPED run is not a paused one: the traffic it was showing no
   // longer exists, so the junction goes dark and clears rather than
   // holding a frozen last frame that looks live. Pausing deliberately
   // does NOT do this — a paused run still has those vehicles sitting
   // where they are. Only asked of a backend that can actually tell us.
-  const ended = run?.available === true && !run.running
+  // A run of another kind (an evaluation) counts as nothing running here.
+  const ended = run?.available === true && (!run.running || run.kind === 'evaluation')
   const powered = live !== null && !ended
   const snap = powered ? (live ?? EMPTY) : EMPTY
   const dimmed = link !== 'open' && powered
@@ -70,11 +66,7 @@ export function OverviewPage() {
           <Panel
             title="Digital Twin"
             meta={
-              evaluating ? (
-                <Link to="/performance" className="underline decoration-[var(--rule-strong)] underline-offset-2">
-                  an evaluation is running — watch it on Performance
-                </Link>
-              ) : powered ? (
+              powered ? (
                 <span className="flex items-center gap-3">
                   <span className="flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full bg-signal-green" /> green {greens}
@@ -88,41 +80,35 @@ export function OverviewPage() {
             }
             bodyClassName="px-2 pb-2"
           >
-            {evaluating ? (
-              <div className="flex aspect-[920/540] w-full items-center justify-center rounded-control bg-inset text-[13px] text-ink">
-                <p className="max-w-sm text-center">
-                  An evaluation is running — Trinetra and vehicle-actuated control side by side.
-                  <br />
-                  <Link to="/performance" className="underline decoration-[var(--rule-strong)] underline-offset-2">Watch it on Performance</Link>
-                </p>
-              </div>
-            ) : (
-              <TwinViewport
-                lanes={snap.lanes}
-                emergencyLanes={snap.emergency_lanes}
-                vehicles={snap.vehicles}
-                powered={powered}
-                releaseKey={phaseKey(snap.sim_time, snap.decision.duration)}
-              />
-            )}
+            <TwinViewport
+              lanes={snap.lanes}
+              emergencyLanes={snap.emergency_lanes}
+              vehicles={snap.vehicles}
+              powered={powered}
+              releaseKey={phaseKey(snap.sim_time, snap.decision.duration)}
+            />
           </Panel>
-          <Link
-            to="/settings"
-            className="flex w-fit items-center gap-1.5 rounded-control border border-rule bg-plate px-2.5 py-1 text-[12px] text-ink"
-            title="Change the scenario on the Simulation Settings page"
-          >
-            <SlidersHorizontal size={12} aria-hidden />
-            Scenario: <span className="text-ink-strong">{scenarioName(chipScenario)}</span>
-          </Link>
 
           <Reveal index={3}>
             <PredictionPanel prediction={snap.prediction} powered={powered} />
           </Reveal>
+
+          {/* The explainability row: the decision boundary and the last
+              few switches. Fills the column to the lane table's height
+              rather than leaving the space under the prediction empty. */}
+          <div className="grid flex-1 grid-cols-2 items-stretch gap-2">
+            <Reveal index={4} className="flex min-h-0">
+              <ScoreLedger decision={snap.decision} powered={powered} />
+            </Reveal>
+            <Reveal index={4} className="flex min-h-0">
+              <RecentSwitches history={snap.phase_history} powered={powered} />
+            </Reveal>
+          </div>
         </div>
 
         <div className="col-span-4 flex min-h-0 flex-col gap-2">
           <Reveal index={1}>
-            <PhasePanel decision={snap.decision} signal={snap.signal} />
+            <PhasePanel decision={snap.decision} signal={snap.signal} powered={powered} />
           </Reveal>
           <Reveal index={2}>
             <LaneTable lanes={snap.lanes} powered={powered} />
@@ -131,10 +117,10 @@ export function OverviewPage() {
       </div>
 
       <div className="mt-2 flex flex-col gap-2">
-        <Reveal index={4}>
+        <Reveal index={5}>
           <RingBarrierHistory history={snap.phase_history} />
         </Reveal>
-        <Reveal index={5}>
+        <Reveal index={6}>
           <MetricsStrip metrics={snap.metrics} history={snap.phase_history} powered={powered} />
         </Reveal>
       </div>

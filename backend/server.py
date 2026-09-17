@@ -29,6 +29,8 @@ the habit refer to.
 """
 
 import argparse
+import os
+import threading
 import logging
 
 import uvicorn
@@ -38,6 +40,7 @@ from services.live_state import DEFAULT_STORE as LIVE_STATE
 from services.dashboard_server import create_app
 from services.control_routes import build_control_router
 from services.sim_supervisor import SimulationSupervisor
+from ml import MLPredictor
 
 
 def build_server_app(store=LIVE_STATE):
@@ -49,6 +52,13 @@ def build_server_app(store=LIVE_STATE):
     TestClient without binding a port.
     """
     supervisor = SimulationSupervisor(store)
+    # Read the 260 MB forest once, now, off the request path: it was
+    # ~7 s of every run's start-up, paid again on each Start.
+    if os.path.isfile(Config.ML_MODEL_PATH):
+        threading.Thread(
+            target=MLPredictor.warm, args=(Config.ML_MODEL_PATH,),
+            name="ml-model-warmup", daemon=True,
+        ).start()
     app = create_app(
         store,
         extra_router=build_control_router(store, supervisor.run_control, supervisor),

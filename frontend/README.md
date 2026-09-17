@@ -10,14 +10,18 @@ Built from a Stitch export whose layout the user approved, then iterated on
 colour and typography over about fifteen rounds (`docs/design/` has the brief).
 
 - **Overview** (`/`) — the junction as the hero, in either a true-scale plan view
-  (one SVG unit = one metre; scroll to zoom about the pointer, drag to pan, 1× =
-  the whole 400 m network, a button frames the junction) or an interactive 3D
+  (one SVG unit = one metre; Ctrl + scroll or pinch to zoom about the pointer,
+  drag to pan, 1× = the whole 400 m network, 3.5× on opening and under the
+  "frame the junction" button; a plain scroll is left to the page) or an interactive 3D
   miniature (`TwinViewport` toggles; 3D is lazy-loaded as its own chunk). Both
   draw the real SUMO vehicles at their real `length × width`, as their real
   types — a bus is a bus, and a queue looks as it does in sumo-gui. Under it, **Prediction vs actual**: the only
   place the ML layer appears in the UI. Beside it: the active-phase panel with the
-  Desired-vs-Actual pair, the 12-lane ledger with plate cross-highlight, a
-  dual-track ring-barrier phase history, and the metrics band.
+  Desired-vs-Actual pair, the 12-lane ledger with plate cross-highlight, the
+  score ledger (`ScoreLedger`: four phase scores + the dashed decision boundary
+  at served score + `decision.margin`) beside the last five switches
+  (`RecentSwitches`, from the snapshot's `phase_history`), a dual-track
+  ring-barrier phase history, and the metrics band.
 - **Analytics** (`/analytics`) — the run happening now, in detail: lane-pressure
   heatmap, lane ledger, network trend lines, congestion by bucket, decision-mode
   donut, phase share, green-duration histogram, speed-vs-wait scatter, peak
@@ -28,16 +32,52 @@ colour and typography over about fifteen rounds (`docs/design/` has the brief).
   evaluation frame, then seven `MetricBlock`s (two-line SVG time series, both
   current values, a verdict badge from `data/verdict.ts` — "Even" inside
   ±0.5 %). History accumulates in `data/evalHistory.ts`, the sibling of
-  `liveHistory.ts`; the verdicts lock when `comparison.final` arrives.
-- **Simulation Settings** (`/settings`) — scenario cards for the demo and for the
-  evaluation (`data/scenarios.ts` holds the plain-language names; ids never
-  render), selection kept in `localStorage` via `data/settings.ts`.
-- **Decisions** — honest placeholder.
+  `liveHistory.ts`; the verdicts lock when `comparison.final` arrives. The two
+  plates pan and zoom independently; each carries a Match button that adopts
+  the other's framing (`TwinViewport`'s `matchView`).
+- **Simulation Settings** (`/settings`) — one grid of scenario cards and a
+  "Choose for" dropdown (Overview / Performance) saying which page a click
+  selects for; cards mark the page(s) using them (`data/scenarios.ts` holds the
+  plain-language names; ids never render). Selection and the dropdown's target
+  are kept in `localStorage` via `data/settings.ts`; Balanced is the demo
+  default, Extreme the evaluation's. The production route (`default`) keeps a
+  name for runs started without a scenario but has no card.
+- **The top bar is per page** (`data/pageContext.ts` → `layout/RunControls.tsx`,
+  `layout/StatusBar.tsx`): Performance's Start/Pause/Stop drive the evaluation,
+  Overview's and Analytics' the demo, Settings' the page its dropdown names
+  (then navigates there). When the other kind of run is up, Start ends it and
+  starts this page's (`runState.replaceWithDemo/Evaluation`: stop, poll until
+  idle, start — `busy` held throughout). A "Scenario: …" chip beside the
+  controls names the page's scenario and links to Settings; the footer's right
+  side names the backend host and stream state (the rate is in the status bar).
+  Performance never shows a placeholder: idle, it draws both junctions dark and
+  seven `EmptyMetricBlock`s. A run of the other kind is "nothing running" from a
+  page's point of view: Overview sits dark during an evaluation, Performance
+  during a demo, and the status bar's clock, Live pill and mode chip follow the
+  page (`foreign` in `StatusBar`), as does `PhasePanel`'s held-seconds counter
+  (`powered`).
+- **Decisions** (`/decisions`) — the audit trail, the only page that reads the
+  database: `decisions/useDecisionLog.ts` (runs list, one run's rows walked with
+  `after_id`, live follow), `DecisionList` (windowed, 30 px rows, ↑/↓),
+  `DecisionDetail` (reason, desired vs actual, `ScoreLedger` from the row's stored
+  scores + margin). Rule chips filter; switches are marked against the full run.
 - App shell: status bar (sim clock, run controls, link state with staleness,
-  emergency slot), nav rail, footer.
+  emergency slot), nav rail, footer (the page's own one-line description on the
+  left, the measured simulation rate on the right).
 
 Every value on screen traces to a real field in `src/data/types.ts`, which is
 transcribed from `backend/simulation_runner.py`'s publish call. Nothing is invented.
+
+Frames arrive five times per simulated second whatever the speed — a decision
+tick (`tick: true`) plus four motion frames (`tick: false`, positions only; the
+histories skip them) — and the server pushes on change. Vehicle motion is
+`data/motion.ts`: a per-fleet buffer of the last frames and a display clock that
+draws 250 ms behind the newest one, interpolating position and SUMO's own
+heading (`angle`) between the bracketing frames from a rAF loop (`VehicleLayer`
+on the plate, the same in `Junction3D`) — no CSS tweens, no React render per
+frame. `smooth` switches to "draw the newest frame" if a frame ever spans
+> 1.6 simulated seconds (a slow link), and `useSim.reset()` forgets everything
+when `run-state.started_at` changes.
 
 ## Why Analytics reads the live stream and not SQLite
 

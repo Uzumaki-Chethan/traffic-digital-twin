@@ -47,6 +47,39 @@ const TITLE: Record<string, string> = {
   throughput_vehicles: 'Vehicles served',
 }
 
+/** The seven metrics in the evaluator's order, for the page before any frame has arrived. */
+export const METRIC_KEYS = Object.keys(TITLE)
+
+/**
+ * The same block with nothing in it yet: title, the two legends without
+ * readings, an empty axis where the lines will draw. The page keeps its
+ * real shape before an evaluation rather than swapping in a notice, so
+ * what Start fills in is already on screen.
+ */
+export function EmptyMetricBlock({ metricKey }: { metricKey: string }) {
+  const title = TITLE[metricKey] ?? metricKey
+  const unit = UNIT[metricKey] ?? ''
+  return (
+    <Panel title={title} bodyClassName="px-3 pb-2.5">
+      <div className="mb-1 flex items-baseline gap-4 text-[12.5px] text-ink-mute">
+        <span className="flex items-center gap-1.5">
+          <span className="h-[3px] w-4 rounded-full" style={{ background: TRINETRA }} />
+          Trinetra <span className="num">—</span> {unit}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-[3px] w-4 rounded-full" style={{ background: VAC }} />
+          VAC <span className="num">—</span> {unit}
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none" aria-hidden>
+        <line x1={PAD_L} y1={PAD_T} x2={PAD_L} y2={H - PAD_B} stroke="var(--rule)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        <line x1={PAD_L} y1={H - PAD_B} x2={W - PAD_R} y2={H - PAD_B} stroke="var(--rule)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+      </svg>
+      <div className="mt-1 text-center text-[11.5px] text-ink-mute">fills in once the evaluation starts</div>
+    </Panel>
+  )
+}
+
 export function MetricBlock({
   row,
   samples,

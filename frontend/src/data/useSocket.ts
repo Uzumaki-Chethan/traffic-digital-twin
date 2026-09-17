@@ -3,6 +3,7 @@ import { connectSocket } from './socket'
 import { useSim } from './store'
 import { pushLiveSample } from './liveHistory'
 import { pushEvalSample } from './evalHistory'
+import { pushMotion } from './motion'
 
 /** Mount exactly once (App.tsx). Every page reads from the store. */
 export function useSocket() {
@@ -20,6 +21,8 @@ export function useSocket() {
         pushLiveSample(snapshot)
         // Same idea for an evaluation - the Performance page's charts.
         pushEvalSample(snapshot)
+        // Vehicle positions, for the views' interpolation (data/motion.ts).
+        pushMotion(snapshot)
       },
       onClose: () => setLink('closed'),
     })

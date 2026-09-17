@@ -8,16 +8,24 @@ import { CENTRE, NET, PLATE_ASPECT } from './plateGeometry'
  * The plan view is a true-scale map (plateGeometry), so the viewport is
  * a window onto the network: a centre and a visible height, both in
  * metres. Zooming out stops at the whole 400 m network (1x); the
- * "Junction" button frames the box and the first ~53 m of each arm,
- * where queues form, which is also the default. Scroll to zoom about
- * the pointer, drag to pan, like sumo-gui. It narrows the SVG viewBox
- * rather than CSS-transforming the element, so it stays vector-sharp.
+ * "Junction" button frames the box and the first ~37 m of each arm,
+ * where queues form (3.5x), which is also the default. Ctrl + scroll
+ * (or a trackpad pinch) zooms about the pointer, drag pans, like a map.
+ * It narrows the SVG viewBox rather than CSS-transforming the element,
+ * so it stays vector-sharp.
+ *
+ * A plain wheel is left to the page. The plate sits in a scrolling
+ * column, and a map that swallows every wheel turn traps the reader who
+ * only wanted to scroll past it; the modifier is the reader saying "the
+ * map". In fullscreen there is nothing behind the map to scroll, so a
+ * plain wheel zooms there (`wheelZoomsPlain`).
  *
  * It also measures the stage, so the plate can draw labels and signal
  * heads at a constant PIXEL size whatever the zoom (pxPerMetre).
  *
- * The view state can be lifted: the Performance page hands both windows
- * one state so Trinetra and the baseline are always framed identically.
+ * The view state can be lifted, so a page can read or set a window's
+ * framing from outside - Performance uses that to copy one window's
+ * framing onto the other.
  *
  * The wheel listener is attached manually because React's onWheel is
  * passive — preventDefault() there is ignored, and the page would scroll
@@ -32,11 +40,18 @@ export interface View {
   h: number
 }
 
-/** Junction framing: 150 m tall - the 43 m box plus ~53 m of each arm. */
-export const HOME_VIEW: View = { cx: CENTRE, cy: CENTRE, h: 150 }
 /** Whole network, with a little ground round it - the zoom-out limit, 1x. */
 export const FIT_VIEW: View = { cx: CENTRE, cy: CENTRE, h: NET + 12 }
+/** The default magnification, relative to the whole network fitted. */
+export const HOME_ZOOM = 3.5
+/** Junction framing at HOME_ZOOM: ~118 m tall - the 43 m box plus ~37 m of each arm. */
+export const HOME_VIEW: View = { cx: CENTRE, cy: CENTRE, h: FIT_VIEW.h / HOME_ZOOM }
 const MIN_H = 24
+
+/** Does this wheel turn mean "zoom the map"? Pinch on a trackpad arrives as a ctrl-wheel. */
+export function wheelIsZoom(e: WheelEvent): boolean {
+  return e.ctrlKey || e.metaKey
+}
 
 export type ViewState = [View, Dispatch<SetStateAction<View>>]
 
@@ -53,10 +68,15 @@ function same(a: View, b: View): boolean {
   return Math.abs(a.cx - b.cx) < 0.01 && Math.abs(a.cy - b.cy) < 0.01 && Math.abs(a.h - b.h) < 0.01
 }
 
-export function usePanZoom(target: RefObject<HTMLElement | null>, shared?: ViewState) {
+export function usePanZoom(
+  target: RefObject<HTMLElement | null>,
+  shared?: ViewState,
+  { wheelZoomsPlain = false }: { wheelZoomsPlain?: boolean } = {},
+) {
   const local = useState<View>(HOME_VIEW)
   const [view, setView] = shared ?? local
   const drag = useRef<{ id: number; x: number; y: number } | null>(null)
+  const [dragging, setDragging] = useState(false)
   const [stagePx, setStagePx] = useState({ w: 920, h: 540 })
 
   useEffect(() => {
@@ -96,6 +116,8 @@ export function usePanZoom(target: RefObject<HTMLElement | null>, shared?: ViewS
     const el = target.current
     if (!el) return
     const onWheel = (e: WheelEvent) => {
+      // A plain turn is the page scrolling; leave it alone.
+      if (!wheelZoomsPlain && !wheelIsZoom(e)) return
       e.preventDefault()
       const rect = el.getBoundingClientRect()
       if (rect.width === 0 || rect.height === 0) return
@@ -107,12 +129,13 @@ export function usePanZoom(target: RefObject<HTMLElement | null>, shared?: ViewS
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [target, zoomAt])
+  }, [target, zoomAt, wheelZoomsPlain])
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return
     drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY }
     e.currentTarget.setPointerCapture(e.pointerId)
+    setDragging(true)
   }, [])
 
   const onPointerMove = useCallback(
@@ -139,6 +162,7 @@ export function usePanZoom(target: RefObject<HTMLElement | null>, shared?: ViewS
   const endDrag = useCallback((e: React.PointerEvent) => {
     if (drag.current?.id !== e.pointerId) return
     drag.current = null
+    setDragging(false)
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
   }, [])
 
@@ -155,9 +179,13 @@ export function usePanZoom(target: RefObject<HTMLElement | null>, shared?: ViewS
     atFit: same(view, FIT_VIEW),
     canZoomIn: view.h > MIN_H + 0.01,
     canZoomOut: view.h < FIT_VIEW.h - 0.01,
+    /** A drag is in progress (for the cursor). */
+    dragging,
     zoomBy,
     home,
     fit,
+    /** Adopt another window's framing. */
+    setView,
     handlers: {
       onPointerDown,
       onPointerMove,

@@ -70,8 +70,11 @@
   --series-4: #6b5a3e;
 
   /* The junction plate keeps a real dark carriageway so signal colours
-     on it stay unmistakable against the pale card behind. */
-  --plate-ground: #badfa4;
+     on it stay unmistakable against the pale card behind. The ground is
+     the 3D model's own grass (Junction3D GROUND), so the two views read
+     as one place; text on it is the marking white (4.75:1 on it). */
+  --plate-ground: #268426;
+  --plate-ink: #f4fbf0;
   --plate-road: #3e3428;
   --plate-kerb: #7fae68;
   --plate-lane: #6d7f5f;

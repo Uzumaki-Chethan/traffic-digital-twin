@@ -1,4 +1,6 @@
 import clsx from 'clsx'
+import { Link } from 'react-router-dom'
+import { SlidersHorizontal } from 'lucide-react'
 import { useSim } from '@/data/store'
 import { isEvaluation, isLive } from '@/data/types'
 import { useLiveClock } from '@/data/useLiveClock'
@@ -6,6 +8,8 @@ import { clock } from '@/utils/format'
 import { APPROACH_NAME, modeMeta } from '@/utils/signal'
 import { approachOf } from '@/data/types'
 import { useRunStore } from '@/data/runState'
+import { usePageContext } from '@/data/pageContext'
+import { useSettings } from '@/data/settings'
 import { RunControls } from './RunControls'
 
 /**
@@ -25,11 +29,17 @@ export function StatusBar() {
   const link = useSim((s) => s.link)
   const { simTime, staleSeconds, tickAge, rate } = useLiveClock()
   const run = useRunStore((s) => s.state)
+  const page = usePageContext()
+  const setTarget = useSettings((s) => s.setTarget)
 
-  const live = isLive(latest) ? latest : lastLive
+  // The bar reports the PAGE's run. A run of the other kind — an
+  // evaluation while reading Overview, a demo while reading Performance —
+  // is idle from here: no clock, no stale demo frame, no mode chip.
+  const foreign = run?.available === true && run.running && !page.running
+  const live = foreign ? null : isLive(latest) ? latest : lastLive
   // During an evaluation there is no demo frame, but there is a run:
   // the clock and the paused/ended states must not read as "waiting".
-  const evaluating = isEvaluation(latest) && run?.running === true
+  const evaluating = !foreign && isEvaluation(latest) && run?.running === true
   const linkLost = link !== 'open' || staleSeconds > 3
   // The backend knows whether it is paused; ask it. The tick-age
   // heuristic is only the fallback for a backend with no control layer
@@ -38,7 +48,7 @@ export function StatusBar() {
     run?.available === true
       ? run.paused
       : !linkLost && live !== null && tickAge > 3
-  const ended = run?.available === true && !run.running
+  const ended = run?.available === true && (!run.running || foreign)
   const emergency = live?.emergency_lanes ?? []
   const mode = modeMeta(live?.decision.mode)
 
@@ -50,7 +60,9 @@ export function StatusBar() {
       <div className="flex items-center gap-3">
         <div>
           <div className="display text-[15px]">Adaptive signal control</div>
-          <div className="text-[12px]">Four approaches · three lanes each · one signalised junction</div>
+          <div className="text-[12px]">
+            Single 4-way junction
+          </div>
         </div>
         {live && mode.loud && (
           <>
@@ -71,6 +83,26 @@ export function StatusBar() {
             </span>
           </div>
         )}
+
+        {/* The page's scenario — what is running here, or what Start would
+            run — and the way to change it: Settings opens choosing for THIS
+            page, so a click from Performance picks the evaluation's scenario. */}
+        <Link
+          to="/settings"
+          onClick={() => {
+            if (!page.path.startsWith('/settings')) setTarget(page.kind === 'evaluation' ? 'performance' : 'overview')
+          }}
+          className="flex items-center gap-1.5 rounded-control border border-[var(--bar-rule)] px-2.5 py-1 text-[12.5px] font-medium text-[var(--bar-ink)] transition-colors hover:bg-[rgb(36_26_16/0.12)]"
+          title={
+            page.running
+              ? `${page.name} is running ${page.scenarioLabel} — change the scenario on Simulation Settings for the next run`
+              : `${page.name} will run ${page.scenarioLabel} — change it on Simulation Settings`
+          }
+        >
+          <SlidersHorizontal size={13} aria-hidden />
+          <span className="opacity-80">Scenario:</span>
+          <span className="font-semibold">{page.scenarioLabel}</span>
+        </Link>
 
         <RunControls />
 

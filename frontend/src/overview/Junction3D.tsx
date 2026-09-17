@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { LANE_IDS, type LaneView, type VehicleView } from '@/data/types'
+import type { LaneView, VehicleView } from '@/data/types'
 import { useSim } from '@/data/store'
+import { DisplayClock, motionBuffer, type MotionSide, type Pose } from '@/data/motion'
 import { lampOf } from '@/utils/signal'
 import { shapeOf, type VehicleShape } from './vehicleTypes'
-import { laneHeading3D } from './junctionTopology'
 
 /**
  * A miniature 3D model of the junction, to the REAL network scale
@@ -69,13 +69,14 @@ const CENTRE = 200
 const LANE_W = 3.2
 const ROAD_HALF = 9.6 // three 3.2 m lanes per direction
 const JUNCTION_HALF = 21.6 // where the inbound lanes stop
+const KERB_R = 11 // the junction's corner fillets (plateGeometry.KERB_R, and why it is not the net's 12)
 const ARM = HALF_NET - JUNCTION_HALF // 178.4, the drawn length of one arm
 const ARM_MID = JUNCTION_HALF + ARM / 2
 
 // sumo-gui's own palette, near enough: near-black asphalt, saturated
 // green surroundings, off-white paint.
 const ASPHALT = '#1b1b1b'
-const GROUND = '#1a7d1a'
+const GROUND = '#268426'
 const HORIZON = '#0d5410'
 const PAINT = '#dcdcdc'
 const HOUSING = '#15110d'
@@ -88,36 +89,19 @@ const PAINT_Y = 0.22 // road surface is at 0.20
 const DASH_LEN = 3
 const DASH_GAP = 6
 
-/**
- * How far past the end of a tick interpolation may run before it holds.
- * Covers ordinary jitter in frame arrival so traffic never visibly
- * stalls, without letting a paused simulation drift far.
- */
-const OVERRUN = 1.35
-
 interface Props {
   lanes: LaneView[]
   vehicles?: VehicleView[]
   powered: boolean
+  /** Which motion buffer to draw (the demo by default). */
+  motionSide?: MotionSide
 }
 
 interface Car {
   group: THREE.Group
-  /** Interpolated FRONT BUMPER position; the body is offset back from it. */
-  from: THREE.Vector3
-  to: THREE.Vector3
-  headingFrom: number
-  headingTo: number
-  heading: number
   type: string
   /** Half the body length, in metres — the bumper-to-centre offset. */
   halfLength: number
-  seen: boolean
-}
-
-/** Shortest signed angular distance from a to b. */
-function angleDelta(a: number, b: number): number {
-  return Math.atan2(Math.sin(b - a), Math.cos(b - a))
 }
 
 /**
@@ -204,13 +188,14 @@ const TURN_LEFT = Math.PI
 const TURN_AHEAD = Math.PI / 2
 const TURN_RIGHT = 0
 
-export function Junction3D({ lanes, vehicles, powered }: Props) {
+export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
   const mount = useRef<HTMLDivElement>(null)
-  const data = useRef({ lanes, vehicles, powered, simTime: 0 })
-  const simTime = useSim((s) => (s.lastLive ? s.lastLive.sim_time : 0))
+  const rate = useSim((s) => s.rate)
+  const smooth = useSim((s) => s.smooth)
+  const data = useRef({ lanes, powered, motionSide, rate, smooth })
   useEffect(() => {
-    data.current = { lanes, vehicles, powered, simTime }
-  }, [lanes, vehicles, powered, simTime])
+    data.current = { lanes, powered, motionSide, rate, smooth }
+  }, [lanes, powered, motionSide, rate, smooth])
 
   useEffect(() => {
     const el = mount.current
@@ -245,11 +230,17 @@ export function Junction3D({ lanes, vehicles, powered }: Props) {
     controls.autoRotate = true
     controls.autoRotateSpeed = 0.35
     controls.target.set(0, 0, 0)
-    // Once someone takes hold of it, stop moving on its own.
+    // Once someone takes hold of it, stop moving on its own, and show the
+    // hand closing while they hold it.
     const stopAuto = () => {
       controls.autoRotate = false
+      renderer.domElement.style.cursor = 'grabbing'
+    }
+    const release = () => {
+      renderer.domElement.style.cursor = 'grab'
     }
     controls.addEventListener('start', stopAuto)
+    controls.addEventListener('end', release)
     renderer.domElement.addEventListener('wheel', stopAuto, { passive: true })
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0x20401a, 1.05))
@@ -287,9 +278,36 @@ export function Junction3D({ lanes, vehicles, powered }: Props) {
       ew.position.set(sign * ARM_MID, 0, 0)
       scene.add(ns, ew)
     }
-    scene.add(
-      new THREE.Mesh(own(new THREE.BoxGeometry(JUNCTION_HALF * 2, 0.4, JUNCTION_HALF * 2)), asphalt),
+    // The junction slab is the network's own `<junction id="C">` shape,
+    // as the plan view draws it: a 19.2 m opening on each side joined by
+    // 12 m quarter-circle kerbs that curve INTO the corners (centred on
+    // the outer corner), not a square. Built in the plan's frame (x east,
+    // y south) and laid flat, which maps y onto -z as the vehicles are.
+    const junction = new THREE.Shape()
+    {
+      const a = -JUNCTION_HALF
+      const b = JUNCTION_HALF
+      const lo = -ROAD_HALF
+      const hi = ROAD_HALF
+      const r = KERB_R
+      junction.moveTo(lo, a)
+      junction.lineTo(hi, a)
+      junction.absarc(b, a, r, Math.PI, Math.PI / 2, true)
+      junction.lineTo(b, hi)
+      junction.absarc(b, b, r, -Math.PI / 2, -Math.PI, true)
+      junction.lineTo(lo, b)
+      junction.absarc(a, b, r, 0, -Math.PI / 2, true)
+      junction.lineTo(a, lo)
+      junction.absarc(a, a, r, Math.PI / 2, 0, true)
+      junction.closePath()
+    }
+    const junctionSlab = new THREE.Mesh(
+      own(new THREE.ExtrudeGeometry(junction, { depth: 0.4, bevelEnabled: false, curveSegments: 24 })),
+      asphalt,
     )
+    junctionSlab.rotation.x = -Math.PI / 2
+    junctionSlab.position.y = -0.2
+    scene.add(junctionSlab)
 
     // ---- lane markings --------------------------------------------------
     const paint = own(new THREE.MeshStandardMaterial({ color: PAINT, roughness: 0.7 }))
@@ -433,7 +451,6 @@ export function Junction3D({ lanes, vehicles, powered }: Props) {
     // Bodies are built per SUMO vehicle type, so a bus is a bus. Geometry
     // and material are cached by type and shared between every vehicle of
     // it — a hundred motorcycles cost one geometry, not a hundred.
-    const bodyCache = new Map<string, { body: THREE.BufferGeometry; cab: THREE.BufferGeometry | null }>()
     const paintCache = new Map<string, THREE.MeshStandardMaterial>()
     const glassMat = own(new THREE.MeshStandardMaterial({ color: '#2b3038', roughness: 0.25 }))
     const rubberMat = own(new THREE.MeshStandardMaterial({ color: '#1a1a1a', roughness: 0.9 }))
@@ -441,23 +458,69 @@ export function Junction3D({ lanes, vehicles, powered }: Props) {
     // Wheels, shared: a motorcycle's two and an auto-rickshaw's three.
     const wheelGeom = own(new THREE.CylinderGeometry(0.31, 0.31, 0.12, 14))
     const smallWheelGeom = own(new THREE.CylinderGeometry(0.24, 0.24, 0.1, 14))
+    const bigWheelGeom = own(new THREE.CylinderGeometry(0.5, 0.5, 0.3, 16))
+    const chassisMat = own(new THREE.MeshStandardMaterial({ color: '#2a2a2a', roughness: 0.85 }))
 
-    function bodyFor(shape: VehicleShape) {
+    // Per-kind part geometries, built once per (kind, dimensions) and
+    // shared by every vehicle of that type. +z is the front of a group.
+    interface BodyParts {
+      body: THREE.BufferGeometry
+      cab: THREE.BufferGeometry | null
+      screen: THREE.BufferGeometry | null
+      windows: THREE.BufferGeometry | null
+      cargo: THREE.BufferGeometry | null
+      chassis: THREE.BufferGeometry | null
+    }
+    const bodyCache = new Map<string, BodyParts>()
+    function bodyFor(shape: VehicleShape): BodyParts {
       const key = `${shape.kind}:${shape.length}:${shape.width}:${shape.height}`
       const hit = bodyCache.get(key)
       if (hit) return hit
       const { length: L, width: Wd, height: Ht, kind } = shape
-      // Bus and truck are one tall slab; a car gets a lower body with a
-      // cabin on top. Motorcycles and auto-rickshaws are built in
-      // buildVehicle from their own parts - a box at their dimensions
-      // just looked like a shrunken car (2026-09-14 visual check).
-      const slab = kind === 'bus' || kind === 'truck'
-      const built = {
-        body: own(new THREE.BoxGeometry(Wd, slab ? Ht * 0.92 : Ht * 0.62, L)),
-        cab: slab ? null : own(new THREE.BoxGeometry(Wd * 0.86, Ht * 0.46, L * 0.46)),
+      let built: BodyParts
+      if (kind === 'truck' || (kind === 'emergency' && L >= 8)) {
+        // A tractor cab up front and a taller cargo box behind it, on a
+        // low chassis; the box is the vType colour, the cab a shade darker.
+        const cabL = L * 0.27
+        built = {
+          body: own(new THREE.BoxGeometry(Wd * 0.94, Ht * 0.58, cabL)), // the cab
+          cab: null,
+          screen: own(new THREE.BoxGeometry(Wd * 0.8, Ht * 0.22, 0.08)),
+          windows: null,
+          cargo: own(new THREE.BoxGeometry(Wd, Ht * 0.78, L - cabL - 0.3)),
+          chassis: own(new THREE.BoxGeometry(Wd * 0.8, 0.35, L * 0.96)),
+        }
+      } else if (kind === 'bus') {
+        // One long body with a dark window band along both sides and a
+        // windscreen across the front.
+        built = {
+          body: own(new THREE.BoxGeometry(Wd, Ht * 0.84, L)),
+          cab: null,
+          screen: own(new THREE.BoxGeometry(Wd * 0.9, Ht * 0.34, 0.08)),
+          windows: own(new THREE.BoxGeometry(Wd + 0.04, Ht * 0.3, L * 0.86)),
+          cargo: null,
+          chassis: own(new THREE.BoxGeometry(Wd * 0.85, 0.3, L * 0.9)),
+        }
+      } else {
+        // A car (and the smaller emergency vehicles): a lower body with a
+        // glazed cabin on top, wheels below.
+        built = {
+          body: own(new THREE.BoxGeometry(Wd, Ht * 0.5, L)),
+          cab: own(new THREE.BoxGeometry(Wd * 0.86, Ht * 0.42, L * 0.46)),
+          screen: null,
+          windows: null,
+          cargo: null,
+          chassis: null,
+        }
       }
       bodyCache.set(key, built)
       return built
+    }
+
+    function shade(colour: string, factor: number): string {
+      const c = new THREE.Color(colour)
+      c.multiplyScalar(factor)
+      return '#' + c.getHexString()
     }
 
     function paintFor(colour: string) {
@@ -544,15 +607,52 @@ export function Junction3D({ lanes, vehicles, powered }: Props) {
       if (shape.kind === 'motorcycle') return buildMotorcycle(shape)
       if (shape.kind === 'rickshaw') return buildRickshaw(shape)
       const g = new THREE.Group()
-      const { body, cab } = bodyFor(shape)
-      const slab = cab === null
-      const lower = new THREE.Mesh(body, paintFor(shape.colour))
-      lower.position.y = slab ? shape.height * 0.46 : shape.height * 0.31
-      g.add(lower)
-      if (cab) {
-        const upper = new THREE.Mesh(cab, glassMat)
-        upper.position.set(0, shape.height * 0.62 + shape.height * 0.23, -shape.length * 0.04)
-        g.add(upper)
+      const { length: L, width: Wd, height: Ht } = shape
+      const parts = bodyFor(shape)
+      const coat = paintFor(shape.colour)
+      const R = parts.cargo || parts.windows ? 0.5 : 0.31 // wheel radius: big for bus/truck
+      const wheelG = parts.cargo || parts.windows ? bigWheelGeom : wheelGeom
+      const axle = R
+
+      if (parts.cargo) {
+        // Truck: chassis, cab (darker), cargo box, six wheels.
+        const cabL = L * 0.27
+        const chassis = new THREE.Mesh(parts.chassis!, chassisMat)
+        chassis.position.y = R * 0.9
+        const cab = new THREE.Mesh(parts.body, paintFor(shade(shape.colour, 0.75)))
+        cab.position.set(0, R + Ht * 0.29, L / 2 - cabL / 2)
+        const screen = new THREE.Mesh(parts.screen!, glassMat)
+        screen.position.set(0, R + Ht * 0.42, L / 2 - 0.04)
+        const cargo = new THREE.Mesh(parts.cargo, coat)
+        cargo.position.set(0, R + Ht * 0.39, -cabL / 2 - 0.15)
+        g.add(chassis, cab, screen, cargo)
+        for (const z of [L * 0.36, -L * 0.18, -L * 0.36]) {
+          g.add(wheel(wheelG, Wd * 0.42, axle, z), wheel(wheelG, -Wd * 0.42, axle, z))
+        }
+      } else if (parts.windows) {
+        // Bus: body, window band, windscreen, four wheels.
+        const chassis = new THREE.Mesh(parts.chassis!, chassisMat)
+        chassis.position.y = R * 0.9
+        const body = new THREE.Mesh(parts.body, coat)
+        body.position.y = R + Ht * 0.42
+        const band = new THREE.Mesh(parts.windows, glassMat)
+        band.position.set(0, R + Ht * 0.58, -L * 0.03)
+        const screen = new THREE.Mesh(parts.screen!, glassMat)
+        screen.position.set(0, R + Ht * 0.55, L / 2 + 0.01)
+        g.add(chassis, body, band, screen)
+        for (const z of [L * 0.32, -L * 0.3]) {
+          g.add(wheel(wheelG, Wd * 0.42, axle, z), wheel(wheelG, -Wd * 0.42, axle, z))
+        }
+      } else {
+        // Car: lower body, glazed cabin, four wheels.
+        const body = new THREE.Mesh(parts.body, coat)
+        body.position.y = R + Ht * 0.25
+        const cabin = new THREE.Mesh(parts.cab!, glassMat)
+        cabin.position.set(0, R + Ht * 0.5 + Ht * 0.21, -L * 0.04)
+        g.add(body, cabin)
+        for (const z of [L * 0.32, -L * 0.32]) {
+          g.add(wheel(wheelG, Wd * 0.44, axle, z), wheel(wheelG, -Wd * 0.44, axle, z))
+        }
       }
       return g
     }
@@ -562,10 +662,11 @@ export function Junction3D({ lanes, vehicles, powered }: Props) {
     scene.add(fleet)
 
     let raf = 0
-    // Interpolation window for the tick currently being played out.
-    let seededSim = Number.NaN
-    let seededAt = performance.now()
-    let seededDur = 1000
+    // The display clock and the poses sampled from the motion buffer
+    // each frame (data/motion.ts) - the same mechanism as the plate's
+    // VehicleLayer, so the two views move identically.
+    const clock = new DisplayClock()
+    const poses = new Map<string, Pose>()
 
     const resize = () => {
       const w = el.clientWidth || 1
@@ -586,7 +687,7 @@ export function Junction3D({ lanes, vehicles, powered }: Props) {
 
     const tick = () => {
       const now = performance.now()
-      const { lanes: ls, vehicles: vs, powered: on, simTime: st } = data.current
+      const { lanes: ls, powered: on, motionSide: side } = data.current
 
       // A STOPPED run clears, and it has to happen out here rather than
       // in the tick-gated block below: when the run ends, sim_time stops
@@ -617,99 +718,50 @@ export function Junction3D({ lanes, vehicles, powered }: Props) {
         }
       }
 
-      // ---- a new simulation tick: re-aim every vehicle ----
-      // Keyed on sim_time, NOT on the message: frames are re-sent at 2 Hz
-      // even when the simulation has not stepped, and re-seeding on those
-      // would restart each interpolation halfway and make traffic crawl.
-      if (st !== seededSim) {
-        // Simulated time running BACKWARDS means a new run started. Drop
-        // everything first: SUMO reuses flow ids, so a surviving car
-        // would interpolate from its old position across the whole
-        // network to its new one — which is the two-second streak of
-        // leftovers at the start of a second run.
-        if (st < seededSim) clearFleet()
-        seededSim = st
-        seededAt = now
-        seededDur = Math.max(120, useSim.getState().tickInterval)
-
-        for (const c of cars.values()) c.seen = false
-        if (on && vs) {
-          for (const v of vs) {
-            const shape = shapeOf(v.type)
-            let car = cars.get(v.id)
-            if (car && car.type !== (v.type ?? '')) {
-              // Type changed under the same id (id reuse): rebuild it.
-              fleet.remove(car.group)
-              cars.delete(v.id)
-              car = undefined
-            }
-            const tx = v.x - CENTRE
-            const tz = CENTRE - v.y
-            if (!car) {
-              const group = buildVehicle(shape)
-              fleet.add(group)
-              // Heading from the LANE, so a car that arrives already
-              // queued still faces the way its lane runs.
-              const initial = laneHeading3D(v.lane) ?? 0
-              car = {
-                group,
-                from: new THREE.Vector3(tx, 0, tz),
-                to: new THREE.Vector3(tx, 0, tz),
-                headingFrom: initial,
-                headingTo: initial,
-                heading: initial,
-                type: v.type ?? '',
-                halfLength: shape.length / 2,
-                seen: true,
-              }
-              cars.set(v.id, car)
-            } else {
-              // Start from where it is actually drawn, so any drift from
-              // the last segment is absorbed rather than snapped away.
-              // The mesh sits half a length behind the bumper, so add
-              // that back to recover the bumper position it is at now.
-              car.from.set(
-                car.group.position.x + Math.sin(car.heading) * car.halfLength,
-                0,
-                car.group.position.z + Math.cos(car.heading) * car.halfLength,
-              )
-            }
-            car.to.set(tx, 0, tz)
-            car.headingFrom = car.heading
-            const dx = car.to.x - car.from.x
-            const dz = car.to.z - car.from.z
-            // On an arm the heading IS the lane's: SUMO changes lane as a
-            // sideways jump between ticks, and a heading taken from that
-            // segment parks the car at 45 degrees in its queue (seen on
-            // every heavy run). Only mid-junction, on an internal lane,
-            // does the movement itself carry the heading - from the whole
-            // segment, once, not per frame from a shrinking remainder.
-            const laneAngle = v.lane.startsWith(':') ? null : laneHeading3D(v.lane)
-            if (laneAngle !== null) car.headingTo = laneAngle
-            else if (dx * dx + dz * dz > 0.09) car.headingTo = Math.atan2(dx, dz)
-            car.seen = true
+      // ---- traffic, from the motion buffer at the display clock ----
+      // Positions and headings are SUMO's own, interpolated between the
+      // two frames that bracket the display time; nothing is derived
+      // from movement any more. SUMO's angle is degrees clockwise from
+      // north; this scene's z runs SOUTH (z = CENTRE − y) and a group
+      // faces (sin θ, cos θ) in (x, z), so north is θ = π and the map is
+      // θ = π − angle. (Mapping it straight faced every N/S vehicle
+      // backwards, and pushed its body across the stop line.)
+      const buffer = motionBuffer(side)
+      const tau = on ? clock.advance(now, buffer, data.current.rate, data.current.smooth) : null
+      if (tau === null) {
+        if (cars.size > 0) clearFleet()
+      } else {
+        buffer.sample(tau, poses)
+        for (const p of poses.values()) {
+          let car = cars.get(p.id)
+          if (car && car.type !== (p.type ?? '')) {
+            // Type changed under the same id (id reuse): rebuild it.
+            fleet.remove(car.group)
+            cars.delete(p.id)
+            car = undefined
           }
+          if (!car) {
+            const shape = shapeOf(p.type)
+            const group = buildVehicle(shape)
+            fleet.add(group)
+            car = { group, type: p.type ?? '', halfLength: shape.length / 2 }
+            cars.set(p.id, car)
+          }
+          const heading = Math.PI - (p.angle * Math.PI) / 180
+          const bx = p.x - CENTRE
+          const bz = CENTRE - p.y
+          // The snapshot coordinate is the front bumper; the body sits
+          // half a length behind it, or it would overhang the stop bar.
+          car.group.position.x = bx - Math.sin(heading) * car.halfLength
+          car.group.position.z = bz - Math.cos(heading) * car.halfLength
+          car.group.rotation.y = heading
         }
         for (const [id, c] of cars) {
-          if (!c.seen) {
+          if (!poses.has(id)) {
             fleet.remove(c.group)
             cars.delete(id)
           }
         }
-      }
-
-      // ---- play the tick out at constant velocity ----
-      const s = Math.min(OVERRUN, (now - seededAt) / seededDur)
-      const turn = Math.min(1, s)
-      for (const c of cars.values()) {
-        c.heading = c.headingFrom + angleDelta(c.headingFrom, c.headingTo) * turn
-        const bx = c.from.x + (c.to.x - c.from.x) * s
-        const bz = c.from.z + (c.to.z - c.from.z) * s
-        // The snapshot coordinate is the front bumper; the body sits
-        // half a length behind it, or it would overhang the stop bar.
-        c.group.position.x = bx - Math.sin(c.heading) * c.halfLength
-        c.group.position.z = bz - Math.cos(c.heading) * c.halfLength
-        c.group.rotation.y = c.heading
       }
 
       controls.update()
@@ -722,6 +774,7 @@ export function Junction3D({ lanes, vehicles, powered }: Props) {
       cancelAnimationFrame(raf)
       ro.disconnect()
       controls.removeEventListener('start', stopAuto)
+      controls.removeEventListener('end', release)
       renderer.domElement.removeEventListener('wheel', stopAuto)
       controls.dispose()
       for (const o of owned) o.dispose()
@@ -743,10 +796,7 @@ export function Junction3D({ lanes, vehicles, powered }: Props) {
     <div className="relative h-full w-full">
       <div ref={mount} className="h-full w-full" aria-label="Interactive 3D model of the junction" role="img" />
       <div className="pointer-events-none absolute right-3 top-3 rounded-control bg-[rgb(36_26_16/0.72)] px-2 py-1 text-[12px] text-[var(--ink-on-dark)]">
-        drag to orbit · scroll to zoom · right-drag to pan
-      </div>
-      <div className="pointer-events-none absolute left-3 top-3 rounded-control bg-[rgb(36_26_16/0.72)] px-2 py-1 text-[12px] text-[var(--ink-on-dark)]">
-        {LANE_IDS.length} lanes · true scale · real vehicle types
+        drag to orbit · Ctrl + scroll to zoom · right-drag to pan
       </div>
     </div>
   )

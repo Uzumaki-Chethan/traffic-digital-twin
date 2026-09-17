@@ -15,12 +15,12 @@ import { DUR, EASE_OUT, STAGGER, arrive } from './motion'
  *
  * Honours reduced motion by rendering the final state immediately.
  */
-export function Reveal({ children, index = 0 }: { children: ReactNode; index?: number }) {
+export function Reveal({ children, index = 0, className }: { children: ReactNode; index?: number; className?: string }) {
   const reduced = useReducedMotion()
-  if (reduced) return <>{children}</>
+  if (reduced) return className ? <div className={className}>{children}</div> : <>{children}</>
   const { initial, animate, transition } = arrive(index)
   return (
-    <motion.div initial={initial} animate={animate} transition={transition}>
+    <motion.div className={className} initial={initial} animate={animate} transition={transition}>
       {children}
     </motion.div>
   )

@@ -86,6 +86,13 @@ class Config:
     # SQLite database file for decision_log / performance_log /
     # prediction_log tables. Lives under data/ next to the datasets.
     DB_PATH = os.path.join(PROJECT_ROOT, "data", "traffic_dashboard.db")
+    # How many runs the database keeps. Every row carries the run it
+    # belongs to (run_id); when a new run starts, rows from runs older
+    # than the newest DB_KEEP_RUNS are deleted, so the file never mixes
+    # a demo from last week into today's history and never grows without
+    # bound. 10 is enough for the offline calibration script's 500-row
+    # minimum many times over.
+    DB_KEEP_RUNS = 10
 
     # Real-time dashboard: when True, app.py starts the FastAPI
     # dashboard server in a background thread and pushes one snapshot

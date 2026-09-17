@@ -152,8 +152,8 @@ class _FakeRunner:
         self.calls = []
         self._write_state = write_state
 
-    def __call__(self, store, control, *, gui=False, load_state=None, sumocfg=None):
-        self.calls.append({"store": store, "gui": gui, "load_state": load_state, "sumocfg": sumocfg})
+    def __call__(self, store, control, *, gui=False, load_state=None, sumocfg=None, run_id=None):
+        self.calls.append({"store": store, "gui": gui, "load_state": load_state, "sumocfg": sumocfg, "run_id": run_id})
         self.started.set()
         # Behave like the real run loop: step until asked to stop or to
         # hand over to a SUMO window.
@@ -239,7 +239,7 @@ def test_stopped_run_does_not_report_stopping_forever():
 
 
 def test_supervisor_reports_a_crashed_run_instead_of_hiding_it():
-    def explode(store, control, *, gui=False, load_state=None, sumocfg=None):
+    def explode(store, control, *, gui=False, load_state=None, sumocfg=None, run_id=None):
         raise ValueError("SUMO is not installed")
 
     sup = SimulationSupervisor(store=object(), runner=explode)
@@ -252,7 +252,7 @@ def test_supervisor_reports_a_crashed_run_instead_of_hiding_it():
 
 
 def test_a_new_start_clears_the_previous_error():
-    def explode(store, control, *, gui=False, load_state=None, sumocfg=None):
+    def explode(store, control, *, gui=False, load_state=None, sumocfg=None, run_id=None):
         raise ValueError("boom")
 
     sup = SimulationSupervisor(store=object(), runner=explode)

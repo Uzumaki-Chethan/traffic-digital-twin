@@ -18,8 +18,13 @@ export interface ScenarioInfo {
   demand: Demand
 }
 
-/** The production route: what `python app.py` has always run. */
-export const DEFAULT_SCENARIO: ScenarioInfo = {
+/**
+ * The production route, `python app.py`'s run and the backend's own
+ * "default". Not offered as a card — at 480 vehicles an hour per approach
+ * it is Balanced traffic's volume with a through/turn split — but a run
+ * started without a scenario still reports it, so it keeps a name.
+ */
+const PRODUCTION_ROUTE: ScenarioInfo = {
   id: 'default',
   name: 'Everyday junction traffic',
   blurb: '480 vehicles an hour from every direction — cars, bikes, autos, buses and trucks — for ten minutes',
@@ -44,10 +49,14 @@ export const EVAL_SCENARIOS: ScenarioInfo[] = [
   { id: 'rain_seed1', name: 'Rain', blurb: 'Slower, more cautious driving; the same demand takes longer to clear', demand: 'moderate' },
 ]
 
-/** What the Overview demo can run: the production route first. */
-export const DEMO_SCENARIOS: ScenarioInfo[] = [DEFAULT_SCENARIO, ...EVAL_SCENARIOS]
+/** What the Overview demo can run: the same library, one card each. */
+export const DEMO_SCENARIOS: ScenarioInfo[] = EVAL_SCENARIOS
 
-const BY_ID = new Map<string, ScenarioInfo>(DEMO_SCENARIOS.map((s) => [s.id, s]))
+/** Where a page starts before anyone has chosen: steady, even, moderate. */
+export const DEFAULT_DEMO_SCENARIO = 'balanced_seed1'
+export const DEFAULT_EVAL_SCENARIO = 'extreme_seed1'
+
+const BY_ID = new Map<string, ScenarioInfo>([PRODUCTION_ROUTE, ...EVAL_SCENARIOS].map((s) => [s.id, s]))
 
 /** Plain-language name for a scenario id; the id itself if unknown. */
 export function scenarioName(id: string | null | undefined): string {

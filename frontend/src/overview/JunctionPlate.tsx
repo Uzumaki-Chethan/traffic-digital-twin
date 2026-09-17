@@ -20,15 +20,18 @@ import {
   stopLinePoint,
   type LaneGeom,
 } from './plateGeometry'
-import { placeVehicles, type Placed } from './vehiclePlacement'
-import { shapeOf } from './vehicleTypes'
+import { VehicleLayer } from './VehicleLayer'
+import type { MotionSide } from '@/data/motion'
 import { DUR, EASE_OUT } from '@/ui/motion'
 
 interface Props {
   lanes: LaneView[]
   emergencyLanes: string[]
-  /** Real vehicles from the snapshot, at their SUMO coordinates. */
+  /** Real vehicles from the snapshot, at their SUMO coordinates. Kept
+   * for the summary; the traffic itself is drawn from data/motion.ts. */
   vehicles?: VehicleView[]
+  /** Which motion buffer this plate draws: the demo, or one side of an evaluation. */
+  motionSide?: MotionSide
   /** Unpowered: heads dark, no traffic — the pre-simulation state. */
   powered: boolean
   /** Pan/zoom window in metres, from usePanZoom. */
@@ -69,22 +72,15 @@ const MIN_LABEL_LANE_PX = 26
 export function JunctionPlate({
   lanes,
   emergencyLanes,
-  vehicles,
+  vehicles: _vehicles,
+  motionSide = 'demo',
   powered,
   viewBox,
   pxPerMetre,
   releaseKey = 0,
 }: Props) {
-  const placed: Placed[] = useMemo(
-    () => (powered && vehicles ? placeVehicles(vehicles) : []),
-    [vehicles, powered],
-  )
   const hoverLane = useSim((s) => s.hoverLane)
   const setHoverLane = useSim((s) => s.setHoverLane)
-  // Vehicle positions arrive once per sim tick, so each move is stretched
-  // across exactly that interval, linearly. A fixed 300ms transition made
-  // cars jump and then freeze for the rest of the tick.
-  const tickInterval = useSim((s) => s.tickInterval)
   const byId = useMemo(() => Object.fromEntries(lanes.map((l) => [l.lane_id, l])), [lanes])
   const emergency = useMemo(() => new Set(emergencyLanes), [emergencyLanes])
   const reduced = useReducedMotion()
@@ -238,7 +234,7 @@ export function JunctionPlate({
           "North · Left" is words now, not a code. */}
       {laneNames && (
         <g
-          fill="var(--ink-strong)"
+          fill="var(--plate-ink)"
           fontFamily="var(--font-ui)"
           fontSize="11"
           fontWeight="600"
@@ -278,7 +274,7 @@ export function JunctionPlate({
           orientation label at all except the compass. Each sits on the
           verge beside its own inbound carriageway, so it names the side
           the traffic arrives from. */}
-      <g fill="var(--ink-strong)" fontFamily="var(--font-ui)" fontSize="12" fontWeight="600" opacity="0.8">
+      <g fill="var(--plate-ink)" fontFamily="var(--font-ui)" fontSize="12" fontWeight="600" opacity="0.9">
         {APPROACH_ORDER.map((arm) => {
           const inset = 16 * px
           const verge = ROAD_HALF + 4
@@ -299,40 +295,18 @@ export function JunctionPlate({
         })}
       </g>
 
-      {/* Real vehicles at their real size and position. Position and
-          heading move together in one transform, linearly over exactly
-          one tick, so a car turning through the junction sweeps round
-          instead of snapping. Size carries the vehicle type; colour is
-          left alone because on this plate colour already means signal
-          state. */}
-      {placed.map((p) => {
-        const shape = shapeOf(p.type)
-        return (
-          <g
-            key={p.id}
-            style={{
-              transform: `translate(${p.x}px, ${p.y}px) rotate(${p.angle}deg)`,
-              transition: `transform ${tickInterval}ms linear`,
-            }}
-          >
-            <rect
-              x={-shape.length / 2}
-              y={-shape.width / 2}
-              width={shape.length}
-              height={shape.width}
-              rx={0.3}
-              fill="var(--plate-vehicle)"
-              opacity={p.moving ? 0.95 : 0.75}
-            />
-          </g>
-        )
-      })}
+      {/* Real vehicles at their real size, from the motion buffer: one
+          element per vehicle, its transform written every animation
+          frame at the display clock's time (see VehicleLayer). Size
+          carries the vehicle type; colour is left alone because on this
+          plate colour already means signal state. */}
+      <VehicleLayer side={motionSide} powered={powered} />
 
       {/* north arrow, drafting-style, pinned to the window's top-right */}
       <g transform={`translate(${vb.x + vb.w} ${vb.y}) scale(${px}) translate(-34 34)`}>
-        <circle r="14" fill="none" stroke="var(--plate-kerb)" strokeWidth="1" />
-        <path d="M 0 -11 L -4 4 L 0 1 L 4 4 Z" fill="var(--ink-strong)" />
-        <text y="26" textAnchor="middle" fontSize="11" fontFamily="var(--font-num)" fill="var(--ink-mute)">
+        <circle r="14" fill="none" stroke="var(--plate-ink)" strokeWidth="1" opacity="0.7" />
+        <path d="M 0 -11 L -4 4 L 0 1 L 4 4 Z" fill="var(--plate-ink)" />
+        <text y="26" textAnchor="middle" fontSize="11" fontFamily="var(--font-num)" fill="var(--plate-ink)" opacity="0.8">
           N
         </text>
       </g>

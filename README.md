@@ -50,8 +50,8 @@ always-on console) both just call it.
 | Final optimization + demo polish | ⬜ |
 
 Full engineering context and history: see `PROJECT_ARCHITECTURE_REPORT.md`
-(read the highest-numbered `SECTION N ... (CURRENT STATE)` first — Section 28
-as of 2026-09-14).
+(read the highest-numbered `SECTION N ... (CURRENT STATE)` first — Section 30
+as of 2026-09-15).
 
 ---
 
@@ -72,7 +72,13 @@ a simulation (headless by default — the page draws the junction itself,
 in plan view and in 3D, with the real vehicles), **Start with SUMO
 window** opens sumo-gui alongside it, and Pause / Play / Stop sit in the
 top bar. The speed control cycles on click or slides on hover, from
-0.25x real time to unthrottled.
+0.25x real time to unthrottled. The bar belongs to the page: on
+Performance it starts and drives the Trinetra-vs-VAC evaluation, on
+Overview and Analytics the demo run, and on Simulation Settings whichever
+page its dropdown names (and then takes you there). The console runs one
+thing at a time, so if the other kind of run is up, Start ends it first
+and then starts this page's — the tooltip says so. A "Scenario: …" chip
+beside the controls names the page's scenario and links to Settings.
 
 A headless run can be moved into a SUMO window at any point with **Open
 window**: the run saves its state and resumes from it, so the same
@@ -92,7 +98,9 @@ python app.py
 
 Opens a sumo-gui window; the AI decides at 1 Hz, logs status once per
 second, and controls the junction through safe yellow-clearance
-transitions. The dashboard runs inside this process, so it can pause and
+transitions. (The console keeps the 258 MB Random Forest loaded between
+runs, so a Start there reaches its first tick in about a second; a
+terminal run loads it once, ~5 s.) The dashboard runs inside this process, so it can pause and
 stop the run but cannot start another — and when this run ends, the
 dashboard ends with it. That is what `server.py` above exists to fix.
 
@@ -206,13 +214,16 @@ confirmation window, a round-robin tie-break) is recorded in Section 26.4b with 
 http://127.0.0.1:8000. `python app.py` serves the same UI from inside
 the simulation process.
 
-Four pages are built:
+Five pages:
 
-- **Overview** — the junction itself, in a true-scale plan view (sumo-gui's
-  zoom: scroll, drag, 1× = the whole network, a button frames the junction)
-  or an interactive 3D miniature (drag to orbit, scroll to zoom), both
+- **Overview** — the junction itself, in a true-scale plan view (a map's
+  zoom: Ctrl + scroll or pinch, drag, 1× = the whole network, opens at 3.5×
+  with a button that returns there; a plain scroll scrolls the page) or an
+  interactive 3D miniature (drag to orbit, Ctrl + scroll to zoom), both
   drawing the real SUMO vehicles at their real size; active phase with its decision mode and reason;
-  the twelve lanes with live signal state; a 60 s phase-history band; and
+  the twelve lanes with live signal state; **Why this phase** (the four phase
+  scores against the switch boundary — the engine's own margin, drawn) and
+  the last five switches with their rule; a 60 s phase-history band; and
   the network metrics strip.
 - **Analytics** — the run happening right now, in detail: lane pressure
   as a lane-by-time heatmap, the lane ledger, network waiting time and
@@ -228,18 +239,30 @@ Four pages are built:
   its own simulation in lockstep, and below them one block per evaluation
   metric — a line of each controller over simulated time, both current
   values, and a verdict ("Trinetra ahead 62 %", "Even", "VAC ahead 3 %")
-  that reads "so far" while running and "final" when the run ends. The
-  same Pause / Stop / speed bar drives it. An evaluation that runs to its
+  that reads "so far" while running and "final" when the run ends. Each
+  junction has its own zoom and pan; a Match button on either copies the
+  other's framing across. Before an evaluation the page keeps its shape —
+  two dark junctions, seven empty blocks — and the top bar's Start fills
+  it in. The same Pause / Stop / speed bar drives it. An evaluation that runs to its
   end also writes `results/comparison_<scenario>.csv`, exactly as a
   terminal run does; one stopped early does not.
-- **Simulation Settings** — which scenario Overview runs and which one
-  Performance runs, as cards with plain-language names ("Rush hour",
-  "Stalled truck on East") and one-line descriptions. The choice persists
-  in the browser and applies the next time that page's Start is pressed.
+- **Simulation Settings** — the thirteen scenarios as cards with
+  plain-language names ("Rush hour", "Stalled truck on East") and one-line
+  descriptions, shown once; a dropdown says whether a click chooses for
+  Overview or for Performance, and each card marks the page(s) currently
+  set to run it. Overview starts on Balanced traffic, Performance on
+  Extreme. The choice persists in the browser and applies the next time
+  that page's Start is pressed — including the top bar's Start on this
+  page, which runs the chosen page's scenario and goes there.
   The console runs one thing at a time: starting an evaluation while a
   demo is up (or the reverse) is refused with a sentence saying so.
 
-**Decisions** is the one remaining placeholder.
+- **Decisions** — the audit trail: every decision of a run, from the
+  database (the one page that can show a run after it has ended, or an
+  earlier one). A run picker, the rules as filter chips with counts, a
+  dense list, and the opened decision with its full reason, what the
+  light was actually showing, and the score ledger as it stood on that
+  tick. Follows the live run as it writes.
 
 For the AI-vs-baseline comparison panel during evaluation runs:
 
@@ -251,8 +274,9 @@ python -m performance.evaluator --scenario heavy_seed1 --dashboard
 
 `services/dashboard_server.py` itself remains strictly READ-ONLY: it is
 fed by an in-process snapshot store (`services/live_state.py`) over
-WebSocket, and defines zero endpoints that can send a command into the
-simulation. Both hosts additionally mount one narrowly-scoped control
+WebSocket — one frame per simulation tick at any speed (≤ 30/s), with a
+0.5 s heartbeat while nothing changes — and defines zero endpoints that
+can send a command into the simulation. Both hosts additionally mount one narrowly-scoped control
 layer on top of it — pause/resume/stop/speed everywhere, plus
 start/stop-simulation in `server.py`, which is the only one that outlives
 a run. That capability lives entirely in a separate module,
@@ -414,6 +438,12 @@ DB file: `data/traffic_dashboard.db`. Predictions are parked until their
 written — so every prediction row is a true predicted-vs-actual record.
 Older database files are migrated in place (new columns are added via
 `ALTER TABLE` on first startup) rather than requiring a fresh DB.
+
+Every row carries `run_id` (the run's start time). A new run prunes runs
+older than the newest `Config.DB_KEEP_RUNS` (10) and vacuums the file,
+and every read — `/api/logs/*` (`?run=`, default the newest;
+`/api/logs/runs` lists them) and `/api/analytics/*` — answers for one
+run, so a run's history is never mixed with an earlier one's.
 
 **Desired vs Actual signal state**: `decision_log.phase/duration/mode/reason`
 describe what the Decision Engine *decided* (Desired State); the

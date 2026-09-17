@@ -35,6 +35,7 @@ import logging
 import os
 import sqlite3
 import threading
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +91,20 @@ CREATE INDEX IF NOT EXISTS idx_lane_state_lane ON lane_state_log(lane_id);
 _DECISION_LOG_MIGRATION_COLUMNS = {
     "actual_phase": "TEXT",
     "actual_is_yellow": "INTEGER",
+    # 2026-09-17, for the Decisions page: the four phase scores and the
+    # effective hysteresis margin of that tick (the score ledger needs
+    # them to redraw a past decision), and the scenario the run played.
+    "phase_scores": "TEXT",
+    "margin": "REAL",
+    "scenario": "TEXT",
 }
+
+# Every table carries the run its rows belong to (2026-09-17): the ISO
+# UTC time the run started, which sorts chronologically as text. Older
+# files gain the column by ALTER TABLE; their existing rows keep NULL
+# and count as one "legacy" run, pruned first.
+_TABLES = ("decision_log", "performance_log", "prediction_log", "lane_state_log")
+_RUN_COLUMN = ("run_id", "TEXT")
 
 
 class DatabaseLogger:
@@ -99,10 +113,14 @@ class DatabaseLogger:
     constructed by app.py, closed in its finally block.
     """
 
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, run_id: str = None, scenario: str = None):
         self._db_path = db_path
         self._lock = threading.Lock()
         self._conn = None
+        # The run every row written through this logger belongs to, and
+        # the scenario it played (stored on each decision row).
+        self._run_id = run_id or datetime.now(timezone.utc).isoformat()
+        self._scenario = scenario
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         try:
             self._conn = sqlite3.connect(db_path, check_same_thread=False)
@@ -112,7 +130,8 @@ class DatabaseLogger:
             self._conn.executescript(_SCHEMA)
             self._conn.commit()
             self._migrate_decision_log_columns()
-            logger.info("Database ready at %s", db_path)
+            self._migrate_run_column()
+            logger.info("Database ready at %s (run %s)", db_path, self._run_id)
         except sqlite3.Error as exc:
             # A broken database degrades to logging-only; it must never
             # take down the control loop.
@@ -122,6 +141,70 @@ class DatabaseLogger:
     @property
     def is_enabled(self) -> bool:
         return self._conn is not None
+
+    @property
+    def run_id(self) -> str:
+        return self._run_id
+
+    def _migrate_run_column(self) -> None:
+        """Add run_id (and an index on it) to any table still without it."""
+        if self._conn is None:
+            return
+        column, sql_type = _RUN_COLUMN
+        try:
+            for table in _TABLES:
+                existing = {row[1] for row in self._conn.execute("PRAGMA table_info({})".format(table))}
+                if column not in existing:
+                    self._conn.execute("ALTER TABLE {} ADD COLUMN {} {}".format(table, column, sql_type))
+                self._conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_{0}_run ON {0} ({1})".format(table, column)
+                )
+            self._conn.commit()
+        except sqlite3.Error as exc:
+            logger.error("run_id migration failed (%s) - rows this run carry no run id.", exc)
+
+    def prune_runs(self, keep: int) -> int:
+        """
+        Delete every row belonging to a run older than the newest `keep`
+        runs (this run counts as one of them, whether or not it has
+        written anything yet). Rows with no run id - from before the
+        column existed - are the oldest of all and go first. Returns the
+        number of rows deleted. Called once, at the start of a run; a
+        failure here is logged and the run goes on.
+        """
+        if self._conn is None or keep < 1:
+            return 0
+        try:
+            with self._lock:
+                ids = set()
+                for table in _TABLES:
+                    ids.update(
+                        r[0] for r in self._conn.execute(
+                            "SELECT DISTINCT run_id FROM {} WHERE run_id IS NOT NULL".format(table)
+                        )
+                    )
+                ids.add(self._run_id)
+                kept = sorted(ids)[-keep:]
+                placeholders = ",".join("?" for _ in kept)
+                deleted = 0
+                for table in _TABLES:
+                    cur = self._conn.execute(
+                        "DELETE FROM {} WHERE run_id IS NULL OR run_id NOT IN ({})".format(table, placeholders),
+                        tuple(kept),
+                    )
+                    deleted += cur.rowcount
+                self._conn.commit()
+                if deleted:
+                    # Deleting rows does not shrink the file; give the
+                    # space back so the database stays the size of the
+                    # runs it holds (a second or two, once per run start).
+                    self._conn.execute("VACUUM")
+            if deleted:
+                logger.info("Pruned %d rows from runs older than the newest %d.", deleted, keep)
+            return deleted
+        except sqlite3.Error as exc:
+            logger.error("Pruning old runs failed (%s) - keeping everything.", exc)
+            return 0
 
     def _migrate_decision_log_columns(self) -> None:
         """
@@ -159,7 +242,8 @@ class DatabaseLogger:
 
     def log_decision(self, time: float, phase: str, duration: float,
                      mode: str, reason: str, actual_phase: str = None,
-                     actual_is_yellow: bool = None) -> None:
+                     actual_is_yellow: bool = None, phase_scores: dict = None,
+                     margin: float = None) -> None:
         """
         One row per DecisionEngine decision. actual_phase/actual_is_yellow
         are optional (default None) so existing callers keep working
@@ -169,11 +253,18 @@ class DatabaseLogger:
         """
         self._execute(
             "INSERT INTO decision_log "
-            "(time, phase, duration, mode, reason, actual_phase, actual_is_yellow) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "(time, phase, duration, mode, reason, actual_phase, actual_is_yellow, run_id, "
+            "phase_scores, margin, scenario) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 time, phase, duration, mode, reason, actual_phase,
                 None if actual_is_yellow is None else int(actual_is_yellow),
+                self._run_id,
+                None if phase_scores is None else json.dumps(
+                    {k: round(float(v), 4) for k, v in phase_scores.items()}
+                ),
+                None if margin is None else float(margin),
+                self._scenario,
             ),
         )
 
@@ -182,9 +273,9 @@ class DatabaseLogger:
         """One row per decision tick's network-wide metrics."""
         self._execute(
             "INSERT INTO performance_log "
-            "(time, avg_wait, avg_speed, queue_length, stopped) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (time, avg_wait, avg_speed, int(queue_length), int(stopped)),
+            "(time, avg_wait, avg_speed, queue_length, stopped, run_id) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (time, avg_wait, avg_speed, int(queue_length), int(stopped), self._run_id),
         )
 
     def log_prediction(self, time: float, predicted_values: dict,
@@ -192,13 +283,14 @@ class DatabaseLogger:
         """One row per evaluated prediction (predicted vs actual)."""
         self._execute(
             "INSERT INTO prediction_log "
-            "(time, predicted_values, actual_values, confidence) "
-            "VALUES (?, ?, ?, ?)",
+            "(time, predicted_values, actual_values, confidence, run_id) "
+            "VALUES (?, ?, ?, ?, ?)",
             (
                 time,
                 json.dumps(predicted_values),
                 json.dumps(actual_values),
                 float(confidence),
+                self._run_id,
             ),
         )
 
@@ -218,14 +310,15 @@ class DatabaseLogger:
                 self._conn.executemany(
                     "INSERT INTO lane_state_log "
                     "(time, lane_id, vehicle_count, avg_speed, avg_waiting_time, "
-                    "stopped_count, congestion_score, signal_state) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    "stopped_count, congestion_score, signal_state, run_id) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     [
                         (
                             time, r["lane_id"], int(r["vehicle_count"]),
                             float(r["avg_speed"]), float(r["avg_waiting_time"]),
                             int(r["stopped_count"]), float(r["congestion_score"]),
                             r["signal_state"],
+                            self._run_id,
                         )
                         for r in rows
                     ],

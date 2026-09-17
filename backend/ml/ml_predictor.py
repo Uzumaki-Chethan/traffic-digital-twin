@@ -79,6 +79,7 @@ prediction.
 import logging
 import json
 import os
+import threading
 from types import MappingProxyType
 from typing import Any
 
@@ -187,10 +188,28 @@ class MLPredictor:
         return self._target_mode
 
     @classmethod
+    def warm(cls, model_path: str) -> None:
+        """
+        Load the model files into the process cache ahead of the first
+        run, so that run does not pay for it. Best-effort: a missing or
+        unreadable model is left for from_path() to report properly.
+        """
+        try:
+            _load_model_files(model_path)
+        except Exception:
+            logger.warning("Could not pre-load the ML model from %s.", model_path, exc_info=True)
+
+    @classmethod
     def from_path(cls, model_path: str) -> "MLPredictor":
         """
         Load a trained model from disk and construct an MLPredictor
         around it.
+
+        The deserialised files are cached for the life of the process
+        (see _load_model_files): the forest is ~260 MB and takes ~7 s to
+        read, which was almost all of the console's start-up time on
+        every run. A fresh MLPredictor is still built around the shared
+        objects each time; the forest is only ever read from.
 
         Also looks for a confidence_calibrators.joblib file in the same
         directory as model_path (see
@@ -212,58 +231,7 @@ class MLPredictor:
             If the deserialized object does not look like a fitted
             multi-output regressor, see _validate_model().
         """
-        if not os.path.isfile(model_path):
-            raise FileNotFoundError(
-                "No trained ML model found at: {}. Training happens in a "
-                "separate milestone, this predictor cannot run until a "
-                "model has been trained and saved to this path.".format(
-                    model_path
-                )
-            )
-
-        import joblib
-
-        try:
-            model = joblib.load(model_path)
-        except Exception as exc:
-            raise RuntimeError(
-                "Failed to load ML model from {}. The file exists but "
-                "could not be deserialized, it may be corrupted or not a "
-                "valid joblib file.".format(model_path)
-            ) from exc
-
-        confidence_calibrators = {}
-        target_weights = {}
-        calibrators_path = os.path.join(
-            os.path.dirname(model_path), "confidence_calibrators.joblib"
-        )
-        if os.path.isfile(calibrators_path):
-            try:
-                saved = joblib.load(calibrators_path)
-                confidence_calibrators = saved.get("calibrators", {})
-                target_weights = saved.get("target_weights", {})
-            except Exception:
-                logger.warning(
-                    "Found %s but could not load it, continuing with "
-                    "uncalibrated confidence.", calibrators_path,
-                )
-                confidence_calibrators = {}
-                target_weights = {}
-
-        # The metadata file train.py writes next to the model says how
-        # its output is to be read. A model without one predates the
-        # residual change and is absolute.
-        target_mode = TARGET_MODE_ABSOLUTE
-        metadata_path = os.path.splitext(model_path)[0] + ".metadata.json"
-        if os.path.isfile(metadata_path):
-            try:
-                with open(metadata_path, "r", encoding="utf-8") as fh:
-                    target_mode = json.load(fh).get("target_mode", TARGET_MODE_ABSOLUTE)
-            except Exception:
-                logger.warning(
-                    "Found %s but could not read it; assuming an absolute-"
-                    "target model.", metadata_path,
-                )
+        model, confidence_calibrators, target_weights, target_mode = _load_model_files(model_path)
         logger.info("MLPredictor target mode: %s", target_mode)
 
         return cls(
@@ -505,3 +473,100 @@ class MLPredictor:
         if calibrator is None:
             return raw_confidence
         return float(calibrator.predict([raw_confidence])[0])
+
+
+# ---------------------------------------------------------------------------
+# Process-level cache of the deserialised model files.
+#
+# Keyed on the model's path, size and mtime, so a retrained model saved
+# over the old file is picked up on the next from_path() without a
+# restart. Guarded by a lock: the console's supervisor and a warm-up
+# thread may ask at the same moment, and loading twice would double the
+# memory for nothing.
+# ---------------------------------------------------------------------------
+
+_MODEL_CACHE: dict = {}
+_MODEL_CACHE_LOCK = threading.Lock()
+
+
+def _model_cache_key(model_path: str):
+    """The forest and both sidecar files: a re-fitted calibrator or a
+    rewritten metadata file must invalidate the cache too."""
+    parts = []
+    for path in (
+        model_path,
+        os.path.join(os.path.dirname(model_path), "confidence_calibrators.joblib"),
+        os.path.splitext(model_path)[0] + ".metadata.json",
+    ):
+        try:
+            st = os.stat(path)
+            parts.append((os.path.abspath(path), st.st_size, st.st_mtime_ns))
+        except OSError:
+            parts.append((os.path.abspath(path), None, None))
+    return tuple(parts)
+
+
+def _load_model_files(model_path: str):
+    """
+    Return (model, confidence_calibrators, target_weights, target_mode)
+    for model_path, reading the files once per distinct file version.
+    """
+    if not os.path.isfile(model_path):
+        raise FileNotFoundError(
+            "No trained ML model found at: {}. Training happens in a "
+            "separate milestone, this predictor cannot run until a "
+            "model has been trained and saved to this path.".format(model_path)
+        )
+    key = _model_cache_key(model_path)
+    with _MODEL_CACHE_LOCK:
+        cached = _MODEL_CACHE.get(key)
+        if cached is not None:
+            return cached
+
+        import joblib
+
+        try:
+            model = joblib.load(model_path)
+        except Exception as exc:
+            raise RuntimeError(
+                "Failed to load ML model from {}. The file exists but "
+                "could not be deserialized, it may be corrupted or not a "
+                "valid joblib file.".format(model_path)
+            ) from exc
+
+        confidence_calibrators = {}
+        target_weights = {}
+        calibrators_path = os.path.join(os.path.dirname(model_path), "confidence_calibrators.joblib")
+        if os.path.isfile(calibrators_path):
+            try:
+                saved = joblib.load(calibrators_path)
+                confidence_calibrators = saved.get("calibrators", {})
+                target_weights = saved.get("target_weights", {})
+            except Exception:
+                logger.warning(
+                    "Found %s but could not load it, continuing with "
+                    "uncalibrated confidence.", calibrators_path,
+                )
+                confidence_calibrators = {}
+                target_weights = {}
+
+        # The metadata file train.py writes next to the model says how
+        # its output is to be read. A model without one predates the
+        # residual change and is absolute.
+        target_mode = TARGET_MODE_ABSOLUTE
+        metadata_path = os.path.splitext(model_path)[0] + ".metadata.json"
+        if os.path.isfile(metadata_path):
+            try:
+                with open(metadata_path, "r", encoding="utf-8") as fh:
+                    target_mode = json.load(fh).get("target_mode", TARGET_MODE_ABSOLUTE)
+            except Exception:
+                logger.warning(
+                    "Found %s but could not read it; assuming an absolute-"
+                    "target model.", metadata_path,
+                )
+
+        # One version at a time: a retrained model replaces the old one
+        # rather than sitting beside it in memory.
+        _MODEL_CACHE.clear()
+        _MODEL_CACHE[key] = (model, confidence_calibrators, target_weights, target_mode)
+        return _MODEL_CACHE[key]

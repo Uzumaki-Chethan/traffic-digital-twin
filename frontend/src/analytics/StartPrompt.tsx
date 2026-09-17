@@ -4,6 +4,7 @@ import { Monitor, Play } from 'lucide-react'
 import { Panel } from '@/ui/Panel'
 import { runControl, useRunStore, type RunState } from '@/data/runState'
 import { useSettings } from '@/data/settings'
+import { scenarioName } from '@/data/scenarios'
 
 /**
  * What Analytics shows before there is anything to analyse.
@@ -25,8 +26,15 @@ export function StartPrompt({ run }: { run: RunState | null }) {
   const failure = useRunStore((s) => s.failure)
   const [launched, setLaunched] = useState(false)
 
-  const canStart = run?.can_start === true
-  const starting = run?.running === true || launched
+  // An evaluation up on Performance is not this page's run: offer to
+  // end it and start the demo instead of reading it as "starting".
+  const evaluating = run?.running === true && run.kind === 'evaluation'
+  const canStart = run?.managed === true && !evaluating ? true : run?.can_start === true
+  const starting = (run?.running === true && !evaluating) || launched
+  const start = (gui: boolean) => {
+    setLaunched(true)
+    void (evaluating ? runControl.replaceWithDemo(gui, demoScenario) : runControl.start(gui, demoScenario))
+  }
 
   return (
     <div className="flex h-full items-center justify-center">
@@ -52,8 +60,9 @@ export function StartPrompt({ run }: { run: RunState | null }) {
                   to show until a simulation is running.
                 </p>
                 <p className="mt-2 text-ink-mute">
-                  Start one and this page fills in tick by tick. When the run ends, whatever it
-                  recorded stays on screen.
+                  {evaluating
+                    ? `An evaluation is running on Performance. Start here ends it and runs ${scenarioName(demoScenario)}; this page then fills in tick by tick.`
+                    : 'Start one and this page fills in tick by tick. When the run ends, whatever it recorded stays on screen.'}
                 </p>
               </>
             )}
@@ -66,20 +75,14 @@ export function StartPrompt({ run }: { run: RunState | null }) {
                   label="Start simulation"
                   hint="headless — watch it here"
                   disabled={busy}
-                  onClick={() => {
-                    setLaunched(true)
-                    void runControl.start(false, demoScenario)
-                  }}
+                  onClick={() => start(false)}
                 />
                 <StartButton
                   icon={<Monitor size={14} aria-hidden />}
                   label="Start with SUMO window"
                   hint="opens sumo-gui too"
                   disabled={busy}
-                  onClick={() => {
-                    setLaunched(true)
-                    void runControl.start(true, demoScenario)
-                  }}
+                  onClick={() => start(true)}
                 />
               </div>
             )}

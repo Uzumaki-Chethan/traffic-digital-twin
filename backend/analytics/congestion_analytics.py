@@ -26,9 +26,34 @@ def _read_only_connection(db_path: str) -> sqlite3.Connection:
     return sqlite3.connect(uri, uri=True)
 
 
-def _time_filter_clause(start_time: Optional[float], end_time: Optional[float]):
+LATEST_RUN = "latest"
+
+
+def latest_run_id(conn: sqlite3.Connection) -> Optional[str]:
+    """
+    The newest run in the database: run ids are the runs' ISO start
+    times, so the greatest sorts last. None on an empty database or one
+    from before run ids existed.
+    """
+    try:
+        row = conn.execute("SELECT MAX(run_id) FROM lane_state_log").fetchone()
+    except sqlite3.OperationalError:
+        return None
+    return row[0] if row else None
+
+
+def _time_filter_clause(start_time: Optional[float], end_time: Optional[float],
+                        run_id: Optional[str] = None):
+    """
+    WHERE clause and params. `run_id` scopes to one run; None means every
+    run in the file (which is only ever what you want for a legacy file
+    with no run ids at all).
+    """
     clauses = []
-    params: List[float] = []
+    params: List[object] = []
+    if run_id is not None:
+        clauses.append("run_id = ?")
+        params.append(run_id)
     if start_time is not None:
         clauses.append("time >= ?")
         params.append(start_time)
@@ -39,17 +64,27 @@ def _time_filter_clause(start_time: Optional[float], end_time: Optional[float]):
     return where, params
 
 
+def _resolve_run(conn: sqlite3.Connection, run_id: Optional[str]) -> Optional[str]:
+    """LATEST_RUN -> the newest run's id (None if the file has none)."""
+    return latest_run_id(conn) if run_id == LATEST_RUN else run_id
+
+
 def average_wait_times(
     db_path: str,
     group_by: str = "network",
     start_time: Optional[float] = None,
     end_time: Optional[float] = None,
+    run_id: Optional[str] = LATEST_RUN,
 ) -> Dict:
     """
     group_by="network": mean of performance_log.avg_wait over the
     optional [start_time, end_time] range.
     group_by="lane": per-lane mean of lane_state_log.avg_waiting_time
     over the same range.
+
+    `run_id` scopes the answer to one run - the newest by default
+    (LATEST_RUN); pass a run's id for an older one, or None for every
+    run the file holds.
 
     Returns an empty-shaped result (not an error) if the database file
     does not exist yet - consistent with dashboard_server.py's own
@@ -58,7 +93,6 @@ def average_wait_times(
     if group_by not in ("network", "lane"):
         raise ValueError("group_by must be 'network' or 'lane', got {!r}".format(group_by))
 
-    where, params = _time_filter_clause(start_time, end_time)
     try:
         conn = _read_only_connection(db_path)
     except sqlite3.OperationalError:
@@ -68,6 +102,7 @@ def average_wait_times(
             else {"group_by": "lane", "lanes": {}}
         )
     try:
+        where, params = _time_filter_clause(start_time, end_time, _resolve_run(conn, run_id))
         if group_by == "network":
             row = conn.execute(
                 "SELECT AVG(avg_wait), COUNT(*) FROM performance_log" + where, params
@@ -97,6 +132,7 @@ def congestion_trend(
     db_path: str,
     bucket_seconds: float = 60.0,
     group_by: str = "network",
+    run_id: Optional[str] = LATEST_RUN,
 ) -> List[Dict]:
     """
     Time-bucketed congestion_score trend, sourced from lane_state_log
@@ -123,8 +159,10 @@ def congestion_trend(
     except sqlite3.OperationalError:
         return []
     try:
+        where, params = _time_filter_clause(None, None, _resolve_run(conn, run_id))
         rows = conn.execute(
-            "SELECT time, lane_id, congestion_score FROM lane_state_log ORDER BY time"
+            "SELECT time, lane_id, congestion_score FROM lane_state_log" + where + " ORDER BY time",
+            params,
         ).fetchall()
     finally:
         conn.close()
@@ -168,6 +206,7 @@ def detect_peak_periods(
     db_path: str,
     top_n: int = 3,
     window_seconds: float = 60.0,
+    run_id: Optional[str] = LATEST_RUN,
 ) -> List[Dict]:
     """
     Statistically detect the top_n highest-congestion, non-overlapping
@@ -189,7 +228,7 @@ def detect_peak_periods(
     if top_n <= 0:
         raise ValueError("top_n must be positive, got {!r}".format(top_n))
 
-    buckets = congestion_trend(db_path, bucket_seconds=window_seconds, group_by="network")
+    buckets = congestion_trend(db_path, bucket_seconds=window_seconds, group_by="network", run_id=run_id)
     if not buckets:
         return []
 

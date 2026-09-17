@@ -2891,6 +2891,8 @@ fit"* — and keep the look. So:
   button was tried and removed at the user's request: its icon read as a second fullscreen
   button. The Performance page lifts one view state into both windows, so Trinetra and the
   baseline are always framed identically — a comparison at two zooms is not a comparison.
+  (Both superseded on 2026-09-15, Section 30: the default is 3.5×, the wheel needs Ctrl,
+  and the two windows zoom independently with a Match button.)
 - Verified in the browser on `extreme_seed1`: queues now read as queues, in Overview and in
   both Performance windows.
 
@@ -2989,3 +2991,392 @@ Four, all fixed, none of them about motion:
 
 Verified: 94 backend tests, 8 Vitest (two new, pinning the badge's length), `tsc -b`,
 oxlint clean, and a live `balanced_seed1` demo plus a VAC evaluation driven in the browser.
+
+---
+
+## SECTION 30 - Scrolling past the map, two zooms, one scenario grid (CURRENT STATE)
+
+Dated 2026-09-15. Chethan's list after using the console: the map ate the wheel when he
+meant to scroll the page; zooming one Performance window zoomed the other; the junction
+opened too far out; Simulation Settings showed the same thirteen scenarios twice; and
+nothing clickable showed a hand cursor. Then, mid-build: the footer's left half should say
+which page this is, the "Everyday junction traffic" card should go with Balanced as the
+default, and the "Ctrl + scroll to zoom" tag must not be printed on the map.
+
+### 30.1 The wheel belongs to the page
+
+`usePanZoom` swallowed every wheel turn over the plate (`preventDefault`, then zoom). On
+a page that scrolls, that traps whoever only wanted to scroll past the junction. The rule
+now, in `overview/usePanZoom.ts`: a wheel turn zooms only with Ctrl (⌘ on a Mac) held —
+`wheelIsZoom()`; a trackpad pinch arrives as a ctrl-wheel, so it zooms as expected — and a
+plain turn is left entirely alone, so the page scrolls. Fullscreen has nothing behind the
+map to scroll, so there `wheelZoomsPlain` lets a plain wheel zoom. The 3D view follows the
+same rule: OrbitControls listens on the canvas, so a capturing wheel listener on the stage
+above it stops a plain turn before OrbitControls sees it, and the page scrolls.
+
+A "Ctrl + scroll to zoom" tag that appeared on the map for 1.4 s after a plain turn was
+built, verified, and removed the same hour at Chethan's instruction — nothing printed on
+the map. The instruction lives in the zoom readout's tooltip instead.
+
+### 30.2 Each Performance window has its own frame, and a Match button
+
+Section 28.5 lifted one view state into both windows so Trinetra and VAC were always
+framed identically. Chethan overruled that: he wanted to study one junction up close while
+the other kept its frame. `PerformancePage` now owns two `View` states, one per
+`ControllerWindow`, and passes each window the other's as `matchView`. `TwinViewport`
+shows a Match button (`Link2`) only when it has a partner; pressing it copies that framing
+across once and disables itself while the two agree — a one-shot, not a lock. Verified in
+the browser: both open at 3.5×, a Ctrl-wheel on Trinetra leaves VAC untouched, VAC's Match
+adopts Trinetra's viewBox to the centimetre and then greys.
+
+### 30.3 3.5× to open
+
+`HOME_ZOOM = 3.5`; `HOME_VIEW.h = FIT_VIEW.h / 3.5` ≈ 118 m visible (was 150 m, 2.7×). The
+"frame the junction" button returns there. `overview/__tests__/usePanZoom.test.ts` pins the
+ratio and the wheel rule — the first test on the plate's window.
+
+### 30.4 One scenario grid
+
+Simulation Settings had two panels of the same thirteen cards. Now: one panel, one grid,
+and a "Choose for" dropdown (Overview · demo / Performance · Trinetra vs VAC) that says
+which page the next click chooses for; the lead sentence under it changes with the
+target. Each card marks the page(s) currently set to run it (an accent dot and an eyebrow
+"Overview" / "Performance"), so both choices read from one grid without touching the
+dropdown. The lock rule is unchanged — while a run of the targeted kind is up the cards
+are inert and the meta says so — and `data/settings.ts` keeps its two keys.
+
+"Everyday junction traffic" is gone as a card. It was the production route
+(`sumo/routes/intersection.rou.xml`, `python app.py`'s run): 480 vehicles an hour per
+approach, split 2:1:1 through/left/right, for ten minutes. Balanced traffic is the same
+480 per approach split 1:1:1 across the three movements (160 on each of the twelve routes)
+with per-seed jitter; Light traffic is half that (80 per route, 240 per approach); Normal
+day is the one with the realistic 65–70 % through share. Two cards at the same volume was
+one too many, so Balanced is now the demo's default (Performance stays on Extreme). The
+backend's `"default"` scenario id is untouched — a run started without a scenario still
+reports it and still gets its name in the chip; it simply has no card. A browser holding
+the old `default` choice in `localStorage` falls back to Balanced, because `settings.ts`
+validates stored ids against the card set.
+
+### 30.5 Cursors, and the footer
+
+Tailwind v4's preflight dropped `cursor: pointer` from buttons (v3 set it), which is why
+every control in the product read as an arrow. One rule in `index.css` gives the hand to
+enabled buttons, `[role=button]`, selects, summaries and labels; disabled controls keep
+their `not-allowed`. The plate shows `grab`, and `grabbing` while a drag is live — in the
+3D view too, via OrbitControls' `start`/`end` events.
+
+The footer's left half read "SUMO · TraCI · read-only viewer · backend 127.0.0.1:8000" on
+every page. The top bar is already the same everywhere, so the footer now names the page
+being read and what it shows in one line (`layout/FooterBar.tsx`, from the route); the
+measured rate stays on the right.
+
+Verified: `tsc -b`, oxlint, 10 Vitest (two new), the build, and a live pass on the console:
+a `light_seed1` demo (plain wheel not prevented and the page scrollable, Ctrl-wheel zooms,
+readout 3.5× at home) and a `light_seed1` VAC evaluation (independent zooms, Match). Zero
+console errors.
+
+### 30.6 The top bar belongs to the page (later the same day)
+
+Chethan's next list: the top bar's Start/Pause/Stop confused him — arriving on Performance
+while a demo was running, he found controls for a run he could not see, and no way to start
+the evaluation without going back to Overview to stop the demo. He wanted each page's bar
+to be its own, and Start on Performance to end the demo and start the evaluation itself.
+
+`data/pageContext.ts` is the one place that decides what a page is about: its kind of run
+(Performance → the evaluation; Overview and Analytics → the demo; Simulation Settings →
+whichever page its "Choose for" dropdown names, which moved from page-local state into the
+settings store so the bar can read it), the scenario that run is or would be, and whether
+a run of this kind — or the other — is up. `RunControls` reads it: nothing of this page's
+kind running → Start; this page's kind running → Pause / Stop / speed; the other kind
+running → still Start, whose press ends that run first. `runState.replaceWithDemo` /
+`replaceWithEvaluation` do the sequence — stop, poll `run-state` until idle (20 s cap),
+start — with `busy` held so nothing else is pressed mid-way; the console's own 409 on a
+second start never has to fire. From Settings, Start also navigates to the page it runs.
+Verified live: demo up → Performance → Start → `running:demo:stopping` → `running:evaluation`,
+one press; the reverse from Overview; and Settings with the dropdown on Performance →
+Start → `/performance`, `kind: evaluation`, the chosen scenario.
+
+The page-level "Scenario: …" chips on Overview and Performance moved into the top bar as
+one chip beside the controls (the sliders icon, linking to Settings), naming the page's
+scenario — running or chosen. The subtitle under "Adaptive signal control" is a line
+about the project; it carried the scenario for a day and Chethan preferred the chip. The
+footer's right side, which duplicated the rate the status bar already shows, now names
+the backend host and the stream state instead. Analytics'
+own start prompt learned the same rule (an evaluation up → "Start here ends it").
+
+### 30.7 Performance keeps its shape
+
+The idle Performance page was a centred card ("Trinetra vs VAC — nothing running yet") with
+its own Start. Chethan: "why did you give the performance page like a placeholder". It now
+always renders its layout — the two junction windows dark and unpowered, exactly as
+Overview draws its plate before a run, and the seven metric blocks as `EmptyMetricBlock`s
+(title, legends without readings, an empty axis, "fills in once the evaluation starts") in
+the evaluator's own order (`METRIC_KEYS`). The windows' header meta carries the one line
+that matters ("press Start to run the evaluation", "a demo run is up on Overview — Start
+here ends it", "starting — both junctions appear on the first tick"). `EvalStartPrompt.tsx`
+is deleted; Start lives in the top bar.
+
+Also removed: the 3D view's "12 lanes · true scale · real vehicle types" caption (its
+orbit hint now says Ctrl + scroll).
+
+### 30.8 A page shows its own run, and nothing else (2026-09-16)
+
+Four defects from using the per-page bar, all one rule: **a run of the other kind is
+"nothing running" from this page.** While an evaluation ran, Overview kept saying "an
+evaluation is running — watch it on Performance" in place of its plate, the top-right
+clock ticked the evaluation's time, and the Active-phase panel's "Green held" counted —
+`useLiveClock` follows whatever frames are on the wire, the evaluation's AI side included,
+and Overview's `ended` only asked "is anything running". Now: `OverviewPage` and
+`PerformancePage` treat a run of the other kind as ended (dark plate, "—" everywhere, no
+message pointing elsewhere); `StatusBar` computes `foreign` from `pageContext` and shows
+"No simulation running" / Idle, no clock, no mode chip; `PhasePanel` takes `powered` and
+does not read the clock when false. The Performance side of it mattered too: for the few
+seconds before a new demo's first tick, the last evaluation frame still on the wire read
+as live there.
+
+And the painted turn arrows: each bent 3 m sideways in a 3.2 m lane, so the kerb lane's
+arrow ran 1.4 m onto the verge and the inner lane's across the median. `arrowPath` now
+ends the bend 1.0 m off centre at 45°, which puts the 0.8 m head's tip at ~1.57 m — inside
+the lane at any zoom (checked at 3.5×, 7.8× and 17×).
+
+### 30.9 The ground, the fast run, and the restart (2026-09-16)
+
+- **The plan view's ground is the 3D model's grass** (`--plate-ground` = Junction3D's
+  `GROUND`, `#268426` after one lightening), at Chethan's request — the two views now read as one place. Text on
+  it (lane names, approach names, the north arrow) moved from ink to the marking white
+  (`--plate-ink`, 4.75:1 on that green); the Light demand chip that borrowed the old pale
+  ground now uses `--accent-soft`.
+- **"Max" speed scattered vehicles.** Frames are broadcast at 2 Hz wall time whatever the
+  speed, so at ~8-16x each frame spans 4-8 simulated seconds, and a constant-velocity tween
+  between two positions that far apart is a chord — through the verge for a car turning in
+  the junction, diagonally across lanes for one that changed lane. `store.ts` now measures
+  `simPerFrame` and derives `smooth` (≤ 1.6 s); above that the plate drops its CSS
+  transition and the 3D view collapses each car's segment to its endpoint, so every frame
+  is drawn where SUMO put the vehicle. Measured: 16.4x, 73 vehicles, zero off the
+  carriageway; back at 1x the 1 s tween returns.
+- **Restarting brought the old vehicles back.** A stop cleared the plate, but the console's
+  `LiveStateStore` kept the ended run's last snapshot and re-broadcast it at 2 Hz, so the
+  moment a new run was reported running the old picture re-powered for the 4-6 s SUMO and
+  the model take to come up, then slid "backwards" into the new run's first frame. Two
+  halves: `SimulationSupervisor.start()`/`start_evaluation()` call `LiveStateStore.clear()`
+  (not the GUI handover, which is the same run continuing — `test_a_new_run_starts_from_an_
+  empty_live_store`), and the frontend's `runState` resets the sim store (`useSim.reset()`:
+  frames, `lastLive`, clocks) whenever `run-state.started_at` changes. Measured with the
+  restarted console: zero vehicles on the plate through the launch, then the new run's own.
+  The 4-5 s itself is real — SUMO launch plus the forest loading — not a rendering delay.
+
+### 30.10 Smooth at any speed, a one-second start, a curved 3D junction (2026-09-16)
+
+Chethan's follow-up: the snap of 30.9 made "max" correct but frame-by-frame, and he wanted
+it smooth; why does a run take 4-5 s to start, and can that go; and the 3D junction was a
+square where the plan has fillets.
+
+**Per-tick frames.** The WebSocket loop sent whatever the store held every 0.5 s of wall
+time, whatever the speed — so at 16-19x each frame spanned 8+ simulated seconds, which no
+interpolation can fill honestly. `LiveStateStore` now carries a version (bumped on
+`publish()` and `clear()`), and the loop sends when the version changes (checked every
+33 ms, so ≤ 30 frames/s) with a 0.5 s heartbeat for unchanged state. Every frame is now
+one simulation tick at any speed; the frontend's tween floor dropped from 120 ms to one
+display frame (33 ms) and its rate guard from 50 ms to 10 ms so it keeps up. Measured on
+`heavy_seed1` at 19.4x: 14 frames/s reaching the page, 54 ms tweens, 67 vehicles, none off
+the carriageway — smooth, and where SUMO put them. The `smooth` gate of 30.9 stays as the
+safety net for a slow link.
+
+**The start-up time was the forest.** `MLPredictor.from_path` deserialised the 258 MB
+joblib on every run: 4.8-7.3 s on this laptop, against ~1 s for SUMO itself.
+`_load_model_files` now caches the deserialised model, calibrators and target mode for the
+life of the process, keyed on the path, size and mtime of all three files (a retrained model
+or re-fitted calibrator invalidates it — `test_from_path_reads_target_mode_from_metadata`
+caught the first version, which keyed on the forest alone). `server.py` warms the cache on
+a daemon thread at start, so even the first run is fast; the evaluator's two sides share the
+same objects (the forest is only ever read). Measured: start → first tick **1.4 s** (was
+5-7); a cached `from_path` is 0.06 s. Terminal `app.py` and the batch sweep are unchanged —
+one process, one load, as before.
+
+**The 3D junction slab** is the network's own `<junction id="C">` outline — the plan
+view's `junctionOutline()` rebuilt as a `THREE.Shape` with four `absarc` fillets (12 m,
+centred on the outer corners) and extruded 0.4 m — instead of a 43.2 m square. Both views
+now share the one shape, to the metre.
+
+### 30.11 Motion frames: a turn drawn as a turn (2026-09-16)
+
+Chethan: turns were not smooth, a car sometimes stood still for a fraction of a second
+before the next frame, and left-turners in the kerb lane crossed the curve line.
+
+All three were the frame spacing. Positions were published once per decision tick — one
+simulated second — so a car in the 13.6 m left-turn arc moved ~8 m between frames and the
+tween was a straight chord 0.6 m inside the arc, while the lane centre sits only 1.6 m
+from the net's 12 m corner. The stall was the tween reaching its mark before the next
+frame arrived.
+
+**Motion frames.** Between ticks the run now publishes a light frame every 0.2 s
+simulated: the last tick's snapshot with fresh `sim_time` and `vehicles`
+(`TrafficAdapter.get_vehicles()` — the subscription results SUMO already delivers each
+step; twin, features and engine never see it) and the decision's held-seconds advanced by
+the elapsed time, so `sim_time − duration`, the plate's release key, does not move. Ticks
+carry `tick: true`, motion frames `tick: false`; the frontend's `liveHistory` and
+`evalHistory` skip the latter, so Analytics and the Performance verdicts still sample once
+a second. `simulation_runner.py` does it in `on_step` (same phase as the tick — 0.25,
+0.45, 0.65, 0.85, never on a tick step), the evaluator in its lockstep loop for both
+fleets (`snapshot_views.motion_frame`, `test_motion_frame_moves_vehicles_and_the_held_
+clock_only`). Batch runs have no store and pay nothing.
+
+**No stall.** The plate's tween runs 20 % longer than the measured frame interval, so the
+next frame lands mid-tween and retargets it (the 3D view already overruns by 35 %).
+
+**The curve.** `KERB_R` is 11 m in both views, not the net polygon's 12: that polygon is
+where the lanes end, not a kerb, and 1 m tighter gives a turning car ~1.7 m of flank
+clearance instead of 0.7.
+
+Measured on `heavy_seed1` at 1x: 5.1 frames/s on the page, 230 ms tweens, and over 20 s
+the closest any vehicle centre came to a corner was 13.5 m (2.5 m outside the drawn kerb).
+Frames on the wire: (6.05, tick), (6.25), (6.45), (6.65), (6.85), (7.05, tick) …
+
+### 30.12 The explainability row: "Why this phase" and "Recent switches" (2026-09-17)
+
+Chethan noticed the empty band under the prediction panel (the left column ended ~100 px
+above the 12-row lane table) and asked what could go there, and what the Decisions page
+was for.
+
+Two panels now fill it, both from the live stream:
+
+- **Why this phase** — the design brief's §7.5 score ledger: the four phase scores as
+  bars, the served phase in signal green, and the decision boundary drawn as a dashed line
+  at *served score + hysteresis margin* — what a challenger must clear before an ordinary
+  preference switch is even considered. The served phase is often not the highest bar
+  (N–S right at 0.03 served while two challengers sat at 0.35 under a 0.40 boundary, on the
+  first live look), and this is the panel that shows that as a decision rather than a
+  fault. The margin was only inside the reason text before; `Decision` gained
+  `switch_margin` (the effective margin of that tick; 0.0 for the baselines, which have
+  none) and `decision_view` exports it as `margin`.
+- **Recent switches** — the last five phase changes: time, from → to, how long the ended
+  phase had run, and the rule (priority / gap-out / starvation / emergency). Sourced from
+  the snapshot's own 60 s `phase_history`, so it is right the moment the page opens; the
+  rule comes from the page's per-tick history and is shown only for ticks this page saw —
+  a switch from before the page opened shows without one rather than with a guess.
+
+**The Decisions page** (still `NotBuiltPage`) is decided: it will be built as the brief's
+§8.4 audit trail — every decision of a run from `GET /api/logs/decisions`, dense list,
+filter by mode, row → ledger + desired/actual + full reason — the one page that can show
+a run after it has ended. Not yet built; it waits on the database question below.
+
+### 30.13 The database knows which run a row belongs to (2026-09-17)
+
+Chethan, on hearing Decisions would read the database: "we don't want the previous
+running data when it finishes running". He was right to ask — nothing separated runs.
+Every demo run appended to the same four insert-only tables with no run id (564,638 rows,
+74 MB, by then), and `/api/logs/decisions` ordered by simulated time was every run ever,
+shuffled. He chose "keep the last few runs, scoped" over "current run only", so the
+offline calibration script keeps enough history.
+
+- **`run_id` on every row** of all four tables: the run's ISO UTC start time (the
+  console passes its `started_at`, so a GUI handover continues the same run; a terminal
+  `app.py` run makes its own). Added by `ALTER TABLE` to an existing file like the
+  actual-state columns were, with an index per table; legacy rows keep NULL and count as
+  the oldest run.
+- **Pruning at run start**: `DatabaseLogger.prune_runs(Config.DB_KEEP_RUNS = 10)` deletes
+  rows from runs older than the newest ten (this run counted), then `VACUUM`s so the file
+  is the size of what it holds — the legacy 74 MB became 4 MB.
+- **Reads are per run**: `/api/logs/{decisions,performance,predictions}` take `?run=`
+  and default to the newest run (`?run=all` is the old behaviour, for a legacy file);
+  `/api/logs/runs` lists the runs held, newest first; the three analytics functions and
+  their endpoints take `run_id` (default `"latest"`). `decisions` rows now also carry
+  `actual_phase` / `actual_is_yellow` / `run_id`, which the Decisions page will show.
+- Tests: `tests/test_db_logger_runs.py` (rows carry their run, reads default to the
+  latest, pruning keeps the newest N and drops legacy rows first). 98/98.
+
+Evaluations still write nothing to the database (they never did); the CSV under
+`results/` is their record.
+
+### 30.14 The Decisions page (2026-09-17)
+
+The last placeholder is gone. `pages/DecisionsPage.tsx` is the design brief's §8.4 audit
+trail, built on the run-scoped database of 30.13:
+
+- **A run picker** (newest first: "17 Sept, 16:24 · Emergency vehicles · 00:14:14") from
+  `/api/logs/runs`, which now also reports the scenario and switch count; the newest run
+  is followed unless the reader picks another, and while the selected run is the one the
+  console is writing, the page polls `?after_id=` every 2 s and appends — a "live" pill
+  says so. The scenario a run played is stored on its decision rows (`scenario`), as are
+  the four phase scores and the margin of every tick (`phase_scores`, `margin`), so a
+  past decision's ledger can be redrawn exactly; rows from before this change show
+  "not recorded" rather than a guess.
+- **Rule chips with counts** (All · Switches 57 · Minimum green 441 · Priority 270 ·
+  Emergency 133 · Gap-out 11 on the emergency run) filter the list; the phase a row
+  replaced is computed on the full run, so a filtered list still marks real switches.
+- **A windowed list** (`decisions/DecisionList.tsx`: fixed 30 px rows, only the visible
+  slice in the DOM — an hour is 3 600 rows), newest at the bottom, pinned there while
+  following unless the reader scrolls up; ↑/↓ move the selection.
+- **The opened decision** (`DecisionDetail.tsx`): the rule and its plain sentence, the
+  full reason, engine-decided vs light-showing with the amber case explained ("amber —
+  clearing into the decided phase", never a fault), and the same `ScoreLedger` Overview
+  shows live, from the row's own scores and margin — on the emergency run's override it
+  shows N–S straight+left taken at 0.22 against a 0.60 boundary, which is the point.
+- The data hook (`decisions/useDecisionLog.ts`) walks a run forward with `after_id` a
+  page at a time, so a run longer than the API's 1 000-row cap is complete. Evaluations
+  never write the database, so only demo runs appear; the CSV under `results/` is theirs.
+
+`NotBuiltPage.tsx` is deleted. Five pages, none a placeholder.
+
+### 30.15 Video-smooth traffic: the motion buffer and SUMO's own heading (2026-09-17)
+
+Chethan: a tiny hitch every few seconds in otherwise smooth traffic, in both views, and
+turning vehicles whose nose swung first and body followed.
+
+**Measured first.** On the wire at 2x, frames due every 100 ms arrived alternating ~92 and
+~142 ms (±20 ms sd; the 33 ms broadcast poll plus pacing). Both views tweened toward each
+frame as it landed, over the *average* interval, so on every longer gap the car reached its
+mark and stood still for the difference — 30-50 ms, a few times a second, noticed every
+few seconds. The heading was derived from position deltas, and on entering a turn the
+derived angle led the interpolated position: the nose swung, the body caught up.
+
+**The fix is what a video player does.** `data/motion.ts` keeps the last twelve frames per
+fleet (`MotionBuffer`: the demo, and the evaluation's `ai` and `baseline`), fed at ingest,
+and a `DisplayClock` per view draws the traffic a fixed 250 ms *behind* the newest frame,
+advancing at the measured sim rate and easing toward that lag; each animation frame
+samples the buffer at the display time and interpolates every vehicle between the two
+frames that bracket it. Jitter smaller than the lag cannot show, nothing extrapolates
+past the newest frame (which is what once put cars on the verge), and a vehicle that just
+appeared sits at its first position rather than sliding in from nowhere. The plate's
+`VehicleLayer` writes transforms straight to its `<g>` elements from a
+`requestAnimationFrame` loop — React only decides which vehicles have an element — and
+`Junction3D` runs the identical buffer and clock, so the two views move as one.
+`vehiclePlacement.ts` and the 3D view's from/to segments are gone.
+
+**Heading is SUMO's.** The adapter subscribes to `VAR_ANGLE` as well; `VehicleState.angle`
+(degrees clockwise from north, SUMO's convention along the lane's real shape) rides in
+every frame and is interpolated the short way round. On the plate that is `angle − 90` in
+its clockwise-from-east frame; in 3D it is `rotation.y` directly. Nothing in the
+pipeline reads it — training rows are untouched. The broadcast poll dropped 33 → 10 ms.
+
+Measured on the page, `heavy_seed1`: 721 display frames over 12 s at 1x with **zero**
+frames in which the moving traffic did not move (the old hitch), headings changing at
+most 2.6° per display frame with no jump over 8°; at 11x, 479 frames, zero stalls, the
+corner clearance of 30.11 kept. Six Vitest cases pin the buffer and the clock.
+
+**Lane changes (later the same day).** Chethan watched an East→South left-turner land in
+the kerb lane and "suddenly come to the middle". That is SUMO's lane-change model moving
+it to the middle lane — and SUMO performs a lane change as an instantaneous 3.2 m sideways
+jump between two steps, which the buffer drew faithfully as a one-frame slide. Offered a
+cosmetic easing or SUMO's `lanechange.duration` (which changes the dynamics and would
+invalidate the sweep), he chose the easing: the buffer notes a jump of ≥ 1.5 m sideways
+between two frames on the same road (`noteLaneChanges`) and, for `LANE_CHANGE_SECONDS`
+(1.2 s) after it, pulls the drawn pose back toward the old lane on a smoothstep with up
+to 6° of yaw toward the new one — the along-road motion exact throughout, the car exactly
+where SUMO put it once the drift ends. Turns (internal lanes) and merges onto another road
+are left alone. Two more Vitest cases; 18 in all.
+
+**And one bug of mine in 3D**, reported by Chethan as "turning abnormally" and "stopping
+on the line": the scene's z axis runs south (z = CENTRE − y) and a group faces (sin θ,
+cos θ), so SUMO's north-based angle maps to θ = π − angle — I had used θ = angle, which
+faced every north/south vehicle backwards and therefore pushed its body *forward* across
+the stop line instead of back from the bumper. East/west vehicles happened to be right,
+which is why it was not obvious. Fixed and checked against queues on all four arms.
+
+**Bodies (later).** "They just seem like boxes now" — the bus and truck were one slab
+each. `Junction3D` now builds a truck as a chassis, a darker tractor cab with a
+windscreen, a cargo box in the vType colour and six wheels; a bus as a chassis, one long
+body with a dark window band along both sides, a windscreen and four large wheels; and a
+car as its lower body, glazed cabin and four wheels. Geometry is still cached per
+(kind, dimensions) and shared, so the cost per vehicle is unchanged. The fire engine
+(9 m) takes the truck build, the ambulance and police car the car build.

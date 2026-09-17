@@ -49,7 +49,7 @@ _TLS_ID = "C"
 # getAllSubscriptionResults() call. Values are byte-identical to the
 # direct reads they replace; the only difference is who asks.
 _VEHICLE_VARS = (
-    tc.VAR_LANE_ID, tc.VAR_SPEED, tc.VAR_WAITING_TIME, tc.VAR_POSITION,
+    tc.VAR_LANE_ID, tc.VAR_SPEED, tc.VAR_WAITING_TIME, tc.VAR_POSITION, tc.VAR_ANGLE,
 )
 # Static for a vehicle's whole life: read once when it is first seen and
 # remembered, never subscribed - SUMO delivers a subscription every step
@@ -154,6 +154,7 @@ class TrafficAdapter:
                 waiting_time=r[tc.VAR_WAITING_TIME],
                 position=tuple(r[tc.VAR_POSITION]),
                 type_id=r[tc.VAR_TYPE],
+                angle=float(r.get(tc.VAR_ANGLE, 0.0)),
             )
             for vehicle_id, r in results.items()
         ]
@@ -165,6 +166,37 @@ class TrafficAdapter:
             vehicles=vehicles,
             signal=signal,
         )
+
+    def get_simulation_time(self) -> float:
+        """Current simulated time, seconds - one round trip."""
+        return float(self._traci.simulation.getTime())
+
+    def get_vehicles(self) -> List[VehicleState]:
+        """
+        The fleet alone - every vehicle's lane, speed, wait, position and
+        type - without the signal or a SimulationState round it. For the
+        dashboard's motion frames between decision ticks: SUMO delivers
+        the subscribed variables inside every step's reply anyway, so
+        this costs the id list and one results call, and nothing
+        downstream (twin, features, engine) sees it.
+        """
+        if not self._traci_manager.is_connected:
+            raise RuntimeError(
+                "TrafficAdapter cannot read vehicles: the TraCIManager is "
+                "not currently connected."
+            )
+        return [
+            VehicleState(
+                id=vehicle_id,
+                lane_id=r[tc.VAR_LANE_ID],
+                speed=r[tc.VAR_SPEED],
+                waiting_time=r[tc.VAR_WAITING_TIME],
+                position=tuple(r[tc.VAR_POSITION]),
+                type_id=r[tc.VAR_TYPE],
+                angle=float(r.get(tc.VAR_ANGLE, 0.0)),
+            )
+            for vehicle_id, r in self._vehicle_results().items()
+        ]
 
     def observe_step(self) -> None:
         """
@@ -362,6 +394,7 @@ class TrafficAdapter:
             tc.VAR_SPEED: vehicle.getSpeed(vehicle_id),
             tc.VAR_WAITING_TIME: vehicle.getWaitingTime(vehicle_id),
             tc.VAR_POSITION: vehicle.getPosition(vehicle_id),
+            tc.VAR_ANGLE: vehicle.getAngle(vehicle_id),
             **static,
         }
 

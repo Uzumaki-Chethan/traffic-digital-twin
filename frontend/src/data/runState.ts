@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { create } from 'zustand'
+import { useSim } from './store'
 
 /**
  * What the backend will let us do to the simulation, and the calls that
@@ -35,6 +36,8 @@ export interface RunState {
   handing_over?: boolean
   /** Set when the last run ended by crashing, in plain text. */
   error?: string | null
+  /** ISO time the current (or last) run was started; changes on every new run. */
+  started_at?: string | null
   /** What the console's worker is running (2026-09-14): a demo run, an
    * evaluation (Trinetra vs a baseline, see the Performance page), or
    * nothing. Only the console reports it. */
@@ -56,11 +59,29 @@ export const useRunStore = create<Store>(() => ({ state: null, busy: false, fail
 
 const POLL_MS = 2000
 
+/** `started_at` of the run the sim store's frames belong to. */
+let knownStart: string | null | undefined
+
+/**
+ * A new run means the frames on screen belong to a run that no longer
+ * exists. Forget them here, the moment the console reports the start,
+ * rather than when the new run's first tick arrives 4-6 s later (SUMO
+ * launch + model load) — otherwise the old vehicles stand on the plate
+ * for those seconds and then slide "backwards" into the new positions.
+ */
+function noteRun(state: RunState): void {
+  const start = state.started_at ?? null
+  if (knownStart !== undefined && start !== knownStart) useSim.getState().reset()
+  knownStart = start
+}
+
 async function refresh(signal?: AbortSignal): Promise<void> {
   try {
     const res = await fetch('/api/control/run-state', { signal })
     if (!res.ok) throw new Error(String(res.status))
-    useRunStore.setState({ state: (await res.json()) as RunState })
+    const state = (await res.json()) as RunState
+    noteRun(state)
+    useRunStore.setState({ state })
   } catch {
     if (signal?.aborted) return
     // Server down or no control layer mounted: report nothing rather
@@ -82,8 +103,10 @@ async function send(path: string, body?: unknown): Promise<void> {
       useRunStore.setState({ failure: payload?.detail ?? `HTTP ${res.status}` })
       return
     }
-    if (payload && 'available' in payload) useRunStore.setState({ state: payload })
-    else void refresh()
+    if (payload && 'available' in payload) {
+      noteRun(payload)
+      useRunStore.setState({ state: payload })
+    } else void refresh()
   } catch (e: unknown) {
     useRunStore.setState({ failure: e instanceof Error ? e.message : String(e) })
   } finally {
@@ -91,6 +114,38 @@ async function send(path: string, body?: unknown): Promise<void> {
     // A start takes a few seconds to reach its first tick (SUMO launch +
     // model load), so confirm the real state shortly after.
     window.setTimeout(() => void refresh(), 600)
+  }
+}
+
+/** How long to wait for a stopped run to report idle before giving up. */
+const SWITCH_TIMEOUT_MS = 20_000
+
+/**
+ * End whatever the console is running, wait for it to report idle, then
+ * start `next`. The console runs one thing at a time and refuses a
+ * second start with a 409, so a page whose kind of run is not the one
+ * up (Start on Performance during a demo, or the reverse) does this
+ * instead of asking the reader to go and stop it themselves. `busy`
+ * is held for the whole sequence so nothing else is pressed mid-way.
+ */
+async function replace(next: () => Promise<void>): Promise<void> {
+  useRunStore.setState({ busy: true, failure: null })
+  try {
+    if (useRunStore.getState().state?.running) {
+      await send('/api/control/stop-simulation')
+      const t0 = performance.now()
+      while (useRunStore.getState().state?.running) {
+        if (performance.now() - t0 > SWITCH_TIMEOUT_MS) {
+          useRunStore.setState({ failure: 'The previous run did not stop in time' })
+          return
+        }
+        await new Promise((r) => window.setTimeout(r, 300))
+        await refresh()
+      }
+    }
+    await next()
+  } finally {
+    useRunStore.setState({ busy: false })
   }
 }
 
@@ -103,6 +158,12 @@ export const runControl = {
   /** Console: start Trinetra vs VAC on `scenarioName`, in-process, headless. */
   startEvaluation: (scenarioName: string) =>
     send('/api/control/start-evaluation', { scenario_name: scenarioName, baseline: 'vac' }),
+  /** Console: end the current run (if any), then start a demo run. */
+  replaceWithDemo: (gui: boolean, scenarioName: string) =>
+    replace(() => runControl.start(gui, scenarioName)),
+  /** Console: end the current run (if any), then start an evaluation. */
+  replaceWithEvaluation: (scenarioName: string) =>
+    replace(() => runControl.startEvaluation(scenarioName)),
   /** Console: end the run the supervisor is hosting. */
   stop: () => send('/api/control/stop-simulation'),
   /**

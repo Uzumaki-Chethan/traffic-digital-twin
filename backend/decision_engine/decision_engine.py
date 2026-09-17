@@ -153,6 +153,13 @@ class Decision:
     # exposed so callers (app.py) can persist per-lane congestion
     # without recomputing it - see backend/analytics/congestion_analytics.py.
     lane_scores: Mapping[str, float]
+    # The effective hysteresis margin at this tick: how far above the
+    # served phase's score a challenger must lead before an ordinary
+    # preference switch is even considered (switch_hysteresis_margin +
+    # oversaturation_margin_bonus x congestion_index). Exposed so the
+    # dashboard can draw the decision boundary, not just the scores.
+    # 0.0 for controllers that have no such margin (the baselines).
+    switch_margin: float = 0.0
 
 
 class DecisionEngine:
@@ -173,6 +180,7 @@ class DecisionEngine:
         self._config = config if config is not None else _load_default_config(calibration_path)
         self._current_phase = initial_phase
         self._seconds_in_current_phase = 0.0
+        self._last_margin = self._config.switch_hysteresis_margin
         self._seconds_since_last_served: Dict[str, float] = {name: 0.0 for name in PHASE_NAMES}
         self._emergency_hold_remaining = 0.0
         # Switch-confirmation debounce state (see decide()'s ordinary
@@ -233,6 +241,10 @@ class DecisionEngine:
         }
         phase_scores = self._phase_scores(lane_scores, features)
         congestion_index = sum(lane_scores.values()) / len(lane_scores)
+        self._last_margin = (
+            cfg.switch_hysteresis_margin
+            + cfg.oversaturation_margin_bonus * congestion_index
+        )
 
         emergency_phase = self._select_emergency_phase(emergency_lanes)
         if emergency_phase is not None and emergency_phase != self._current_phase:
@@ -392,10 +404,7 @@ class DecisionEngine:
                 ),
             )
 
-        effective_margin = (
-            cfg.switch_hysteresis_margin
-            + cfg.oversaturation_margin_bonus * congestion_index
-        )
+        effective_margin = self._last_margin
         leads = phase_scores[best_other] > phase_scores[self._current_phase] + effective_margin
 
         if not leads:
@@ -595,6 +604,7 @@ class DecisionEngine:
             reason_text=reason,
             phase_scores=dict(phase_scores),
             lane_scores=dict(lane_scores),
+            switch_margin=self._last_margin,
         )
 
     def _switch_to(
@@ -637,4 +647,5 @@ class DecisionEngine:
             reason_text=reason,
             phase_scores=dict(phase_scores),
             lane_scores=dict(lane_scores),
+            switch_margin=self._last_margin,
         )

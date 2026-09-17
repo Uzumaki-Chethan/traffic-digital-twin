@@ -71,6 +71,9 @@ export interface VehicleView {
    * older backend does not send it, and those vehicles draw as cars.
    */
   type?: string
+  /** SUMO's heading, degrees clockwise from north, along the lane's
+   * real shape (2026-09-17). Optional on an older backend. */
+  angle?: number
 }
 
 export interface LaneView {
@@ -95,6 +98,10 @@ export interface DecisionView {
   reason: string
   duration: number
   phase_scores: Record<string, number>
+  /** The effective hysteresis margin this tick: a challenger must score
+   * more than the served phase plus this to take the junction by
+   * preference. 0 for a baseline (no margin); absent on an older backend. */
+  margin?: number
 }
 
 export interface PredictionRow {
@@ -136,6 +143,12 @@ export interface LiveSnapshot {
    * backend omits it. Evaluation frames are a different shape entirely
    * (EvaluationSnapshot). Added 2026-09-14. */
   kind?: 'demo'
+  /** True on a decision tick (1 Hz). False on the motion frames between
+   * ticks (every 0.2 s simulated, since 2026-09-16), which carry only
+   * fresh vehicle positions and an advanced held-seconds; anything that
+   * samples per tick must skip those. An older backend omits it (all
+   * ticks). */
+  tick?: boolean
   sim_time: number
   signal: SignalView | null
   metrics: MetricsView
@@ -173,6 +186,8 @@ export interface SideView {
  * only, so verdicts can lock. */
 export interface EvaluationSnapshot {
   kind: 'evaluation'
+  /** As LiveSnapshot.tick. */
+  tick?: boolean
   sim_time: number
   scenario: string
   baseline_controller: 'vac' | 'fixed_timer' | string

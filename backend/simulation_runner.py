@@ -52,7 +52,8 @@ logger = logging.getLogger(__name__)
 # with the evaluator so both sides of a live evaluation draw exactly as a
 # demo run does.
 from services.snapshot_views import (  # noqa: E402
-    _INDEX_TO_PHASE, decision_view, lanes_view, metrics_view, signal_view, vehicles_view,
+    _INDEX_TO_PHASE, MOTION_FRAME_INTERVAL_SECONDS, decision_view, lanes_view, metrics_view,
+    motion_frame, signal_view, vehicles_view,
 )
 
 
@@ -102,7 +103,7 @@ def resolve_config(gui=None, base=Config, load_state=None, sumocfg=None):
 
 
 def run_simulation(store, control=None, *, gui=None, base_config=Config,
-                   load_state=None, sumocfg=None):
+                   load_state=None, sumocfg=None, run_id=None):
     """
     Run one live simulation to completion.
 
@@ -136,7 +137,14 @@ def run_simulation(store, control=None, *, gui=None, base_config=Config,
     config.validate()
 
     manager = TraCIManager(config)
-    db_logger = DatabaseLogger(config.DB_PATH)
+    # Every row this run writes carries run_id (the console passes its
+    # started_at, so a GUI handover continues the SAME run's rows); runs
+    # older than the newest DB_KEEP_RUNS are pruned on the way in.
+    scenario = (
+        os.path.splitext(os.path.basename(sumocfg))[0] if sumocfg else "default"
+    )
+    db_logger = DatabaseLogger(config.DB_PATH, run_id=run_id, scenario=scenario)
+    db_logger.prune_runs(config.DB_KEEP_RUNS)
 
     try:
         manager.start()
@@ -333,6 +341,8 @@ def run_simulation(store, control=None, *, gui=None, base_config=Config,
                 reason=decision.reason_text,
                 actual_phase=sig_view["phase"],
                 actual_is_yellow=sig_view["is_yellow"],
+                phase_scores=decision.phase_scores,
+                margin=getattr(decision, "switch_margin", None),
             )
             db_logger.log_performance(
                 time=features.simulation_time,
@@ -378,11 +388,14 @@ def run_simulation(store, control=None, *, gui=None, base_config=Config,
                 "phase": decision.active_phase,
                 "is_yellow": sig_view["is_yellow"],
             })
-            store.publish({
+            last_tick_snapshot[0] = {
                 # Tells the frontend which page this frame belongs to:
                 # a demo run (this) or an evaluation (both controllers
                 # side by side - see performance/evaluator.py).
                 "kind": "demo",
+                # A decision tick, as opposed to the motion frames in
+                # between (on_step below), which only move the vehicles.
+                "tick": True,
                 "sim_time": features.simulation_time,
                 "signal": sig_view,
                 "metrics": metrics_view(features),
@@ -396,13 +409,48 @@ def run_simulation(store, control=None, *, gui=None, base_config=Config,
                 "prediction": latest_evaluated,
                 "comparison": None,
                 "phase_history": list(phase_history),
-            })
+            }
+            store.publish(last_tick_snapshot[0])
+
+        # Between ticks, a light motion frame every 0.2 s: the last tick's
+        # snapshot with fresh vehicle positions, so the plate can draw a
+        # turn as a turn. Read-only, and nothing in the pipeline sees it.
+        last_tick_snapshot = [None]
+        step_seconds = None
+        try:
+            step_seconds = float(manager.connection.simulation.getDeltaT())
+        except Exception:
+            logger.debug("Could not read the step length; no motion frames.", exc_info=True)
+        steps_per_tick = max(1, int(round(Config.DECISION_INTERVAL_SECONDS / step_seconds))) if step_seconds else 0
+        steps_per_motion = max(1, int(round(MOTION_FRAME_INTERVAL_SECONDS / step_seconds))) if step_seconds else 0
+        step_count = [0]
+
+        def on_step():
+            adapter.observe_step()
+            if not steps_per_tick:
+                return
+            step_count[0] += 1
+            n = step_count[0]
+            # Same phase as the tick (0.05, 1.05, ...), so a motion frame
+            # never lands on a tick step - the tick's own publish follows.
+            if n % steps_per_tick == 1 % steps_per_tick or n % steps_per_motion != 1 % steps_per_motion:
+                return
+            snapshot = last_tick_snapshot[0]
+            if snapshot is None:
+                return
+            try:
+                store.publish(motion_frame(
+                    snapshot, adapter.get_simulation_time(), {None: adapter.get_vehicles()},
+                ))
+            except Exception:
+                # A side-channel: never the reason a control tick is lost.
+                logger.debug("Motion frame skipped.", exc_info=True)
 
         # State is read and the pipeline run once per decision tick, not
         # per 0.05 s step; the adapter watches every step for the event
         # lists that would otherwise be lost (Section 28).
         manager.run(
-            update_twin, control=control, on_step=adapter.observe_step,
+            update_twin, control=control, on_step=on_step,
             callback_interval_seconds=Config.DECISION_INTERVAL_SECONDS,
         )
     finally:

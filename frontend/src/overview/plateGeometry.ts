@@ -9,7 +9,7 @@
  *   network            400 x 400 m, junction C at (200, 200)
  *   lanes              3.2 m wide, three per direction (9.6 m corridors)
  *   inbound lanes end  21.6 m from the centre (x/y = 178.4 or 221.6)
- *   junction corners   12 m kerb fillets (190.4 -> 178.4 at the box edge)
+ *   junction corners   11 m kerb fillets (the net polygon has 12; see KERB_R)
  *   N_in lane centres  x = 208.0 / 204.8 / 201.6 for lanes 0 / 1 / 2
  *   C_out_N            x = 192.0 / 195.2 / 198.4 - the other side
  *
@@ -30,7 +30,14 @@ export const CENTRE = 200
 export const LANE_W = 3.2
 export const ROAD_HALF = 9.6
 export const JUNCTION_HALF = 21.6
-export const KERB_R = 12
+/**
+ * The junction's corner fillets. The net file's junction polygon has
+ * 12 m corners, but that polygon is where the lanes end, not a kerb: the
+ * left-turn lane's centre runs only 1.6 m inside it, which put a 1.8 m
+ * car's flank on the line. Drawn 1 m tighter in both views, so a turning
+ * vehicle keeps ~1.7 m clear of it.
+ */
+export const KERB_R = 11
 /** Inbound lane length: the 200 m arm minus the 21.6 m to the stop line. */
 export const ARM_METRES = CENTRE - JUNCTION_HALF // 178.4
 
@@ -129,6 +136,11 @@ export function laneHeading(lane: string): number | null {
  * runs along +x toward the stop line at x = 0, lane centre at y = 0, and
  * because rotation keeps handedness, the driver's left is always -y.
  * Sized like real road paint: 5 m long, starting 7 m before the line.
+ *
+ * A turn arrow stays INSIDE its 3.2 m lane: the stem, then a bend that
+ * ends 1.0 m off centre heading 45°, so the 0.8 m head (markerEnd,
+ * centred on the path's end) tips out at ~1.57 m — the kerb lane's arrow
+ * used to run 1.4 m onto the verge and the inner lane's across the median.
  */
 export function arrowPath(index: number): string {
   const tail = -12
@@ -136,7 +148,7 @@ export function arrowPath(index: number): string {
   if (index === 1) return `M ${tail} 0 L ${head} 0`
   const side = index === 0 ? -1 : 1 // lane 0 turns left (-y), lane 2 right
   const bend = tail + 3.2
-  return `M ${tail} 0 L ${bend} 0 Q ${bend + 1.4} 0 ${bend + 1.4} ${side * 1.4} L ${bend + 1.4} ${side * 3}`
+  return `M ${tail} 0 L ${bend} 0 Q ${bend + 1.4} 0 ${bend + 2.4} ${side * 1.0}`
 }
 
 /** Rotation that takes the local arrow frame onto a lane. */
@@ -147,7 +159,7 @@ export function laneTransform(l: LaneGeom): string {
 
 /**
  * The junction's outline, exactly the `<junction id="C">` shape: a
- * 19.2 m-wide opening on each side joined by 12 m quarter-circle kerbs
+ * 19.2 m-wide opening on each side joined by KERB_R quarter-circle kerbs
  * that curve INTO the corner (centred on the outer corner, so the road
  * corner is filleted, not bulged) - the shape's own vertices
  * (212.6, 187.4) etc. sit 12 m from (221.6, 178.4).

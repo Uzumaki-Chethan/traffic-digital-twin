@@ -17,8 +17,22 @@ import { modeMeta, phaseLabel } from '@/utils/signal'
  * the engine reasons about — and during clearance it is the amber
  * countdown.
  */
-export function PhasePanel({ decision, signal }: { decision: DecisionView; signal: SignalView | null }) {
-  const { heldSeconds, clearance } = useLiveClock()
+export function PhasePanel({
+  decision,
+  signal,
+  powered = true,
+}: {
+  decision: DecisionView
+  signal: SignalView | null
+  /** False while this page shows no run: the clock is not read. */
+  powered?: boolean
+}) {
+  const clock = useLiveClock()
+  // The clock follows whatever frames are on the wire — an evaluation's
+  // AI side included — so an unpowered panel must not read it, or the
+  // "green held" counter runs for a run this page is not showing.
+  const heldSeconds = powered ? clock.heldSeconds : null
+  const clearance = powered ? clock.clearance : null
   const mode = modeMeta(decision.mode)
 
   const decided = decision.active_phase

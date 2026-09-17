@@ -136,6 +136,9 @@ function publish(force: boolean): void {
  */
 export function pushLiveSample(snapshot: Snapshot): void {
   if (!isLive(snapshot)) return
+  // One sample per decision tick; the motion frames in between only
+  // move the vehicles and would multiply the record five-fold.
+  if (snapshot.tick === false) return
   const t = snapshot.sim_time
   if (lastT !== null && t === lastT) return
   if (lastT !== null && t < lastT) {

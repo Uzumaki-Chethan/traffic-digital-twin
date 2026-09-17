@@ -72,7 +72,45 @@ def lanes_view(features, lane_scores, lane_states):
     return rows
 
 
+# Simulated seconds between the light "motion frames" published between
+# decision ticks, so the dashboard sees vehicle positions five times a
+# second at 1x rather than once. A car turning through the junction at
+# 8 m/s moves ~1.6 m per frame instead of 8 m, so the straight tween
+# between two frames stays on the arc instead of cutting 0.6 m inside
+# it - which is what put left-turners over the kerb line.
+MOTION_FRAME_INTERVAL_SECONDS = 0.2
+
+
+def motion_frame(tick_snapshot: dict, sim_time: float, vehicles_by_side: dict) -> dict:
+    """
+    The last decision-tick snapshot with fresh time and vehicle
+    positions, marked `tick: False` so the frontend's per-tick histories
+    ignore it. `vehicles_by_side` is {None: vehicles} for a demo frame or
+    {"ai": ..., "baseline": ...} for an evaluation frame. The decision's
+    held-seconds are advanced by the elapsed time so the phase clock the
+    plate keys its release on (sim_time - duration) does not move.
+    """
+    elapsed = sim_time - tick_snapshot["sim_time"]
+    frame = dict(tick_snapshot)
+    frame["sim_time"] = sim_time
+    frame["tick"] = False
+    for side, vehicles in vehicles_by_side.items():
+        target = frame if side is None else dict(frame[side])
+        target["vehicles"] = vehicles_view_from(vehicles)
+        decision = dict(target["decision"])
+        decision["duration"] = round(decision["duration"] + elapsed, 2)
+        target["decision"] = decision
+        if side is not None:
+            frame[side] = target
+    return frame
+
+
 def vehicles_view(state):
+    """Per-vehicle positions for a SimulationState (see vehicles_view_from)."""
+    return vehicles_view_from(state.vehicles)
+
+
+def vehicles_view_from(vehicles):
     """
     Per-vehicle positions straight from TrafficAdapter's VehicleState (a
     real traci.vehicle.getPosition() reading in network metres), rounded
@@ -88,8 +126,10 @@ def vehicles_view(state):
             "y": round(v.position[1], 2),
             "speed": round(v.speed, 2),
             "type": v.type_id,
+            # SUMO's heading, degrees clockwise from north.
+            "angle": round(getattr(v, "angle", 0.0), 1),
         }
-        for v in state.vehicles
+        for v in vehicles
     ]
 
 
@@ -101,6 +141,9 @@ def decision_view(decision):
         "reason": decision.reason_text,
         "duration": decision.green_duration_seconds,
         "phase_scores": dict(decision.phase_scores),
+        # The decision boundary (see Decision.switch_margin); 0 for a
+        # baseline controller, which has none.
+        "margin": round(float(getattr(decision, "switch_margin", 0.0)), 4),
     }
 
 

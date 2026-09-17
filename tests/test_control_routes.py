@@ -32,7 +32,7 @@ class _Blocking:
     def __init__(self):
         self.started = threading.Event()
 
-    def demo(self, store, control, *, gui=False, load_state=None, sumocfg=None):
+    def demo(self, store, control, *, gui=False, load_state=None, sumocfg=None, run_id=None):
         self.started.set()
         while not control.stop_requested:
             control.wait_if_paused()
@@ -113,3 +113,21 @@ def test_spa_fallback_serves_the_app_for_deep_links_but_not_api_paths():
     assert client.get("/settings").status_code == 200
     assert client.get("/performance").status_code == 200
     assert client.get("/api/does-not-exist").status_code == 404
+
+
+def test_a_new_run_starts_from_an_empty_live_store():
+    """The previous run's last picture must not be served until the new
+    run's first tick - the dashboard would show its stopped vehicles for
+    the 4-6 s SUMO and the model take to come up, then slide them away."""
+    fake = _Blocking()
+    store = LiveStateStore()
+    store.publish({"sim_time": 599.0, "vehicles": [{"id": "leftover"}]})
+    sup = SimulationSupervisor(store, runner=fake.demo, evaluation_runner=fake.evaluation)
+    try:
+        sup.start(gui=False, scenario_name="light_seed1")
+        assert fake.started.wait(2.0)
+        assert store.latest() is None
+    finally:
+        if sup.is_running():
+            sup.stop()
+            sup.join(timeout=3.0)

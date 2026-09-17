@@ -28,7 +28,7 @@ from services.snapshot_views import (
 
 def _state(phase_index=0, lane_states=None):
     vehicles = [
-        VehicleState(id="v1", lane_id="N_in_0", speed=3.456, waiting_time=0.0,
+        VehicleState(id="v1", lane_id="N_in_0", speed=3.456, waiting_time=0.0, angle=0.04,
                      position=(123.456, 200.001), type_id="bus"),
         VehicleState(id="v2", lane_id=":C_3_0", speed=0.0, waiting_time=2.0,
                      position=(200.0, 200.0), type_id="car_normal"),
@@ -85,7 +85,7 @@ def test_lanes_view_has_all_twelve_lanes_in_order():
 
 def test_vehicles_view_rounds_and_carries_type():
     rows = vehicles_view(_state())
-    assert rows[0] == {"id": "v1", "lane": "N_in_0", "x": 123.46, "y": 200.0, "speed": 3.46, "type": "bus"}
+    assert rows[0] == {"id": "v1", "lane": "N_in_0", "x": 123.46, "y": 200.0, "speed": 3.46, "type": "bus", "angle": 0.0}
     assert rows[1]["lane"] == ":C_3_0"
 
 
@@ -97,6 +97,7 @@ def test_metrics_and_decision_views():
     assert d == {
         "active_phase": "NS_straight_left", "mode": "priority", "switched": False,
         "reason": "holding", "duration": 3.0, "phase_scores": {"NS_straight_left": 0.5},
+        "margin": 0.0,
     }
 
 
@@ -105,3 +106,28 @@ def test_side_view_has_exactly_the_evaluation_side_keys():
     assert set(side) == {"signal", "metrics", "lanes", "vehicles", "decision", "phase_history"}
     assert side["phase_history"] == [{"time": 1.0}]
     assert "prediction" not in side
+
+
+def test_motion_frame_moves_vehicles_and_the_held_clock_only():
+    """A motion frame is the tick's snapshot with fresh positions and the
+    held-seconds advanced by the elapsed time, so sim_time - duration (the
+    plate's release key) does not move between ticks. Never a tick."""
+    from services.snapshot_views import motion_frame
+
+    class _V:
+        id, lane_id, position, speed, type_id = "v1", "N_in_0", (1.0, 2.0), 3.0, "car"
+
+    tick = {"kind": "demo", "tick": True, "sim_time": 10.05, "vehicles": [],
+            "decision": {"duration": 3.0, "active_phase": "NS_straight_left"}}
+    frame = motion_frame(tick, 10.25, {None: [_V()]})
+    assert frame["tick"] is False and frame["sim_time"] == 10.25
+    assert frame["decision"]["duration"] == 3.2 and frame["decision"]["active_phase"] == "NS_straight_left"
+    assert [v["id"] for v in frame["vehicles"]] == ["v1"]
+    assert tick["decision"]["duration"] == 3.0 and tick["vehicles"] == []  # the tick is untouched
+
+    ev = {"kind": "evaluation", "tick": True, "sim_time": 10.05,
+          "ai": {"vehicles": [], "decision": {"duration": 1.0}},
+          "baseline": {"vehicles": [], "decision": {"duration": 2.0}}}
+    frame = motion_frame(ev, 10.45, {"ai": [_V()], "baseline": []})
+    assert frame["ai"]["decision"]["duration"] == 1.4 and frame["baseline"]["decision"]["duration"] == 2.4
+    assert len(frame["ai"]["vehicles"]) == 1 and frame["baseline"]["vehicles"] == []

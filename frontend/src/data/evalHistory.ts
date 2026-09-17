@@ -66,6 +66,8 @@ function publish(force: boolean, patch: Partial<EvalHistoryState>): void {
 
 export function pushEvalSample(snapshot: Snapshot): void {
   if (!isEvaluation(snapshot)) return
+  // One sample per decision tick (see liveHistory); motion frames skip.
+  if (snapshot.tick === false) return
   const t = snapshot.sim_time
   const scenarioChanged = lastScenario !== null && lastScenario !== snapshot.scenario
   if ((lastT !== null && t < lastT) || scenarioChanged) {
