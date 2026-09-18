@@ -177,6 +177,10 @@ export interface SideView {
   lanes: LaneView[]
   vehicles: VehicleView[]
   decision: DecisionView
+  /** Lanes holding an emergency vehicle, as this side's engine was told
+   * (the AI's detection; the baseline is never told and sends []).
+   * Absent on a backend from before 2026-09-18. */
+  emergency_lanes?: string[]
   phase_history: PhaseHistoryEntry[]
 }
 

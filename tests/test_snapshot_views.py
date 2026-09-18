@@ -103,9 +103,12 @@ def test_metrics_and_decision_views():
 
 def test_side_view_has_exactly_the_evaluation_side_keys():
     side = side_view(_state(), _features(), _decision(), {"N_in_0": "G"}, [{"time": 1.0}])
-    assert set(side) == {"signal", "metrics", "lanes", "vehicles", "decision", "phase_history"}
+    assert set(side) == {"signal", "metrics", "lanes", "vehicles", "decision", "emergency_lanes", "phase_history"}
     assert side["phase_history"] == [{"time": 1.0}]
+    assert side["emergency_lanes"] == []
     assert "prediction" not in side
+    told = side_view(_state(), _features(), _decision(), {}, [], emergency_lanes=frozenset({"N_in_0", "E_in_1"}))
+    assert told["emergency_lanes"] == ["E_in_1", "N_in_0"]
 
 
 def test_motion_frame_moves_vehicles_and_the_held_clock_only():

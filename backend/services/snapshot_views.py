@@ -147,12 +147,13 @@ def decision_view(decision):
     }
 
 
-def side_view(state, features, decision, lane_states, phase_history):
+def side_view(state, features, decision, lane_states, phase_history, emergency_lanes=frozenset()):
     """
     Everything one controller's junction needs drawing: what an
     evaluation snapshot carries under `ai` and under `baseline`. No
     prediction - the baseline has none, and the Performance page shows
-    the model nowhere.
+    the model nowhere. `emergency_lanes` is what that side's engine was
+    told (the AI's detection; the baseline is never told, and sends []).
     """
     return {
         "signal": signal_view(state),
@@ -160,5 +161,6 @@ def side_view(state, features, decision, lane_states, phase_history):
         "lanes": lanes_view(features, decision.lane_scores, lane_states),
         "vehicles": vehicles_view(state),
         "decision": decision_view(decision),
+        "emergency_lanes": sorted(emergency_lanes),
         "phase_history": list(phase_history),
     }

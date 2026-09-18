@@ -3411,3 +3411,41 @@ whoever works on the interface next; and sweep the codebase for junk.
   (from when the folder was emptied) and three empty untracked folders went. Nothing in
   the pipeline, the model, the datasets, the scenarios or the evaluation was touched:
   99/99 backend tests, 18/18 frontend, build clean.
+
+### 30.17 Every scenario checked on both pages; the evaluator's blind spot (2026-09-18)
+
+Chethan asked for confirmation that all thirteen scenarios run as intended on Overview and
+on Performance. Two layers:
+
+**Static.** Every `<name>_seed1.sumocfg` resolves to existing net, route and additional
+files, and each route file matches its card: light 227 veh/h per approach, balanced 471,
+normal day 676–847 with a through/turn split, heavy 964, extreme 1 334, each directional
+scenario ~1 270 on its arm against ~320 elsewhere, rush hour in three periods (0–120 /
+120–400 / 400–700 s), accident = one truck with a 550 s `<stop>` on `E_in_1` departing at
+90 s, emergency = ambulance / fire engine / police at 100 / 250 / 400 / 550 / 700 s, rain =
+the five `_wet` types via `vehicle_types_wet_weather.add.xml`.
+
+**Live.** A script drove the console through all 13 scenarios as a demo and again as a VAC
+evaluation — 26 runs, each observed to 320 simulated seconds at max speed — checking the
+run-state's kind and scenario, the frame kind (with both sides and all 7 rows for an
+evaluation), first-tick latency (0.5–1.4 s), vehicles and types, per-approach loads, and the
+scenario's own signature (peak counts 60 → 60 → 78 → 117 across light / balanced / heavy /
+extreme; the heavy arm carrying 2–4× the others; the rush-hour window exceeding the first
+100 s; a truck at 0 m/s on `E_in_1`; emergency types present and `emergency_lanes` raised;
+only `_wet` types in rain). 25 of 26 passed.
+
+**The one finding was real.** `PerformanceEvaluator` called the AI's `decide()` with
+`emergency_lanes=frozenset()`: the demo runner feeds `adapter.get_emergency_vehicle_lanes()`
+to the engine (Section 16), but the evaluator predates that and was never updated, so on
+the Performance page the emergency override never fired and the README's
+`emergency_response` row had been measured with the AI's emergency logic switched off.
+Nothing documented it as a decision. Fixed: the evaluator reads the AI side's adapter and
+passes the lanes to the AI only (VAC has no emergency handling — that asymmetry is part of
+what is measured); `side_view` carries `emergency_lanes`, so the Performance plates hatch
+them and the status bar's alert band and loud mode chip follow the evaluation's Trinetra
+side. Verified on the console: override at 101.9 s, the ambulance's lanes in the frame.
+Re-measured with the batch evaluator, VAC byte-identical: still **7/7**, with the AI giving
+back a little where serving the ambulances costs the rest of the traffic — wait +83.0 %
+(was +85.9), travel +30.0 % (+32.0), worst travel +62.6 % (+70.2), avg queue +57.8 %
+(+61.7), max queue +45.9 % (+56.8), speed +38.8 % (+42.5). The README row is updated;
+the other twelve rows stand.

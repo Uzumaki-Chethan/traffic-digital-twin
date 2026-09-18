@@ -245,6 +245,7 @@ class PerformanceEvaluator:
         ai_side = side_view(
             latest["state_ai"], latest["features_ai"], latest["decision_ai"],
             dict(latest["state_ai"].signal.lane_states), phase_history_ai,
+            emergency_lanes=latest.get("emergency_ai", frozenset()),
         )
         base_side = side_view(
             latest["state_base"], latest["features_base"], latest["decision_base"],
@@ -318,7 +319,8 @@ class PerformanceEvaluator:
             step_index = 0
             phase_history_ai = deque(maxlen=_PHASE_HISTORY_TICKS)
             phase_history_base = deque(maxlen=_PHASE_HISTORY_TICKS)
-            latest = {"state_ai": None, "features_ai": None, "decision_ai": None,
+            latest = {"emergency_ai": frozenset(),
+                      "state_ai": None, "features_ai": None, "decision_ai": None,
                       "state_base": None, "features_base": None, "decision_base": None}
 
             # ---- Simulation A: the full AI pipeline ----
@@ -439,11 +441,20 @@ class PerformanceEvaluator:
                             predictor.predict(features)
                             if predictor is not None else None
                         )
+                        # Same feed the demo runner gives the engine: the
+                        # lanes holding an emergency-class vehicle, read
+                        # from this side's own adapter. VAC below is not
+                        # told - it has no emergency handling, which is
+                        # part of what is being measured. (Until
+                        # 2026-09-18 this was frozenset() here, so the
+                        # override never fired in an evaluation.)
+                        emergency_lanes_ai = adapter_ai.get_emergency_vehicle_lanes()
                         decision = decision_engine.decide(
                             features, prediction,
                             dt_seconds=elapsed,
-                            emergency_lanes=frozenset(),
+                            emergency_lanes=emergency_lanes_ai,
                         )
+                        latest["emergency_ai"] = emergency_lanes_ai
                         signal_controller.apply_decision(
                             decision, dt_seconds=elapsed
                         )

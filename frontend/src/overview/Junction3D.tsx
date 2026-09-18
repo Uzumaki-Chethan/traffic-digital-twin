@@ -190,6 +190,9 @@ const TURN_RIGHT = 0
 
 export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
   const mount = useRef<HTMLDivElement>(null)
+  // The compass overlay; turned every frame to keep its arrow on world
+  // north however the camera has been orbited.
+  const compass = useRef<SVGSVGElement>(null)
   const rate = useSim((s) => s.rate)
   const smooth = useSim((s) => s.smooth)
   const data = useRef({ lanes, powered, motionSide, rate, smooth })
@@ -765,6 +768,13 @@ export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
       }
 
       controls.update()
+      // Compass: world north is -z; the camera's azimuth (its angle
+      // round the y axis, 0 when it stands on +z looking north) is
+      // exactly how far north has turned clockwise on screen.
+      if (compass.current) {
+        const deg = (controls.getAzimuthalAngle() * 180) / Math.PI
+        compass.current.style.transform = `rotate(${deg.toFixed(1)}deg)`
+      }
       renderer.render(scene, camera)
       raf = requestAnimationFrame(tick)
     }
@@ -797,6 +807,18 @@ export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
       <div ref={mount} className="h-full w-full" aria-label="Interactive 3D model of the junction" role="img" />
       <div className="pointer-events-none absolute right-3 top-3 rounded-control bg-[rgb(36_26_16/0.72)] px-2 py-1 text-[12px] text-[var(--ink-on-dark)]">
         drag to orbit · Ctrl + scroll to zoom · right-drag to pan
+      </div>
+      {/* The plan view's compass, for the same reason it has one: once
+          the model is orbited nothing else says which arm is which. It
+          turns with the camera so the arrow stays on north. */}
+      <div className="pointer-events-none absolute right-4 top-12" aria-label="Compass: north">
+        <svg ref={compass} width="44" height="44" viewBox="-22 -22 44 44" style={{ transformOrigin: '50% 50%' }}>
+          <circle r="18" fill="rgb(36 26 16 / 0.55)" stroke="var(--plate-ink)" strokeWidth="1.2" opacity="0.9" />
+          <path d="M 0 -13 L -5 5 L 0 1 L 5 5 Z" fill="var(--plate-ink)" />
+          <text y="15" textAnchor="middle" fontSize="9" fontWeight="700" fontFamily="var(--font-num)" fill="var(--plate-ink)">
+            N
+          </text>
+        </svg>
       </div>
     </div>
   )

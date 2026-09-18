@@ -49,8 +49,11 @@ export function StatusBar() {
       ? run.paused
       : !linkLost && live !== null && tickAge > 3
   const ended = run?.available === true && (!run.running || foreign)
-  const emergency = live?.emergency_lanes ?? []
-  const mode = modeMeta(live?.decision.mode)
+  // The emergency band and the loud mode chip follow the page's run: the
+  // demo frame here, or the evaluation's Trinetra side on Performance.
+  const side = live ?? (evaluating && isEvaluation(latest) ? latest.ai : null)
+  const emergency = side?.emergency_lanes ?? []
+  const mode = modeMeta(side?.decision.mode)
 
   return (
     <header
@@ -64,7 +67,7 @@ export function StatusBar() {
             Single 4-way junction
           </div>
         </div>
-        {live && mode.loud && (
+        {side && mode.loud && (
           <>
             <span className="h-5 w-px" style={{ background: 'var(--bar-rule)' }} />
             <span className="rounded-chip bg-[var(--signal-red)] px-2.5 py-0.5 text-[12.5px] font-semibold text-white">

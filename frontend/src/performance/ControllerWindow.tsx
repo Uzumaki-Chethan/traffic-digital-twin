@@ -58,7 +58,7 @@ export function ControllerWindow({
     >
       <TwinViewport
         lanes={lanes}
-        emergencyLanes={[]}
+        emergencyLanes={side?.emergency_lanes ?? []}
         vehicles={side?.vehicles}
         powered={powered}
         allow3d={false}
