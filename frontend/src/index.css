@@ -199,6 +199,18 @@ small {
   outline-offset: 2px;
 }
 
+/* Emergency light bars on the plate: the two lamps alternate at 2 Hz.
+   Steady under reduced motion. */
+@keyframes beacon-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0.3; }
+}
+.beacon-a { animation: beacon-blink 0.5s steps(1) infinite; }
+.beacon-b { animation: beacon-blink 0.5s steps(1) infinite; animation-delay: 0.25s; }
+@media (prefers-reduced-motion: reduce) {
+  .beacon-a, .beacon-b { animation: none; opacity: 1; }
+}
+
 /* Anything that answers a click shows the hand. Tailwind v4's preflight
    dropped the pointer from buttons (v3 set it), so without this every
    control in the product read as an arrow. Disabled controls keep the

@@ -405,6 +405,21 @@ class PerformanceEvaluator:
                     adapter_base.observe_step()
                 step_index += 1
 
+                # Emergency dispatches from the console go into BOTH
+                # simulations, same vehicle, same route, same step - the
+                # question becomes "how does each controller handle an
+                # ambulance now?", and the comparison stays fair. A run
+                # with dispatches is not the library's scenario any more,
+                # so its CSV is never saved (see the supervisor).
+                if control is not None:
+                    for n, vehicle_type, route_id in control.take_dispatches():
+                        vid = "dispatch_{}_{}".format(n, vehicle_type)
+                        for adapter in (adapter_ai, adapter_base):
+                            try:
+                                adapter.add_vehicle(vid, route_id, vehicle_type)
+                            except Exception:
+                                logger.exception("Could not dispatch %s on %s.", vehicle_type, route_id)
+
                 # Motion frames between ticks for the Performance page's
                 # two plates (see snapshot_views.motion_frame): the last
                 # tick's snapshot with both fleets' fresh positions.

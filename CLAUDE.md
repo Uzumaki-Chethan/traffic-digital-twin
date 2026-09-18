@@ -235,7 +235,13 @@ frontend replaced it; the dead fallback code path was cleaned up 2026-09-06).
   route still exists for terminal/`app.py` use; the console UI no longer calls it. The
   WebSocket carries one shape with `kind`: an evaluation frame has `ai` and `baseline`
   sides built by the same `services/snapshot_views.py` builders the demo uses (and no
-  `prediction`).
+  `prediction`). **Emergency dispatch (2026-09-18, Section 30.18):** `POST
+  /api/control/dispatch {vehicle_type, approach, turn}` queues a vehicle on `RunControl`
+  (still the ONE object that influences a run); the run loops drain it through
+  `TrafficAdapter.add_vehicle` — the adapter's only traffic write. The evaluator adds it to
+  BOTH sides and the supervisor then skips the results CSV. The evaluator now also feeds
+  the AI side `get_emergency_vehicle_lanes()` (it was `frozenset()` until 2026-09-18 —
+  Section 30.17).
 - **Performance Evaluation** (`backend/performance/`): `evaluator.py` runs two PARALLEL,
   lockstep-synchronized SUMO instances (separate TraCI connections, labeled `"ai"`/
   `"baseline"`) of the identical scenario for a fair comparison; `baseline_controllers.py`

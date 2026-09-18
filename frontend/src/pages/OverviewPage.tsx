@@ -11,6 +11,7 @@ import { MetricsStrip } from '@/overview/MetricsStrip'
 import { PredictionPanel } from '@/overview/PredictionPanel'
 import { ScoreLedger } from '@/overview/ScoreLedger'
 import { RecentSwitches } from '@/overview/RecentSwitches'
+import { DispatchBar } from '@/layout/DispatchBar'
 import { lampOf, phaseKey } from '@/utils/signal'
 
 const EMPTY: LiveSnapshot = {
@@ -87,6 +88,9 @@ export function OverviewPage() {
               powered={powered}
               releaseKey={phaseKey(snap.sim_time, snap.decision.duration)}
             />
+            <div className="mt-2">
+              <DispatchBar />
+            </div>
           </Panel>
 
           <Reveal index={3}>

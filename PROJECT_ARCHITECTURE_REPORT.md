@@ -3449,3 +3449,45 @@ back a little where serving the ambulances costs the rest of the traffic — wai
 (was +85.9), travel +30.0 % (+32.0), worst travel +62.6 % (+70.2), avg queue +57.8 %
 (+61.7), max queue +45.9 % (+56.8), speed +38.8 % (+42.5). The README row is updated;
 the other twelve rows stand.
+
+### 30.18 Emergency vehicles you can see, and dispatch (2026-09-18)
+
+Chethan asked for three things: emergency vehicles that look like emergency vehicles in
+both views (blinking red/blue for an ambulance, red/red for a fire engine), a way to send
+one into a run whenever he wants, on whatever approach, and confirmation that none of it
+changes anything validated. It does not: the model, the datasets, the scenario files and
+the recorded sweep are untouched; a dispatched vehicle exists only in the run it was sent
+into, and an evaluation with dispatches never writes its CSV.
+
+- **Light bars.** On the plate every emergency type carries two roof lamps that alternate
+  at 2 Hz (`VehicleLayer`, `vehicleTypes.BEACONS`: ambulance red/blue, fire engine
+  red/red, police blue/red; CSS `beacon-blink`, steady under reduced motion). This is the
+  one deliberate exception to the "no looping motion" rule, made by the owner: it is the
+  signal a real light bar gives. In 3D (`buildEmergency`) an ambulance is a white van with
+  a red band, a fire engine a red truck with a ladder, a police car a dark saloon with
+  white doors - each with a roof bar whose two emissive lamps the render loop blinks.
+- **Dispatch.** `POST /api/control/dispatch {vehicle_type, approach, turn}` queues one
+  emergency vehicle on `RunControl` (`request_dispatch` / `take_dispatches` - this object
+  is, by design, the only thing that may influence a run, so the second channel rides on
+  it rather than beside it). The route is derived from the network's twelve
+  (`route_N_E` for North turning left; left-hand traffic, `dispatch_route_id`), never
+  named by the caller. The demo runner drains the queue every step and adds the vehicle
+  through `TrafficAdapter.add_vehicle` - the adapter's one write to the traffic; the
+  signal is still only ever written by the SignalController. The evaluator drains it into
+  **both** simulations, same vehicle, same route, same step, so the comparison stays a
+  comparison ("how does each controller handle an ambulance now?"); the supervisor skips
+  `save_csv` for a run with dispatches. `run-state.dispatched` counts them. The
+  `DispatchBar` (Overview under the plate, Performance above the windows) shows only while
+  the page's own run is live: vehicle - from approach - turn - Send.
+- **Why no lane picker.** On this network each lane carries exactly one movement, so the
+  turn IS the lane, and the engine gives green to that lane's phase the moment the vehicle
+  is detected - there is no "all three movements of one approach" phase in the signal
+  program, and adding one would mean re-deriving the program, the engine's phase table and
+  the model's features for a movement the vehicle will never make.
+
+Verified live: an ambulance dispatched from West turning left entered `W_in_0`, the
+override fired at once, and it left by the North exit; a fire engine from North going
+straight; `emergency_lanes` and the alert band followed each. Tests:
+`test_dispatch_route_geometry`, `test_dispatch_is_queued_on_the_run_control_and_refused_
+when_idle`. The 3D view also gained a compass that turns with the camera (Chethan: "once
+we rotate, we don't know which is which").

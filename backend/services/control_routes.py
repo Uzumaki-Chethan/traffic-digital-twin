@@ -97,6 +97,41 @@ class StartEvaluationRequest(BaseModel):
     baseline: str = "vac"
 
 
+class DispatchRequest(BaseModel):
+    """
+    One emergency vehicle into the running simulation: which kind, which
+    approach it enters from, and which way it turns at the junction. The
+    route id is derived here from the network's own twelve routes - the
+    request never names a route or a lane directly.
+    """
+    vehicle_type: str = "ambulance"
+    approach: str = "N"
+    turn: str = "straight"
+
+
+# The library's emergency vTypes (sumo/vehicles/vehicle_types.add.xml) and
+# the network's turn geometry: left-hand traffic, so from the North arm
+# (travelling south) a left turn goes East.
+DISPATCH_TYPES = ("ambulance", "fire_engine", "police_vehicle")
+_LEFT_OF = {"N": "E", "S": "W", "E": "S", "W": "N"}
+_OPPOSITE = {"N": "S", "S": "N", "E": "W", "W": "E"}
+
+
+def dispatch_route_id(approach: str, turn: str) -> str:
+    """'route_N_E' for approach N turning left, and so on."""
+    if approach not in _OPPOSITE:
+        raise ValueError("approach must be one of N, S, E, W")
+    if turn == "left":
+        to = _LEFT_OF[approach]
+    elif turn == "straight":
+        to = _OPPOSITE[approach]
+    elif turn == "right":
+        to = _LEFT_OF[_OPPOSITE[approach]]
+    else:
+        raise ValueError("turn must be left, straight or right")
+    return "route_{}_{}".format(approach, to)
+
+
 class SpeedRequest(BaseModel):
     """
     Simulated seconds per wall-clock second. null means unthrottled -
@@ -226,6 +261,26 @@ def build_control_router(store: LiveStateStore, run_control=None,
         _require_run_control("re-pace")
         run_control.set_speed(body.multiplier)
         return _run_state_dict()
+
+    @router.post("/api/control/dispatch")
+    async def dispatch(body: DispatchRequest):
+        """
+        Send an emergency vehicle into the run that is on now, from the
+        chosen approach, turning the chosen way. Refused when nothing is
+        running. On an evaluation it enters both simulations at once.
+        """
+        _require_run_control("dispatch into")
+        if body.vehicle_type not in DISPATCH_TYPES:
+            raise HTTPException(status_code=400, detail="Unknown emergency vehicle type.")
+        try:
+            route_id = dispatch_route_id(body.approach, body.turn)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        state = _run_state_dict()
+        if not state.get("running"):
+            raise HTTPException(status_code=409, detail="Nothing is running to dispatch into.")
+        n = run_control.request_dispatch(body.vehicle_type, route_id)
+        return {"dispatched": n, "vehicle_type": body.vehicle_type, "route": route_id, **_run_state_dict()}
 
     @router.post("/api/control/start-simulation")
     async def start_simulation(body: StartSimulationRequest):

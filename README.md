@@ -226,7 +226,10 @@ Five pages:
   zoom: Ctrl + scroll or pinch, drag, 1× = the whole network, opens at 3.5×
   with a button that returns there; a plain scroll scrolls the page) or an
   interactive 3D miniature (drag to orbit, Ctrl + scroll to zoom), both
-  drawing the real SUMO vehicles at their real size; active phase with its decision mode and reason;
+  drawing the real SUMO vehicles at their real size — emergency vehicles with
+  blinking light bars — and a **Dispatch** bar to send an ambulance, fire
+  engine or police car in from any approach while a run is live (on
+  Performance it enters both simulations at once); active phase with its decision mode and reason;
   the twelve lanes with live signal state; **Why this phase** (the four phase
   scores against the switch boundary — the engine's own margin, drawn) and
   the last five switches with their rule; a 60 s phase-history band; and

@@ -47,6 +47,17 @@ export const VEHICLE_TYPES: Record<string, VehicleShape> = {
   fire_engine: { kind: 'emergency', length: 9.0, width: 2.5, height: 3.2, colour: '#ff0000', label: 'Fire engine' },
 }
 
+/**
+ * The roof light bar an emergency type carries, as the two lamp colours
+ * that alternate: ambulance red/blue, fire engine red/red, police
+ * blue/red. Undefined for everything else.
+ */
+export const BEACONS: Record<string, [string, string]> = {
+  ambulance: ['#ff2a2a', '#2a6dff'],
+  fire_engine: ['#ff2a2a', '#ff2a2a'],
+  police_vehicle: ['#2a6dff', '#ff2a2a'],
+}
+
 /** What an unrecognised type is drawn as — a plain car, not nothing. */
 export const DEFAULT_SHAPE: VehicleShape = { ...CAR_BODY, colour: '#e6e6e6', label: 'Vehicle' }
 

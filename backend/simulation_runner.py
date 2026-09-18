@@ -427,6 +427,16 @@ def run_simulation(store, control=None, *, gui=None, base_config=Config,
 
         def on_step():
             adapter.observe_step()
+            # Emergency dispatches from the console (RunControl is the
+            # only object allowed to influence a run): add each queued
+            # vehicle now, through the adapter.
+            if control is not None:
+                for n, vehicle_type, route_id in control.take_dispatches():
+                    try:
+                        adapter.add_vehicle("dispatch_{}_{}".format(n, vehicle_type), route_id, vehicle_type)
+                        logger.info("Dispatched %s on %s (#%d).", vehicle_type, route_id, n)
+                    except Exception:
+                        logger.exception("Could not dispatch %s on %s.", vehicle_type, route_id)
             if not steps_per_tick:
                 return
             step_count[0] += 1

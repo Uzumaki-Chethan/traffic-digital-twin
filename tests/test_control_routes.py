@@ -131,3 +131,29 @@ def test_a_new_run_starts_from_an_empty_live_store():
         if sup.is_running():
             sup.stop()
             sup.join(timeout=3.0)
+
+
+def test_dispatch_route_geometry():
+    from services.control_routes import dispatch_route_id
+    # Left-hand traffic: from North (travelling south) left is East.
+    assert dispatch_route_id("N", "left") == "route_N_E"
+    assert dispatch_route_id("N", "straight") == "route_N_S"
+    assert dispatch_route_id("N", "right") == "route_N_W"
+    assert dispatch_route_id("E", "left") == "route_E_S"
+    assert dispatch_route_id("W", "right") == "route_W_S"
+    assert dispatch_route_id("S", "left") == "route_S_W"
+
+
+def test_dispatch_is_queued_on_the_run_control_and_refused_when_idle(console):
+    client, sup, fake = console
+    r = client.post("/api/control/dispatch", json={"vehicle_type": "ambulance", "approach": "N", "turn": "left"})
+    assert r.status_code == 409  # nothing running
+    client.post("/api/control/start-simulation", json={"scenario_name": "light_seed1"})
+    assert fake.started.wait(2.0)
+    r = client.post("/api/control/dispatch", json={"vehicle_type": "fire_engine", "approach": "E", "turn": "straight"})
+    assert r.status_code == 200 and r.json()["route"] == "route_E_W" and r.json()["dispatched"] == 1
+    r = client.post("/api/control/dispatch", json={"vehicle_type": "tank", "approach": "E", "turn": "straight"})
+    assert r.status_code == 400
+    assert sup.run_control.take_dispatches() == [(1, "fire_engine", "route_E_W")]
+    assert sup.run_control.take_dispatches() == []
+    assert client.get("/api/control/run-state").json()["dispatched"] == 1

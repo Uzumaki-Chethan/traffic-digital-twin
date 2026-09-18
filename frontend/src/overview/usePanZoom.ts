@@ -134,7 +134,11 @@ export function usePanZoom(
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return
     drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY }
-    e.currentTarget.setPointerCapture(e.pointerId)
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      // A synthetic pointer (tests, automation) has nothing to capture.
+    }
     setDragging(true)
   }, [])
 

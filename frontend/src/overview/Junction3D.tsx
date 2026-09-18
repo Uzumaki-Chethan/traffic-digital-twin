@@ -5,7 +5,7 @@ import type { LaneView, VehicleView } from '@/data/types'
 import { useSim } from '@/data/store'
 import { DisplayClock, motionBuffer, type MotionSide, type Pose } from '@/data/motion'
 import { lampOf } from '@/utils/signal'
-import { shapeOf, type VehicleShape } from './vehicleTypes'
+import { BEACONS, shapeOf, type VehicleShape } from './vehicleTypes'
 
 /**
  * A miniature 3D model of the junction, to the REAL network scale
@@ -102,6 +102,17 @@ interface Car {
   type: string
   /** Half the body length, in metres — the bumper-to-centre offset. */
   halfLength: number
+  /** An emergency vehicle's two roof lamps, blinked in the render loop. */
+  beacons?: [THREE.MeshStandardMaterial, THREE.MeshStandardMaterial]
+}
+
+/** How an emergency vehicle is painted, over the vType's colour: an
+ * ambulance is a white van with a red band, a fire engine is red, a
+ * police car is dark blue with white doors. */
+const EMERGENCY_PAINT: Record<string, { body: string; band?: string; kind: 'van' | 'truck' | 'car' }> = {
+  ambulance: { body: '#f4f4f4', band: '#d1202a', kind: 'van' },
+  fire_engine: { body: '#c8102e', band: '#f0f0f0', kind: 'truck' },
+  police_vehicle: { body: '#12245c', band: '#f0f0f0', kind: 'car' },
 }
 
 /**
@@ -606,9 +617,10 @@ export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
       return g
     }
 
-    function buildVehicle(shape: VehicleShape): THREE.Group {
+    function buildVehicle(shape: VehicleShape, typeId: string): THREE.Group {
       if (shape.kind === 'motorcycle') return buildMotorcycle(shape)
       if (shape.kind === 'rickshaw') return buildRickshaw(shape)
+      if (shape.kind === 'emergency') return buildEmergency(shape, typeId)
       const g = new THREE.Group()
       const { length: L, width: Wd, height: Ht } = shape
       const parts = bodyFor(shape)
@@ -656,6 +668,92 @@ export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
         for (const z of [L * 0.32, -L * 0.32]) {
           g.add(wheel(wheelG, Wd * 0.44, axle, z), wheel(wheelG, -Wd * 0.44, axle, z))
         }
+      }
+      return g
+    }
+
+    /**
+     * Ambulance, fire engine, police: their own paint over the vType's
+     * colour, a roof light bar with two lamps the render loop blinks, and
+     * a body shape that reads as what it is - a high white van, a red
+     * truck, a dark saloon. Geometry per type is shared like the others.
+     */
+    const beaconGeom = own(new THREE.BoxGeometry(0.5, 0.22, 0.4))
+    const barGeom = own(new THREE.BoxGeometry(1.5, 0.12, 0.45))
+    const barMat = own(new THREE.MeshStandardMaterial({ color: '#1a1a1a', roughness: 0.8 }))
+    const emergencyGeom = new Map<string, THREE.BufferGeometry[]>()
+    function emergencyParts(typeId: string, shape: VehicleShape): THREE.BufferGeometry[] {
+      const hit = emergencyGeom.get(typeId)
+      if (hit) return hit
+      const { length: L, width: Wd, height: Ht } = shape
+      const livery = EMERGENCY_PAINT[typeId] ?? EMERGENCY_PAINT.ambulance
+      let parts: THREE.BufferGeometry[]
+      if (livery.kind === 'van') {
+        parts = [
+          own(new THREE.BoxGeometry(Wd, Ht * 0.62, L)), // body
+          own(new THREE.BoxGeometry(Wd + 0.02, Ht * 0.14, L * 0.7)), // band
+          own(new THREE.BoxGeometry(Wd * 0.9, Ht * 0.3, 0.08)), // screen
+        ]
+      } else if (livery.kind === 'truck') {
+        parts = [
+          own(new THREE.BoxGeometry(Wd, Ht * 0.62, L)),
+          own(new THREE.BoxGeometry(Wd + 0.02, Ht * 0.1, L * 0.8)),
+          own(new THREE.BoxGeometry(Wd * 0.9, Ht * 0.26, 0.08)),
+          own(new THREE.BoxGeometry(0.3, 0.2, L * 0.55)), // ladder
+        ]
+      } else {
+        parts = [
+          own(new THREE.BoxGeometry(Wd, Ht * 0.5, L)),
+          own(new THREE.BoxGeometry(Wd + 0.02, Ht * 0.16, L * 0.34)), // white doors
+          own(new THREE.BoxGeometry(Wd * 0.86, Ht * 0.42, L * 0.46)), // cabin
+        ]
+      }
+      emergencyGeom.set(typeId, parts)
+      return parts
+    }
+    function buildEmergency(shape: VehicleShape, typeId: string): THREE.Group {
+      const g = new THREE.Group()
+      const { length: L, width: Wd, height: Ht } = shape
+      const livery = EMERGENCY_PAINT[typeId] ?? EMERGENCY_PAINT.ambulance
+      const parts = emergencyParts(typeId, shape)
+      const R = livery.kind === 'car' ? 0.31 : 0.42
+      const wheelG = livery.kind === 'car' ? wheelGeom : bigWheelGeom
+      const body = new THREE.Mesh(parts[0], paintFor(livery.body))
+      const band = new THREE.Mesh(parts[1], paintFor(livery.band ?? livery.body))
+      let roofY: number
+      if (livery.kind === 'car') {
+        body.position.y = R + Ht * 0.25
+        band.position.set(0, R + Ht * 0.25, 0)
+        const cabin = new THREE.Mesh(parts[2], glassMat)
+        cabin.position.set(0, R + Ht * 0.5 + Ht * 0.21, -L * 0.04)
+        g.add(body, band, cabin)
+        roofY = R + Ht * 0.5 + Ht * 0.42
+      } else {
+        body.position.y = R + Ht * 0.31
+        band.position.set(0, R + Ht * 0.31, 0)
+        const screen = new THREE.Mesh(parts[2], glassMat)
+        screen.position.set(0, R + Ht * 0.45, L / 2 + 0.01)
+        g.add(body, band, screen)
+        if (livery.kind === 'truck') {
+          const ladder = new THREE.Mesh(parts[3], paintFor('#d9d9d9'))
+          ladder.position.set(0, R + Ht * 0.62 + 0.1, -L * 0.15)
+          g.add(ladder)
+        }
+        roofY = R + Ht * 0.62
+      }
+      const bar = new THREE.Mesh(barGeom, barMat)
+      bar.position.set(0, roofY + 0.06, livery.kind === 'car' ? 0 : L * 0.3)
+      const [ca, cb] = BEACONS[typeId] ?? BEACONS.ambulance
+      const ma = new THREE.MeshStandardMaterial({ color: ca, emissive: ca, emissiveIntensity: 1.2, roughness: 0.3 })
+      const mb = new THREE.MeshStandardMaterial({ color: cb, emissive: cb, emissiveIntensity: 0.1, roughness: 0.3 })
+      const la = new THREE.Mesh(beaconGeom, ma)
+      const lb = new THREE.Mesh(beaconGeom, mb)
+      la.position.set(-0.4, roofY + 0.22, bar.position.z)
+      lb.position.set(0.4, roofY + 0.22, bar.position.z)
+      g.add(bar, la, lb)
+      g.userData.beacons = [ma, mb]
+      for (const z of [L * 0.32, -L * 0.32]) {
+        g.add(wheel(wheelG, Wd * 0.44, R, z), wheel(wheelG, -Wd * 0.44, R, z))
       }
       return g
     }
@@ -745,9 +843,9 @@ export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
           }
           if (!car) {
             const shape = shapeOf(p.type)
-            const group = buildVehicle(shape)
+            const group = buildVehicle(shape, p.type ?? '')
             fleet.add(group)
-            car = { group, type: p.type ?? '', halfLength: shape.length / 2 }
+            car = { group, type: p.type ?? '', halfLength: shape.length / 2, beacons: group.userData.beacons }
             cars.set(p.id, car)
           }
           const heading = Math.PI - (p.angle * Math.PI) / 180
@@ -764,6 +862,13 @@ export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
             fleet.remove(c.group)
             cars.delete(id)
           }
+        }
+        // Light bars: the two lamps alternate at 2 Hz.
+        const lit = Math.floor(now / 250) % 2 === 0
+        for (const c of cars.values()) {
+          if (!c.beacons) continue
+          c.beacons[0].emissiveIntensity = lit ? 1.4 : 0.08
+          c.beacons[1].emissiveIntensity = lit ? 0.08 : 1.4
         }
       }
 

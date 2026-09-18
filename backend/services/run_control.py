@@ -77,6 +77,8 @@ class RunControl:
         # Pacing state. `_anchor_wall` is None whenever the schedule needs
         # rebuilding from the next step (start, resume, speed change).
         self._lock = threading.Lock()
+        self._dispatch_queue = []
+        self._dispatch_seq = 0
         self._speed = self._clean_speed(speed)
         self._anchor_wall = None
         self._anchor_sim = 0.0
@@ -112,7 +114,37 @@ class RunControl:
             "stopping": self.stop_requested,
             "handing_over": self.handover_requested,
             "speed": self.speed,
+            "dispatched": self.dispatched,
         }
+
+    # ---- emergency dispatch ---------------------------------------------
+    #
+    # The one way a reader can put something INTO a run: an emergency
+    # vehicle on an approach of their choosing. Queued here, drained by
+    # the run loop on its next step (the evaluator drains into BOTH
+    # simulations, identically, so the comparison stays a comparison).
+    # It rides on RunControl rather than a second channel because this
+    # object is, by design, the only thing that may influence a run.
+
+    def request_dispatch(self, vehicle_type: str, route_id: str) -> int:
+        """Queue one emergency vehicle. Returns its dispatch number."""
+        with self._lock:
+            self._dispatch_seq += 1
+            n = self._dispatch_seq
+            self._dispatch_queue.append((n, vehicle_type, route_id))
+            return n
+
+    def take_dispatches(self):
+        """Run loop: everything queued since last asked, as (n, type, route)."""
+        with self._lock:
+            items = list(self._dispatch_queue)
+            self._dispatch_queue.clear()
+            return items
+
+    @property
+    def dispatched(self) -> int:
+        """How many emergency vehicles have been dispatched into this run."""
+        return self._dispatch_seq
 
     # ---- called by the web side -----------------------------------------
 
@@ -170,6 +202,8 @@ class RunControl:
             self._anchor_wall = None
             self._anchor_sim = 0.0
             self._sim_elapsed = 0.0
+            self._dispatch_queue.clear()
+            self._dispatch_seq = 0
 
     # ---- called by the simulation side ----------------------------------
 

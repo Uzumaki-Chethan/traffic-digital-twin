@@ -236,10 +236,13 @@ class SimulationSupervisor:
                 # for a run that reached its natural end. One stopped
                 # from the browser is a partial result and must never
                 # replace the completed run's CSV that README.md cites.
-                if not control.stop_requested:
-                    PerformanceEvaluator.save_csv(result)
-                else:
+                if control.stop_requested:
                     logger.info("Evaluation stopped early; results CSV left untouched.")
+                elif control.dispatched:
+                    logger.info("Evaluation had %d dispatched vehicle(s); results CSV left "
+                                "untouched - it is not the library scenario.", control.dispatched)
+                else:
+                    PerformanceEvaluator.save_csv(result)
 
         try:
             runner(self._store, self.run_control, scenario_name, baseline)

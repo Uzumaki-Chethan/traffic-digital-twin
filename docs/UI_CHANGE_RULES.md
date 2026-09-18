@@ -80,13 +80,17 @@ change on the page you touched (and any page you moved something to or from).
 
 - **Digital Twin panel:** the junction in **plan view** (true scale, Ctrl +
   scroll / pinch zoom, drag, zoom readout, ± buttons, frame-the-junction
-  button, fullscreen) or **3D** (orbit, Ctrl + scroll zoom, right-drag pan),
-  with: all 12 inbound lanes filled by signal state, the junction box, kerbs,
-  lane dividers, painted turn arrows, stop bars, signal heads with lamps, the
-  compass, the four approach names, lane names when zoomed in, every vehicle at
-  its real size/type/position/heading, the green **release** sweep on a
-  confirmed green, emergency-lane hatching; panel meta: green/red lane counts
-  and vehicle count.
+  button, fullscreen) or **3D** (orbit, Ctrl + scroll zoom, right-drag pan, a
+  compass that turns with the camera), with: all 12 inbound lanes filled by
+  signal state, the junction box, kerbs, lane dividers, painted turn arrows,
+  stop bars, signal heads with lamps, the compass, the four approach names,
+  lane names when zoomed in, every vehicle at its real size/type/position/
+  heading, emergency vehicles with their blinking light bars (both views), the
+  green **release** sweep on a confirmed green, emergency-lane hatching; panel
+  meta: green/red lane counts and vehicle count.
+- **Dispatch bar** (under the plate; also above the Performance windows): send
+  an emergency vehicle — vehicle type, approach, turn, Send — with the count
+  dispatched this run; shown only while the page's run is live.
 - **Active phase panel:** phase (name and plain label), decision mode chip
   with its one-sentence explanation, the engine's **reason** text, **green
   held** seconds (or amber remaining) against the min/max window with the

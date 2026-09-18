@@ -311,6 +311,22 @@ class TrafficAdapter:
             )
         return self._take_events(tc.VAR_STOP_ENDING_VEHICLES_IDS, self._traci.simulation.getStopEndingVehiclesIDList)
 
+    def add_vehicle(self, vehicle_id: str, route_id: str, type_id: str) -> None:
+        """
+        Put one vehicle of `type_id` onto `route_id` now, at the route's
+        entry, on the lane that best fits the route (SUMO's "best"). The
+        one write to the traffic this adapter performs, for the console's
+        emergency dispatch; the signal is still only ever written by the
+        SignalController. Raises traci's TraCIException for an unknown
+        route or type - the caller validated both, so that is a bug.
+        """
+        if not self._traci_manager.is_connected:
+            raise RuntimeError("TrafficAdapter cannot add a vehicle: not connected.")
+        self._traci.vehicle.add(
+            vehicle_id, route_id, typeID=type_id,
+            depart="now", departLane="best", departSpeed="max",
+        )
+
     def get_emergency_vehicle_lanes(self) -> frozenset:
         """
         Return the set of lane IDs that currently hold at least one

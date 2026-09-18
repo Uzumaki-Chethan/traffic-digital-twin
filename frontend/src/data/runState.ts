@@ -38,6 +38,8 @@ export interface RunState {
   error?: string | null
   /** ISO time the current (or last) run was started; changes on every new run. */
   started_at?: string | null
+  /** Emergency vehicles dispatched into this run from the console (2026-09-18). */
+  dispatched?: number
   /** What the console's worker is running (2026-09-14): a demo run, an
    * evaluation (Trinetra vs a baseline, see the Performance page), or
    * nothing. Only the console reports it. */
@@ -166,6 +168,9 @@ export const runControl = {
     replace(() => runControl.startEvaluation(scenarioName)),
   /** Console: end the run the supervisor is hosting. */
   stop: () => send('/api/control/stop-simulation'),
+  /** Send an emergency vehicle into the running simulation (both sides of an evaluation). */
+  dispatch: (vehicleType: string, approach: string, turn: string) =>
+    send('/api/control/dispatch', { vehicle_type: vehicleType, approach, turn }),
   /**
    * Continue the running simulation in a SUMO window. Not a restart: the
    * run saves its state and resumes from it, so the same vehicles and

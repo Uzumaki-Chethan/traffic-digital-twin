@@ -8,6 +8,7 @@ import { Reveal } from '@/ui/Reveal'
 import { ControllerWindow } from '@/performance/ControllerWindow'
 import { HOME_VIEW, type View } from '@/overview/usePanZoom'
 import { EmptyMetricBlock, METRIC_KEYS, MetricBlock } from '@/performance/MetricBlock'
+import { DispatchBar } from '@/layout/DispatchBar'
 
 /**
  * Trinetra against vehicle-actuated control on the identical scenario,
@@ -64,6 +65,7 @@ export function PerformancePage() {
 
   return (
     <div className={dimmed ? 'flex flex-col gap-2 opacity-70 transition-opacity' : 'flex flex-col gap-2 transition-opacity'}>
+      <DispatchBar />
       <div className="grid grid-cols-2 gap-2">
         <Reveal index={0}>
           <ControllerWindow

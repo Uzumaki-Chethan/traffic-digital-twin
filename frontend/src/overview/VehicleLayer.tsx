@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useSim } from '@/data/store'
 import { DisplayClock, motionBuffer, type MotionSide, type Pose } from '@/data/motion'
 import { NET } from './plateGeometry'
-import { shapeOf } from './vehicleTypes'
+import { BEACONS, shapeOf } from './vehicleTypes'
 
 /**
  * The plate's traffic, drawn from the motion buffer (data/motion.ts).
@@ -76,7 +76,9 @@ export function VehicleLayer({ side, powered }: { side: MotionSide; powered: boo
     <g fill="var(--plate-vehicle)">
       {ids.map((id) => {
         // The type is static for a vehicle's life.
-        const shape = shapeOf(buffer.typeOf(id))
+        const type = buffer.typeOf(id)
+        const shape = shapeOf(type)
+        const beacons = type ? BEACONS[type] : undefined
         return (
           <g
             key={id}
@@ -87,6 +89,16 @@ export function VehicleLayer({ side, powered }: { side: MotionSide; powered: boo
             }}
           >
             <rect x={-shape.length / 2} y={-shape.width / 2} width={shape.length} height={shape.width} rx={0.3} />
+            {beacons && (
+              // The roof light bar, blinking: two lamps side by side just
+              // behind the cab, each 0.6 m, one lit while the other is
+              // dark. The one looping motion on the plate, by the owner's
+              // choice: it is the signal a real light bar gives.
+              <g className="beacons">
+                <rect className="beacon-a" x={shape.length * 0.02} y={-0.85} width={0.8} height={0.75} fill={beacons[0]} />
+                <rect className="beacon-b" x={shape.length * 0.02} y={0.1} width={0.8} height={0.75} fill={beacons[1]} />
+              </g>
+            )}
           </g>
         )
       })}
