@@ -261,14 +261,24 @@ class DecisionEngine:
             self._emergency_hold_remaining = max(
                 self._emergency_hold_remaining, cfg.emergency_service_window_seconds
             )
+        elif emergency_phase is None and self._emergency_hold_remaining > cfg.emergency_clear_seconds:
+            # No emergency vehicle on any approach lane any more: it has
+            # entered the junction or passed. A few seconds to clear the
+            # box, then ordinary control resumes.
+            self._emergency_hold_remaining = cfg.emergency_clear_seconds
 
         if self._emergency_hold_remaining > 0.0:
-            return self._hold(
-                phase_scores, lane_scores, "emergency",
+            reason = (
                 "Holding {} for emergency service window ({:.1f}s remaining).".format(
                     self._current_phase, self._emergency_hold_remaining
-                ),
+                )
+                if emergency_phase is not None
+                else "Emergency vehicle has passed the stop line; holding {} {:.1f}s more to "
+                     "clear the junction, then normal control resumes.".format(
+                    self._current_phase, self._emergency_hold_remaining
+                )
             )
+            return self._hold(phase_scores, lane_scores, "emergency", reason)
 
         starved_phase = self._most_starved_phase_over_hard_limit(features)
         if starved_phase is not None and starved_phase != self._current_phase:

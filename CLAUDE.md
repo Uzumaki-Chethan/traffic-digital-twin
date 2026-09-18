@@ -116,7 +116,9 @@ frontend replaced it; the dead fallback code path was cleaned up 2026-09-06).
   reaches its first tick in ~1.4 s instead of 5-7. The forest is read-only at inference,
   so sharing it across runs (and the evaluator's two sides) is safe.
 - **Decision Engine** (`backend/decision_engine/decision_engine.py`): all tunables (green
-  clamps, hysteresis margin, starvation limits, emergency windows, normalization ceilings,
+  clamps, hysteresis margin, starvation limits, emergency windows — incl.
+  `emergency_clear_seconds`, 3 s: once the vehicle is off every served approach lane the
+  15 s service hold collapses to this (Section 30.19) — normalization ceilings,
   `switch_confirmation_seconds`) live in `decision_config.py`'s `DecisionConfig` dataclass,
   not module constants — construct one with overrides for tests/experiments.
   `calibrate_normalization.py` derives the normalization ceilings from recorded data

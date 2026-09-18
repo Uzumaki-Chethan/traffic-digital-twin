@@ -5,8 +5,7 @@ import { useSim } from '@/data/store'
 import { isEvaluation, isLive } from '@/data/types'
 import { useLiveClock } from '@/data/useLiveClock'
 import { clock } from '@/utils/format'
-import { APPROACH_NAME, modeMeta } from '@/utils/signal'
-import { approachOf } from '@/data/types'
+import { modeMeta } from '@/utils/signal'
 import { useRunStore } from '@/data/runState'
 import { usePageContext } from '@/data/pageContext'
 import { useSettings } from '@/data/settings'
@@ -52,7 +51,6 @@ export function StatusBar() {
   // The emergency band and the loud mode chip follow the page's run: the
   // demo frame here, or the evaluation's Trinetra side on Performance.
   const side = live ?? (evaluating && isEvaluation(latest) ? latest.ai : null)
-  const emergency = side?.emergency_lanes ?? []
   const mode = modeMeta(side?.decision.mode)
 
   return (
@@ -78,14 +76,6 @@ export function StatusBar() {
       </div>
 
       <div className="flex items-center gap-4">
-        {emergency.length > 0 && (
-          <div className="flex items-center gap-2 rounded-control border border-alert bg-alert-wash px-2 py-1">
-            <span className="hatch-alert h-4 w-4 rounded-sm" aria-hidden />
-            <span className="text-[12.5px] font-semibold text-alert">
-              Emergency vehicle — {[...new Set(emergency.map(approachOf))].map((a) => APPROACH_NAME[a]).join(', ')}
-            </span>
-          </div>
-        )}
 
         {/* The page's scenario — what is running here, or what Start would
             run — and the way to change it: Settings opens choosing for THIS

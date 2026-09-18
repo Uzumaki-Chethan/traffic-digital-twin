@@ -162,7 +162,7 @@ number):
 | `east_heavy` | **7/7** | +61.9 % | +15.4 % | +41.3 % | +36.9 % | +3.2 % | +18.6 % | +0.0 % |
 | `west_heavy` | **7/7** | +63.8 % | +14.8 % | +43.1 % | +37.6 % | +21.1 % | +16.1 % | +0.0 % |
 | `accident` | **7/7** | +83.8 % | +34.0 % | +70.2 % | +62.5 % | +54.7 % | +41.3 % | +0.0 % |
-| `emergency_response` | **7/7** | +83.0 % | +30.0 % | +62.6 % | +57.8 % | +45.9 % | +38.8 % | +0.0 % |
+| `emergency_response` | **7/7** | +84.5 % | +30.2 % | +70.2 % | +58.6 % | +45.9 % | +39.1 % | +0.0 % |
 | `rain` | **7/7** | +85.7 % | +35.6 % | +66.2 % | +67.5 % | +64.5 % | +46.4 % | +0.0 % |
 
 **13/13 clean sweeps — every scenario, every metric.** Twelve of the thirteen `results/
@@ -170,9 +170,9 @@ comparison_<scenario>_seed1.csv` files were written by one run on 2026-09-14, af
 performance work of Section 28 (the whole sweep now takes ~6 minutes; metrics are sampled
 once per decision tick, so these differ from the 2026-09-13 table only by sampling noise);
 `emergency_response` was re-measured on 2026-09-18 after the evaluator was found to be
-withholding emergency-vehicle detection from the AI side (Section 30.17) — with the
-override active the AI serves the ambulances and gives back a few points on the other
-metrics, as it should. The AI
+withholding emergency-vehicle detection from the AI side (Section 30.17), and again the
+same day when the emergency hold was made to release ~3 s after the vehicle clears the
+stop line instead of 15 s later (Section 30.19). The AI
 switches less than VAC in every light seed (64 vs 74, 58 vs 67, 65 vs 75) and, under
 saturation, holds a phase serving a stream for at least ~17 s of real green before any
 score can end it. Throughput is tied by construction in every row; the two 0.0 max-queue

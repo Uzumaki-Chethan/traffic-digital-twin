@@ -209,8 +209,15 @@ class DecisionConfig:
     # Minimum green the CURRENT phase gets before an emergency override
     # may cut it short.
     emergency_minimum_safety_seconds: float = 5.0
-    # Minimum time an emergency phase is held once switched to.
+    # Minimum time an emergency phase is held once switched to - while
+    # the vehicle is still on an approach lane the window is refreshed
+    # every tick, so this is really "how long after it was last seen".
     emergency_service_window_seconds: float = 15.0
+    # Once the vehicle has left every approach lane the phase serves (it
+    # is in the junction or beyond), the remaining hold is cut to this,
+    # so ordinary control resumes a few seconds after it has passed
+    # rather than 15 s later (2026-09-18, at the owner's request).
+    emergency_clear_seconds: float = 3.0
 
     # Ceiling on how much of the predicted component's weight is used,
     # reached only at 100% prediction confidence.

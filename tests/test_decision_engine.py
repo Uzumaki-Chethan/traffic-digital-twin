@@ -536,6 +536,24 @@ def test_emergency_holds_current_phase_when_already_serving_it():
     assert decision.active_phase == "NS_straight_left"
 
 
+def test_emergency_hold_releases_a_few_seconds_after_the_vehicle_has_passed():
+    """While the vehicle is on an approach lane the 15 s window is refreshed
+    every tick; the moment it is off every served lane (in the junction or
+    beyond) the remaining hold collapses to emergency_clear_seconds, so
+    ordinary control is back a few seconds later, not 15."""
+    engine = DecisionEngine(initial_phase="NS_straight_left")
+    for _ in range(3):
+        d = engine.decide(make_features({}), None, dt_seconds=1.0, emergency_lanes=frozenset({"N_in_1"}))
+        assert d.decision_mode == "emergency" and "service window" in d.reason_text
+    # Passed the stop line: no approach lane holds it any more.
+    d = engine.decide(make_features({}), None, dt_seconds=1.0, emergency_lanes=frozenset())
+    assert d.decision_mode == "emergency" and "passed the stop line" in d.reason_text
+    assert engine._emergency_hold_remaining <= 3.0
+    for _ in range(3):
+        d = engine.decide(make_features({}), None, dt_seconds=1.0, emergency_lanes=frozenset())
+    assert d.decision_mode != "emergency"
+
+
 # ===================== Confidence-weighted prediction blending =====================
 
 

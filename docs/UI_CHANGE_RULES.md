@@ -68,9 +68,10 @@ change on the page you touched (and any page you moved something to or from).
   slides); the **simulated clock** with measured × real-time rate, or
   "Simulation paused" / "Run ended" / "No simulation running" / "Waiting for
   simulation"; the **link pill** (Live / Paused / Idle / Connecting / Link lost
-  with seconds / No data for N s); the **emergency band** (approach names) when
-  an emergency vehicle is present; the **loud mode chip** (Starvation override,
-  Emergency) when active.
+  with seconds / No data for N s); the **loud mode chip** (Starvation override,
+  Emergency) when active. (The emergency band naming the approach was removed
+  on 2026-09-18 on the owner's explicit instruction; the plate's lane hatching
+  and the light bars carry that information.)
 - **Nav rail:** Overview, Analytics, Performance, Decisions, Simulation
   Settings; the active item marked; collapse control; simulation link state.
 - **Footer:** the page's name and one-line description on the left; on the

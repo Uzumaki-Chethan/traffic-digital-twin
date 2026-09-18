@@ -3491,3 +3491,28 @@ straight; `emergency_lanes` and the alert band followed each. Tests:
 `test_dispatch_route_geometry`, `test_dispatch_is_queued_on_the_run_control_and_refused_
 when_idle`. The 3D view also gained a compass that turns with the camera (Chethan: "once
 we rotate, we don't know which is which").
+
+### 30.19 The emergency hold releases once the vehicle has passed (2026-09-18)
+
+Two things from Chethan after using the dispatch: the top bar's "Emergency vehicle —
+North" band had appeared on Performance for a run he had not put an emergency into
+(the evaluation's AI side now reports its lanes, and a dispatch from either page lands in
+both simulations — so it was telling the truth, but he wants it gone), and after the
+ambulance has crossed the junction the engine should "continue normally after 2-3
+seconds" instead of holding its phase for the rest of the 15 s window.
+
+- The band is removed (owner's explicit instruction, recorded in
+  `docs/UI_CHANGE_RULES.md`); the loud mode chip, the plate's lane hatching and the
+  light bars still say what is happening.
+- `DecisionConfig.emergency_clear_seconds = 3.0`: while the vehicle is on any approach
+  lane the phase serves, the 15 s window is refreshed every tick as before; the first tick
+  it is on none of them (in the junction or beyond) the remaining hold collapses to 3 s,
+  with the reason "Emergency vehicle has passed the stop line; holding … 3.0 s more to
+  clear the junction, then normal control resumes." Measured on a dispatched ambulance:
+  detected 8.1 s → override; crossed the stop line 24.4 s; normal control (a gap-out) at
+  28.1 s. `test_emergency_hold_releases_a_few_seconds_after_the_vehicle_has_passed`.
+- Re-measured `emergency_response_seed1` vs VAC, VAC unchanged: **7/7**, wait +84.5 %,
+  travel +30.2 %, worst travel +70.2 %, avg queue +58.6 %, max queue +45.9 %, speed
+  +39.1 % — the earlier release wins back most of what the full 15 s hold had cost (30.17).
+  The training data's emergency runs were generated under the old hold; the model predicts
+  demand, not the engine's behaviour, so this is not a retraining trigger.
