@@ -2625,8 +2625,9 @@ Section 22.3, a literal "every seed of every scenario" guarantee is not claimed.
 
 Dated 2026-09-14. Two new pages, one evaluator that now runs under the console, and three
 rendering defects the user reported the moment they saw the 3D view up close. The written
-design is `docs/superpowers/specs/2026-09-14-performance-and-settings-design.md`; the plan
-it was built from is beside it under `docs/superpowers/plans/`.
+design and the plan built from it (`docs/superpowers/specs/`, `docs/superpowers/plans/`)
+were removed 2026-09-21 as stale once-used planning artifacts, on the user's instruction —
+the feature they described shipped weeks ago and its own history is this section.
 
 ### 27.1 What the user asked for
 
@@ -3516,3 +3517,248 @@ seconds" instead of holding its phase for the rest of the 15 s window.
   +39.1 % — the earlier release wins back most of what the full 15 s hold had cost (30.17).
   The training data's emergency runs were generated under the old hold; the model predicts
   demand, not the engine's behaviour, so this is not a retraining trigger.
+
+## SECTION 31 — Rain, drawn (2026-09-20) (CURRENT STATE)
+
+Requested: the `rain` scenario (Section 30.17's table; wet-weather vehicle types, already
+in the library) had no visual weather in either view — the junction looked the same as any
+other scenario, and only the vehicles' slower, more cautious dynamics said otherwise. Both
+the plan view and the 3D model now draw falling rain while it runs.
+
+- **Gating.** A `raining` boolean, computed once per page from
+  `usePageContext().scenario.startsWith('rain')` (Overview) or the same read on
+  `PerformancePage` (one evaluation, so one flag for both `ControllerWindow`s) — true only
+  while the run actually playing is the Rain scenario, the same way the wet vehicle types
+  already only appear there. No manual toggle. Threaded through `TwinViewport` (`raining`
+  prop) into `JunctionPlate` and `Junction3D`.
+- **Plan view** (`overview/JunctionPlate.tsx`): a `rainStreaks` SVG pattern (a 5x10 m tile,
+  two short slanted lines) filling a rect sized like the ground rect, drawn LAST so it falls
+  over the whole drawing including vehicles and signal heads — the same layering a weather
+  overlay on a real photo would have. The CSS class `rain-fall` (`index.css`) translates
+  that rect by exactly one tile height (10 user units) per 0.5 s loop, which is what makes
+  a simple translate loop seamless; static under reduced motion, same convention as
+  `beacon-blink`.
+- **3D view** (`overview/Junction3D.tsx`): 900 short `THREE.LineSegments`, respawned at
+  `RAIN_HEIGHT` (90 m) when they fall below the ground and given a fresh random (x, z)
+  within a 220 m half-width box centred on the junction, driven every animation frame at a
+  constant real-time rate (`RAIN_FALL` = 140 m/s) independent of the simulation's own speed
+  control — it is weather, not simulated physics, so "max" speed does not turn it into a
+  blur. One `BufferGeometry`/`BufferAttribute` reused in place (`needsUpdate` per frame),
+  not rebuilt, so the cost is one typed-array walk regardless of how long the rain runs.
+- **The one deliberate rule exception.** `docs/UI_CHANGE_RULES.md` §2 bans looping motion in
+  the periphery; the emergency light bars (30.18) were the first exception, made by the
+  owner because a light bar's whole job is to blink. Rain is the second, for the same
+  reason: it is reporting the sim's own weather state, not decorating the page, and the
+  owner asked for it directly. Both views stay restrained — no glow, a
+  muted grey-blue only, no lightning or storm sound — deliberately short of a dramatic
+  effect.
+- Verified live against the console's own `rain_seed1` run (not a fresh one — an existing
+  paused session was resumed, screenshotted in both views, then paused again at its
+  original speed to leave it as found): the plan view's streak texture is visible without
+  hiding lane fills or vehicles underneath it; the 3D view's streaks fall continuously
+  through the scene at a density that reads as rain without obscuring the junction. No
+  console errors. `npx tsc -b`, `oxlint`, all 18 Vitest cases, and the production build are
+  all clean; nothing in the pipeline, the model, the scenarios or the evaluator was touched.
+
+## SECTION 32 — Ad hoc accidents: incident dispatch and its hazard marker (2026-09-20) (CURRENT STATE)
+
+Requested: the `accident` scenario only ever blocks East's straight lane with a scripted
+truck; asked whether an accident could be triggered on ANY lane, on demand, the way
+emergency dispatch (30.18) already lets you send an ambulance in — and whether the
+`accident_seed1` card's name ("Stalled truck on East") should just say "Accident".
+
+- **The scenario card is renamed** (`data/scenarios.ts`): `accident_seed1` → **Accident**.
+  Purely cosmetic — the scripted scenario file, its recorded 7/7 sweep row, and its training
+  data are all untouched.
+- **Incident dispatch is Emergency Dispatch's sibling, built the same way.** A new queue on
+  `RunControl` (`request_incident`/`take_incidents`, alongside `request_dispatch`/
+  `take_dispatches`) carries `(n, vehicle_type, route_id, edge_id, lane_index, duration)`.
+  `TrafficAdapter.stall_vehicle()` adds the vehicle exactly like `add_vehicle()` does, then
+  calls TraCI's `vehicle.setStop(edge_id, pos=80, laneIndex, duration)` — 80 m into the
+  178.4 m inbound edge, matching the scripted `accident` scenario's own stop position
+  (`sumo/scenarios/demo/accident.rou.xml`: `<stop lane="E_in_1" endPos="80" duration="550"/>`)
+  so a dispatched one reads the same way. `POST /api/control/dispatch-incident
+  {vehicle_type, approach, turn, duration}` (default 120 s, 5-300 s range; vehicle types
+  truck/bus/car_normal) validates and queues it; `simulation_runner.py`'s `on_step` and
+  `evaluator.py`'s lockstep loop drain it exactly where they drain emergency dispatches
+  (evaluator: into both sides, same vehicle, same lane, same step). The turn-to-lane-index
+  mapping (left=0, straight=1, right=2) is read off `intersection.net.xml`'s own
+  `<connection>` elements, not assumed. The supervisor skips the results CSV for a run with
+  incidents, the same rule dispatched emergencies already trigger.
+  `test_incident_is_queued_on_the_run_control_and_refused_when_idle` covers it; 103/103.
+- **No engine or model changes were needed, or made.** A physically blocked lane is just
+  more congestion; the Decision Engine has never had an "accident" special case; it scores
+  the lane the same way it scores any other. Confirmed by reading the mechanism before
+  building anything, not assumed.
+- **The hazard marker.** Both views mark a stalled vehicle — the scripted scenario's own
+  `accident_vehicle` or a dispatched `incident_<n>_<type>` — with a static amber marker
+  (`vehicleTypes.isStalledVehicleId`, matched on the vehicle's own id, both of which this
+  project already controls exactly, so the match is exact rather than a heuristic guess: no
+  backend flag needed). The plate draws a small triangle in `--alert`
+  (`VehicleLayer.tsx`); the 3D view adds a shared, owned `ConeGeometry` above the vehicle's
+  roof (`Junction3D.tsx`), attached once when that vehicle's group is first built, like the
+  emergency beacons are. Neither blinks — a static marker needs no exception to the
+  no-looping-motion rule, unlike rain (31) and the beacons (30.18).
+- **The Incident bar** (`layout/IncidentBar.tsx`) is `DispatchBar`'s sibling, sharing its
+  approach/turn option lists and its `Sel` control: vehicle (Truck/Bus/Car), on approach,
+  turn, Stall, a running count. Sits beside Dispatch on Overview and above the Performance
+  windows, shown only while the page's own run is live, disabled while paused, entering both
+  evaluation sides at once exactly like Dispatch does.
+- **Verified live** against the console: dispatched a truck on North's right-turn lane and,
+  separately, East's straight lane (the scripted truck's own lane) while a real
+  `accident_seed1` run was up; `GET /api/latest` confirmed each stalled vehicle at the
+  correct lane, position (98.4 m from the junction, matching `endPos=80` on the 178.4 m
+  edge) and speed 0; the plate's hazard triangle (`path[d^="M 0 -2.2"]`) was confirmed
+  present in the live DOM the moment the vehicle existed. Zero console errors across the
+  whole check, including cycling the 3D view. `tsc -b`, `oxlint`, all 18 Vitest cases, and
+  the production build are all clean.
+
+**A methodology note, since it cost real time this session:** a screenshot-only check of a
+dynamically-dispatched vehicle is unreliable here — the stall duration is short relative to
+how long manual browser navigation takes, the 3D and plan views can look confusingly alike
+once the 3D camera is dragged near-vertical, and a vehicle 98 m up an arm is off-screen at
+the plate's normal 3.5x framing. `GET /api/latest` (the plain REST snapshot, not just the
+WebSocket) and a direct DOM query for the expected SVG element are faster and unambiguous;
+prefer them over screenshot hunting when verifying a live, time-limited effect.
+
+### 32.1 The real hazard triangle, noticeably bigger smoke, and scenario-led ordering (same day)
+
+Three refinements from using it: the plain amber shape didn't read as a road hazard sign,
+the smoke was too faint to notice, and the Dispatch/Incident bars should lead with whichever
+tool matches the scenario actually running.
+
+- **The hazard marker is now the real sign**, not an abstract triangle: yellow fill, a black
+  rounded outline, a black bar-and-dot exclamation — nothing behind it, only the shape
+  itself is opaque. The plate draws it as three SVG primitives (a path, a rounded rect, a
+  circle); the 3D view draws the identical shape once onto a canvas and shows it as a
+  `THREE.Sprite`, which always faces the camera on its own — a flat mesh would vanish
+  edge-on the moment the model is orbited, which a marker that has to read from any angle
+  cannot afford.
+- **Smoke is bigger, denser, and darker.** Five puffs instead of three, spread with a small
+  horizontal offset each (a cloud, not a column), peaking at 0.85 opacity (was 0.5-0.55) on
+  a fade-in/fade-out curve rather than a flat fade, climbing further before resetting (3.2 m
+  in 3D, up from 2.2; a radius run of 0.4-2.6 on the plate, up from 0.25-1.5). Colour moved
+  from a pale grey to a darker one so it reads against green and asphalt alike.
+- **The Dispatch/Incident bars lead with whichever tool matches the running scenario**:
+  `data/scenarios.ts`'s `leadingIncidentTool(scenario)` returns `'incident'` only when the
+  scenario id starts with `accident`, so the Accident scenario shows Incident first and
+  Dispatch second; the Emergency scenario (and everything else, which only ever had
+  Dispatch) keeps Dispatch first. Both `OverviewPage.tsx` and `PerformancePage.tsx` read it
+  once and swap which `<>` renders first — no change to either bar's own code.
+- **The on-plate lane names (30's "North · Left" etc., shown only once zoomed in past
+  `MIN_LABEL_LANE_PX`) are removed** at the owner's explicit instruction — the four
+  approach names and the Lanes panel's own rows still carry that information; nothing on
+  the plate itself named a lane before this feature existed, and nothing does after.
+  `MIN_LABEL_LANE_PX`, the `laneNames` flag and the whole rendering block are gone from
+  `JunctionPlate.tsx`; `laneLabel` itself stays, still used by the plate's aria-label and
+  by the Lanes/Decisions panels.
+- Verified live: authoritative coordinates from `GET /api/latest` (not screenshot-hunting a
+  moving target, the lesson from 32's own verification) framed the exact SVG viewBox around
+  the scripted `accident_vehicle`, confirming the new triangle and the bigger smoke
+  side by side; a DOM text-content dump at 17x zoom on a fully-queued approach confirmed
+  zero lane-name text nodes remain, only the four approach names and the compass. `tsc -b`,
+  `oxlint`, all 18 Vitest cases, and the production build are clean throughout.
+- **Both bars gated to their own two scenarios (later the same day).** Dispatch and
+  Incident used to show on any scenario, any page, the moment a run was live. On the
+  owner's instruction, `data/scenarios.ts`'s new `showsIncidentControls(scenario)` hides
+  both entirely unless the running scenario is Accident or Emergency vehicles — the general
+  "dispatch anything into any run" capability the backend still offers (Section 32) is now
+  only surfaced in the UI where it's thematically relevant. Verified live: `light_seed1`
+  shows neither bar; switching to `accident_seed1` brings both back, Incident still leading
+  as 32.1 set it to.
+
+## SECTION 33 — The design brief retired, its skills removed, a scratch cleanup (2026-09-20) (CURRENT STATE)
+
+Requested: the original UI design brief (`docs/design/TRINETRA_UI_DESIGN_BRIEF.md` and its
+`archive/`) and the project-local Claude Code skills for frontend/UI design work (`design`,
+`design-system`, `ui-styling`, `ui-ux-pro-max` under `.claude/skills/`) were, in the user's
+judgement, constraining the interface's direction rather than helping it — on top of the
+brief already having several sections superseded by his own later choices (motion, palette,
+the reference-kit process — Section 29, Section 30's status header). Both are gone now,
+along with the accumulated Playwright screenshot/log scratch (`​.playwright-mcp/`, 158
+files, ~12 MB back to 2026-09-13 — gitignored, never part of the repo, safe to clear
+outright).
+
+- **`docs/design/` deleted** (`git rm -r`): the brief and its `archive/` (two documents
+  already superseded and moved there on 2026-09-17, plus that move's own README). Nothing
+  was lost from the product's own rules: `docs/UI_CHANGE_RULES.md` already restates the
+  brief's essential data rules in its own §2 (no invented numbers, never show confidence,
+  no internal jargon) independently of the brief's continued existence, and its §3 content
+  inventory is the actual, current binding contract — it was written to stand alone.
+  `CLAUDE.md`, `docs/ONBOARDING.md` and `docs/UI_CHANGE_RULES.md`'s own §2 heading were
+  updated to stop pointing at the now-deleted file; `PROJECT_ARCHITECTURE_REPORT.md`'s
+  earlier sections that mention it (Sections 29-30) are left as the historical record they
+  are, unedited, per this file's own rule of adding new sections rather than editing
+  history away.
+- **All seven skill folders removed** from `.claude/skills/` (project-local, gitignored
+  tooling — never pushed, per Section 30.16): `design`, `design-system`, `ui-styling`,
+  `ui-ux-pro-max` first; `banner-design`, `brand` and `slides` were flagged rather than
+  assumed (they are marketing/graphic-design/presentation skills, not frontend UI ones) and
+  removed on the user's follow-up confirmation. `.claude/skills/` is now empty.
+- Confirmed before deleting anything: `.claude/settings.local.json` has no permission
+  entries naming the removed skills, and `git status` showed no other stray untracked
+  clutter in the tree beyond the day's own legitimate new file
+  (`frontend/src/layout/IncidentBar.tsx`) — the skills and `.playwright-mcp/` were the only
+  things actually there to clean up.
+
+### 33.1 `results/` — the CSVs and the cited archives stay, the debug scratch goes
+
+Same request, `results/` specifically: 46 gitignored debug files removed (13 `eval_
+<scenario>_seed1.log` — raw SUMO step-log console capture, already redundant with the CSV
+each run also wrote; `experiments.log`, 18 `probe_*.log`, a `server.log`, and four
+`sweep_*.log` — one-off empirical-tuning scratch from Sections 19-26, referenced nowhere by
+name). Kept: the 13 `comparison_<scenario>_seed1.csv` — the actual validated sweep the
+README's table quotes, and every one of them git-tracked, not scratch — and the four
+archived-experiment directories (`countfirst_gapout_2026-09-13/`,
+`interim_2026-09-13_absolute_nextswitch/`, `modelfix_only_2026-09-13/`,
+`old_shared_left_2026-09-08/`, ~80 KB total) that Sections 26.4b and 25 cite by name as the
+source of specific numbers still asserted as fact — deleting those would have pulled the
+evidence out from under claims this very report still makes.
+
+## SECTION 34 — The 3D signal head redesigned as the hardware blueprint (2026-09-20) (CURRENT STATE)
+
+Requested: the plan view's per-lane signal read-out (three lamps — red, amber, green — per
+lane, at the stop bar) stays exactly as it is; the 3D mast head's lens layout and logic
+change to match a specific design the user is going to build as physical hardware, so
+whatever the 3D model shows from here has to be the literal wiring diagram.
+
+**The design, confirmed with the user before building it:**
+
+| state of one movement (left / straight / right) | what lights |
+|---|---|
+| being served | that movement's own arrow, green |
+| stopped, while a sibling movement on the same approach is still green or clearing | that movement's own arrow, red |
+| clearing (was green, now ending), while a sibling is still green | that movement's own arrow, amber |
+| clearing, and nothing else on this approach is green (its last active movement) | the shared amber circle, arrows dark |
+| nothing on this approach is being served at all | the shared red circle, arrows dark |
+
+Arrows carry green always; they carry red or amber only while the approach is *partially*
+active. The two shared circles exist only for "the whole approach is doing nothing right
+now" and the transition into it — a real signal head only needs the one red bulb for that,
+not three.
+
+- **Five independent lenses per mast, not four.** `Junction3D.tsx`'s `Head` no longer holds
+  one `aspects` array with a merged left+ahead arrow; it holds `redCircle`, `amberCircle`
+  (the two shared discs) and `arrows` (three separate `THREE.Mesh`es — left, straight,
+  right — each with its OWN material, because an arrow now needs to carry red or amber, not
+  only green). The housing (`headGeom`) widened 6.0 m → 7.2 m and `LENS_X` moved from four
+  positions to five evenly spaced ones to fit them without crowding.
+- **The tick loop reads only the current tick, no lookahead.** For a given approach:
+  `wholeApproachQuiet = !lamps.includes('green')`. If quiet: the shared red circle lights
+  unless something is amber, in which case the shared amber circle does, arrows dark. If
+  NOT quiet (something on the approach is green): every lane's own SUMO-reported lamp
+  colour (green/amber/red) is written straight to its own arrow, unconditionally — the
+  algebra alone guarantees an arrow showing red or amber here always has an active green
+  sibling, without needing to check for one explicitly. This is deliberately the same
+  information physical hardware reading live signal state would have — no peeking at the
+  next phase to decide the shape early.
+- **The stop-line lane bars are untouched** — they are a separate, more granular per-lane
+  read-out (Section on Digital Twin panel content), not part of this head redesign, and
+  were never in scope.
+- Verified live (`balanced_seed1`, fresh run, 3D view): a mast head showing an individual
+  red arrow beside an individual green arrow at once (partial state, shared circles both
+  dark); a few ticks later the same head showing only the shared amber circle lit, all
+  three arrows dark (its last movement clearing); a few ticks after that, only the shared
+  red circle lit, arrows dark (fully stopped, waiting its turn). All three states matched
+  the confirmed design exactly. `tsc -b`, `oxlint`, all 18 Vitest cases, and the production
+  build are clean; the plan view's own per-lane lamps were not touched.

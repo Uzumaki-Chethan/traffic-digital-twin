@@ -211,6 +211,20 @@ small {
   .beacon-a, .beacon-b { animation: none; opacity: 1; }
 }
 
+/* Rain on the plate, only while the Rain scenario is running: the
+   rainStreaks pattern tile (JunctionPlate.tsx) is 10 user units tall, so
+   translating its rect by exactly that each loop is seamless. Static
+   under reduced motion — the streaks and the wetter tone still say it's
+   raining without relying on motion to say it. */
+@keyframes rain-fall {
+  from { transform: translateY(0); }
+  to { transform: translateY(10px); }
+}
+.rain-fall { animation: rain-fall 0.5s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .rain-fall { animation: none; }
+}
+
 /* Anything that answers a click shows the hand. Tailwind v4's preflight
    dropped the pointer from buttons (v3 set it), so without this every
    control in the product read as an arrow. Disabled controls keep the

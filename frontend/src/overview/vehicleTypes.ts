@@ -65,3 +65,20 @@ export function shapeOf(typeId: string | undefined): VehicleShape {
   if (!typeId) return DEFAULT_SHAPE
   return VEHICLE_TYPES[typeId] ?? DEFAULT_SHAPE
 }
+
+/**
+ * A stalled vehicle — the scripted `accident` scenario's truck, or one
+ * stalled on demand (layout/IncidentBar.tsx) — is identified by its own
+ * id rather than a backend flag, because both ids are ones this project
+ * already controls exactly: the scenario's is literally named
+ * "accident_vehicle" (sumo/scenarios/demo/accident.rou.xml) and a
+ * dispatched one is "incident_<n>_<type>"
+ * (backend/services/control_routes.py's /dispatch-incident, drained in
+ * simulation_runner.py and evaluator.py). Matching them is exact, not a
+ * heuristic guess. Both views draw a small hazard marker over one
+ * (VehicleLayer.tsx, Junction3D.tsx) — static, not blinking, so it needs
+ * no exception to the no-looping-motion rule.
+ */
+export function isStalledVehicleId(id: string): boolean {
+  return id === 'accident_vehicle' || id.startsWith('incident_')
+}

@@ -5,7 +5,7 @@ import type { LaneView, VehicleView } from '@/data/types'
 import { useSim } from '@/data/store'
 import { DisplayClock, motionBuffer, type MotionSide, type Pose } from '@/data/motion'
 import { lampOf } from '@/utils/signal'
-import { BEACONS, shapeOf, type VehicleShape } from './vehicleTypes'
+import { BEACONS, isStalledVehicleId, shapeOf, type VehicleShape } from './vehicleTypes'
 
 /**
  * A miniature 3D model of the junction, to the REAL network scale
@@ -95,6 +95,10 @@ interface Props {
   powered: boolean
   /** Which motion buffer to draw (the demo by default). */
   motionSide?: MotionSide
+  /** True only while the running scenario is Rain (data/pageContext.ts).
+   * Falling streaks, reporting the sim's own weather — see the matching
+   * note on JunctionPlate's own `raining` prop. */
+  raining?: boolean
 }
 
 interface Car {
@@ -104,6 +108,9 @@ interface Car {
   halfLength: number
   /** An emergency vehicle's two roof lamps, blinked in the render loop. */
   beacons?: [THREE.MeshStandardMaterial, THREE.MeshStandardMaterial]
+  /** A stalled vehicle's smoke puffs, shown only while it is actually
+   * stopped (the render loop checks its current speed). */
+  smoke?: { mesh: THREE.Mesh; mat: THREE.MeshStandardMaterial; phase: number; riseFrom: number }[]
 }
 
 /** How an emergency vehicle is painted, over the vType's colour: an
@@ -165,8 +172,15 @@ const HEAD_ALONG_ARM = [3.8, 7.0, 10.2]
 const HEAD_ALONG = HEAD_ALONG_ARM[1]
 const MAST_HEIGHT = 10.6
 const HEAD_CENTRE_Y = 8.7
-/** Four lenses in a row: red, amber, left+ahead, right. */
-const LENS_X = [-2.35, -0.8, 0.8, 2.35]
+/**
+ * Five lenses in a row: a shared red circle, a shared amber circle, then
+ * three independent arrows (left, straight, right) - the hardware design
+ * (Section 34): an arrow carries its own movement's red/amber/green
+ * whenever another movement on the same approach is still active, and the
+ * two shared circles take over - arrows dark - only once nothing on this
+ * approach is being served at all (see the tick loop's own comment).
+ */
+const LENS_X = [-3.0, -1.5, 0, 1.5, 3.0]
 
 /**
  * An arrow lens in the xy plane facing +z. The head faces the driver
@@ -199,17 +213,17 @@ const TURN_LEFT = Math.PI
 const TURN_AHEAD = Math.PI / 2
 const TURN_RIGHT = 0
 
-export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
+export function Junction3D({ lanes, powered, motionSide = 'demo', raining = false }: Props) {
   const mount = useRef<HTMLDivElement>(null)
   // The compass overlay; turned every frame to keep its arrow on world
   // north however the camera has been orbited.
   const compass = useRef<SVGSVGElement>(null)
   const rate = useSim((s) => s.rate)
   const smooth = useSim((s) => s.smooth)
-  const data = useRef({ lanes, powered, motionSide, rate, smooth })
+  const data = useRef({ lanes, powered, motionSide, rate, smooth, raining })
   useEffect(() => {
-    data.current = { lanes, powered, motionSide, rate, smooth }
-  }, [lanes, powered, motionSide, rate, smooth])
+    data.current = { lanes, powered, motionSide, rate, smooth, raining }
+  }, [lanes, powered, motionSide, rate, smooth, raining])
 
   useEffect(() => {
     const el = mount.current
@@ -382,7 +396,7 @@ export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
     const housingMat = own(new THREE.MeshStandardMaterial({ color: HOUSING, roughness: 0.6 }))
     const poleGeom = own(new THREE.CylinderGeometry(0.3, 0.34, MAST_HEIGHT, 10))
     const mastGeom = own(new THREE.BoxGeometry(HEAD_ALONG + 0.8, 0.26, 0.26))
-    const headGeom = own(new THREE.BoxGeometry(6.0, 2.0, 0.85))
+    const headGeom = own(new THREE.BoxGeometry(7.2, 2.0, 0.85))
     const discGeom = own(new THREE.CircleGeometry(0.58, 20))
     const aheadGeom = own(new THREE.ShapeGeometry(arrowShape(TURN_AHEAD)))
     const leftGeom = own(new THREE.ShapeGeometry(arrowShape(TURN_LEFT)))
@@ -391,10 +405,17 @@ export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
     const barEW = own(new THREE.BoxGeometry(0.75, 0.12, LANE_W - 0.5))
 
     interface Head {
-      /** The three inbound lanes this head speaks for, in order 0,1,2. */
+      /** The three inbound lanes this head speaks for, in order 0 (left),
+       * 1 (straight), 2 (right). */
       lanes: string[]
-      /** red, amber, left+ahead, right — one material each. */
-      aspects: THREE.MeshStandardMaterial[]
+      /** The two shared circles - lit only once nothing on this approach
+       * is being served at all (see the tick loop). */
+      redCircle: THREE.MeshStandardMaterial
+      amberCircle: THREE.MeshStandardMaterial
+      /** One independent arrow per movement, in lane order (left, straight,
+       * right) - each carries its OWN red/amber/green whenever a sibling
+       * movement on this approach is still active. */
+      arrows: THREE.MeshStandardMaterial[]
       bars: { lane: string; mat: THREE.MeshStandardMaterial }[]
     }
     const heads: Head[] = []
@@ -414,35 +435,24 @@ export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
       head.position.set(HEAD_ALONG, HEAD_CENTRE_Y, 0)
       mast.add(pole, arm, head)
 
-      // Four aspects in a row. Red and amber are discs, the two greens
-      // are arrows: one combining left with ahead (they run together in
-      // this program), one for the protected right turn.
-      const aspects: THREE.MeshStandardMaterial[] = []
-      const lensGeoms: (THREE.BufferGeometry | THREE.BufferGeometry[])[] = [
-        discGeom,
-        discGeom,
-        [leftGeom, aheadGeom],
-        rightGeom,
-      ]
-      lensGeoms.forEach((geom, i) => {
+      // Five lenses in a row: a shared red circle, a shared amber circle,
+      // then one independent arrow per movement (left, straight, right) -
+      // the hardware design (Section 34). Every lens gets its own
+      // material, since an arrow now needs to carry red or amber, not
+      // only green.
+      const lensGeoms: THREE.BufferGeometry[] = [discGeom, discGeom, leftGeom, aheadGeom, rightGeom]
+      const mats = lensGeoms.map((geom, i) => {
         const mat = new THREE.MeshStandardMaterial({
           color: LENS_OFF,
           emissive: '#000000',
           side: THREE.DoubleSide,
         })
-        aspects.push(mat)
-        const pieces = Array.isArray(geom) ? geom : [geom]
-        // The combined aspect is two arrows sharing one material, so
-        // lighting it lights both halves together.
-        pieces.forEach((g, part) => {
-          const lens = new THREE.Mesh(g, mat)
-          const nudge = pieces.length > 1 ? (part === 0 ? -0.3 : 0.3) : 0
-          const scale = pieces.length > 1 ? 0.72 : 1
-          lens.scale.set(scale, scale, 1)
-          lens.position.set(HEAD_ALONG + LENS_X[i] + nudge, HEAD_CENTRE_Y, 0.46)
-          mast.add(lens)
-        })
+        const lens = new THREE.Mesh(geom, mat)
+        lens.position.set(HEAD_ALONG + LENS_X[i], HEAD_CENTRE_Y, 0.46)
+        mast.add(lens)
+        return mat
       })
+      const [redCircle, amberCircle, ...arrows] = mats
 
       const stopAt = Math.sign(a.kerb[a.vertical ? 1 : 0]) * (JUNCTION_HALF - 0.6)
       const bars = a.lanePos.map((lanePos, i) => {
@@ -457,7 +467,7 @@ export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
         return { lane: `${a.arm}_in_${i}`, mat }
       })
 
-      heads.push({ lanes: [0, 1, 2].map((i) => `${a.arm}_in_${i}`), aspects, bars })
+      heads.push({ lanes: [0, 1, 2].map((i) => `${a.arm}_in_${i}`), redCircle, amberCircle, arrows, bars })
       scene.add(mast)
     }
 
@@ -681,6 +691,67 @@ export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
     const beaconGeom = own(new THREE.BoxGeometry(0.5, 0.22, 0.4))
     const barGeom = own(new THREE.BoxGeometry(1.5, 0.12, 0.45))
     const barMat = own(new THREE.MeshStandardMaterial({ color: '#1a1a1a', roughness: 0.8 }))
+
+    // A static hazard marker over a stalled vehicle (isStalledVehicleId) -
+    // the scripted accident truck, or one stalled on demand - so it reads
+    // as broken down rather than merely waiting at red. Not blinking, so
+    // it needs no exception to the no-looping-motion rule. The real
+    // road-sign triangle - yellow, black rounded outline, black bar-and-
+    // dot, transparent everywhere else - drawn once onto a canvas and
+    // used as a sprite, which three.js always faces to the camera on its
+    // own: the one marker that has to read correctly from any orbit
+    // angle, so a flat mesh (which would vanish edge-on) is the wrong
+    // shape for the job.
+    function buildHazardTexture(): THREE.CanvasTexture {
+      const size = 128
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d')!
+      ctx.beginPath()
+      ctx.moveTo(size * 0.5, size * 0.06)
+      ctx.lineTo(size * 0.95, size * 0.91)
+      ctx.lineTo(size * 0.05, size * 0.91)
+      ctx.closePath()
+      ctx.fillStyle = '#FFC400'
+      ctx.fill()
+      ctx.lineWidth = size * 0.08
+      ctx.lineJoin = 'round'
+      ctx.strokeStyle = '#000000'
+      ctx.stroke()
+      ctx.fillStyle = '#000000'
+      const bx = size * 0.435, by = size * 0.28, bw = size * 0.13, bh = size * 0.33, br = size * 0.065
+      ctx.beginPath()
+      ctx.moveTo(bx + br, by)
+      ctx.arcTo(bx + bw, by, bx + bw, by + bh, br)
+      ctx.arcTo(bx + bw, by + bh, bx, by + bh, br)
+      ctx.arcTo(bx, by + bh, bx, by, br)
+      ctx.arcTo(bx, by, bx + bw, by, br)
+      ctx.closePath()
+      ctx.fill()
+      ctx.beginPath()
+      ctx.arc(size * 0.5, size * 0.775, size * 0.075, 0, Math.PI * 2)
+      ctx.fill()
+      const texture = new THREE.CanvasTexture(canvas)
+      texture.needsUpdate = true
+      return texture
+    }
+    const hazardTexture = own(buildHazardTexture())
+    const hazardMat = own(new THREE.SpriteMaterial({ map: hazardTexture, transparent: true, depthWrite: false }))
+
+    // Smoke, once a stalled vehicle has actually stopped (the render loop
+    // gates this on its current speed, not just its id): a handful of
+    // puffs per vehicle rising and fading on a loop, big and dark enough
+    // to read against the asphalt. A second exception to the
+    // no-looping-motion rule, made the same way the beacons were - it
+    // reports "broken down right now", not decoration. One shared
+    // geometry, an owned material PER PUFF (opacity is animated per puff,
+    // so it cannot share one) - cheap, since at most a vehicle or two on
+    // screen is ever stalled at once.
+    const smokeGeom = own(new THREE.SphereGeometry(0.55, 10, 10))
+    const SMOKE_RISE = 3.2 // metres climbed over one cycle
+    const SMOKE_CYCLE = 2.4 // seconds
+    const SMOKE_DX = [0, 0.5, -0.4, 0.3, -0.6] // horizontal spread per puff, a real cloud rather than a column
     const emergencyGeom = new Map<string, THREE.BufferGeometry[]>()
     function emergencyParts(typeId: string, shape: VehicleShape): THREE.BufferGeometry[] {
       const hit = emergencyGeom.get(typeId)
@@ -762,6 +833,41 @@ export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
     const fleet = new THREE.Group()
     scene.add(fleet)
 
+    // ---- rain --------------------------------------------------------
+    // Reports the sim's own weather (the Rain scenario) rather than
+    // decorating the scene, the same reasoning as the plate's own rain
+    // layer. Streaks are short line segments that fall at a constant real
+    // rate and respawn at the top when they pass the ground — driven here
+    // rather than by CSS because three.js has no keyframe loop to hook.
+    const RAIN_COUNT = 900
+    const RAIN_HALF = 220 // covers the network with margin at any orbit
+    const RAIN_HEIGHT = 90
+    const RAIN_FALL = 140 // m/s, exaggerated so it reads at this scale
+    const RAIN_LEN = 3.2 // streak length
+    const RAIN_DRIFT = 0.6 // sideways offset over that length - a wind-slant
+    const rainPositions = new Float32Array(RAIN_COUNT * 2 * 3)
+    const dropY = new Float32Array(RAIN_COUNT)
+    const setDrop = (i: number, x: number, y: number, z: number) => {
+      const o = i * 6
+      rainPositions[o] = x
+      rainPositions[o + 1] = y
+      rainPositions[o + 2] = z
+      rainPositions[o + 3] = x - RAIN_DRIFT
+      rainPositions[o + 4] = y - RAIN_LEN
+      rainPositions[o + 5] = z
+      dropY[i] = y
+    }
+    for (let i = 0; i < RAIN_COUNT; i++) {
+      setDrop(i, (Math.random() * 2 - 1) * RAIN_HALF, Math.random() * RAIN_HEIGHT, (Math.random() * 2 - 1) * RAIN_HALF)
+    }
+    const rainGeom = own(new THREE.BufferGeometry())
+    rainGeom.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3))
+    const rainMat = own(new THREE.LineBasicMaterial({ color: '#bcd2e6', transparent: true, opacity: 0.4 }))
+    const rain = new THREE.LineSegments(rainGeom, rainMat)
+    rain.visible = false
+    scene.add(rain)
+    let lastRainTick = performance.now()
+
     let raf = 0
     // The display clock and the poses sampled from the motion buffer
     // each frame (data/motion.ts) - the same mechanism as the plate's
@@ -801,18 +907,39 @@ export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
       if (!on && cars.size > 0) clearFleet()
 
       // ---- signals ----
+      // The hardware design (Section 34, confirmed with the owner): each
+      // movement (left/straight/right) has its OWN arrow, carrying that
+      // movement's own red/amber/green, for as long as anything else on
+      // the same approach is still green. Only once NOTHING on the whole
+      // approach is green does it collapse to the two shared circles -
+      // arrows dark, one plain red (waiting its turn) or one plain amber
+      // (the approach's last green just ended) - because at that point
+      // three individual reds would say nothing three individually cannot
+      // already say once, and a real signal head only needs the one bulb.
+      // This is deliberately read fresh from the CURRENT tick only, with
+      // no lookahead into the next phase - exactly what physical hardware
+      // reading live signal state would have available too.
       const byLane = new Map(ls.map((l) => [l.lane_id, l]))
       const lampFor = (id: string) => (on ? lampOf(byLane.get(id)?.signal ?? 'r') : 'off')
       for (const head of heads) {
-        const [left, ahead, right] = head.lanes.map(lampFor)
-        const anyAmber = left === 'amber' || ahead === 'amber' || right === 'amber'
-        const straightLeft = left === 'green' || ahead === 'green'
-        const rightGreen = right === 'green'
-        const dark = left === 'off'
-        setLens(head.aspects[0], !dark && !anyAmber && !straightLeft && !rightGreen ? RED : null)
-        setLens(head.aspects[1], anyAmber ? AMBER : null)
-        setLens(head.aspects[2], straightLeft ? GREEN : null)
-        setLens(head.aspects[3], rightGreen ? GREEN : null)
+        const lamps = head.lanes.map(lampFor)
+        const dark = lamps[0] === 'off'
+        const anyGreen = lamps.includes('green')
+        const anyAmber = lamps.includes('amber')
+        const wholeApproachQuiet = !anyGreen
+        setLens(head.redCircle, !dark && wholeApproachQuiet && !anyAmber ? RED : null)
+        setLens(head.amberCircle, !dark && wholeApproachQuiet && anyAmber ? AMBER : null)
+        lamps.forEach((lamp, i) => {
+          const colour =
+            dark || wholeApproachQuiet
+              ? null
+              : lamp === 'green'
+                ? GREEN
+                : lamp === 'amber'
+                  ? AMBER
+                  : RED
+          setLens(head.arrows[i], colour)
+        })
         for (const bar of head.bars) {
           const lamp = lampFor(bar.lane)
           setLens(bar.mat, lamp === 'red' ? RED : lamp === 'amber' ? AMBER : lamp === 'green' ? GREEN : null)
@@ -844,8 +971,24 @@ export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
           if (!car) {
             const shape = shapeOf(p.type)
             const group = buildVehicle(shape, p.type ?? '')
+            let smoke: Car['smoke']
+            if (isStalledVehicleId(p.id)) {
+              const hazard = new THREE.Sprite(hazardMat)
+              hazard.scale.set(1.2, 1.2, 1)
+              hazard.position.set(0, shape.height + 0.75, 0)
+              group.add(hazard)
+              const riseFrom = shape.height * 0.6
+              smoke = [0, 0.6, 1.2, 1.8, 2.2].map((phase, i) => {
+                const mat = own(new THREE.MeshStandardMaterial({ color: '#b5b5b5', transparent: true, opacity: 0, roughness: 1 }))
+                const mesh = new THREE.Mesh(smokeGeom, mat)
+                mesh.position.set(shape.length * 0.28 + SMOKE_DX[i], riseFrom, 0)
+                mesh.visible = false
+                group.add(mesh)
+                return { mesh, mat, phase, riseFrom }
+              })
+            }
             fleet.add(group)
-            car = { group, type: p.type ?? '', halfLength: shape.length / 2, beacons: group.userData.beacons }
+            car = { group, type: p.type ?? '', halfLength: shape.length / 2, beacons: group.userData.beacons, smoke }
             cars.set(p.id, car)
           }
           const heading = Math.PI - (p.angle * Math.PI) / 180
@@ -856,6 +999,20 @@ export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
           car.group.position.x = bx - Math.sin(heading) * car.halfLength
           car.group.position.z = bz - Math.cos(heading) * car.halfLength
           car.group.rotation.y = heading
+          // Smoke only while actually stalled (not just "is the stalled
+          // vehicle") - not while it is still driving toward its stop
+          // point, and not once it moves off again at the end of its hold.
+          if (car.smoke) {
+            const stalled = p.speed < 0.3
+            for (const puff of car.smoke) {
+              puff.mesh.visible = stalled
+              if (!stalled) continue
+              const t = (((now / 1000 + puff.phase) % SMOKE_CYCLE) / SMOKE_CYCLE)
+              puff.mesh.position.y = puff.riseFrom + t * SMOKE_RISE
+              puff.mesh.scale.setScalar(0.6 + t * 2.2)
+              puff.mat.opacity = t < 0.25 ? (t / 0.25) * 0.85 : 0.85 * (1 - (t - 0.25) / 0.75)
+            }
+          }
         }
         for (const [id, c] of cars) {
           if (!poses.has(id)) {
@@ -871,6 +1028,24 @@ export function Junction3D({ lanes, powered, motionSide = 'demo' }: Props) {
           c.beacons[1].emissiveIntensity = lit ? 0.08 : 1.4
         }
       }
+
+      // ---- rain: real-time, independent of sim speed - it is weather,
+      // not simulated physics, so it falls at its own constant rate.
+      const isRaining = data.current.raining
+      rain.visible = isRaining
+      if (isRaining) {
+        const dt = Math.min(0.05, (now - lastRainTick) / 1000)
+        for (let i = 0; i < RAIN_COUNT; i++) {
+          const o = i * 6
+          let y = dropY[i] - RAIN_FALL * dt
+          const x = y > 0 ? rainPositions[o] : (Math.random() * 2 - 1) * RAIN_HALF
+          const z = y > 0 ? rainPositions[o + 2] : (Math.random() * 2 - 1) * RAIN_HALF
+          if (y <= 0) y = RAIN_HEIGHT
+          setDrop(i, x, y, z)
+        }
+        rainGeom.attributes.position.needsUpdate = true
+      }
+      lastRainTick = now
 
       controls.update()
       // Compass: world north is -z; the camera's azimuth (its angle

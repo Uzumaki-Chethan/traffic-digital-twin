@@ -44,7 +44,7 @@ export const EVAL_SCENARIOS: ScenarioInfo[] = [
   { id: 'south_heavy_seed1', name: 'South approach heavy', blurb: DIRECTIONAL, demand: 'heavy' },
   { id: 'east_heavy_seed1', name: 'East approach heavy', blurb: DIRECTIONAL, demand: 'heavy' },
   { id: 'west_heavy_seed1', name: 'West approach heavy', blurb: DIRECTIONAL, demand: 'heavy' },
-  { id: 'accident_seed1', name: 'Stalled truck on East', blurb: 'A truck blocks the East straight lane for nine minutes; the rest of the junction must absorb it', demand: 'heavy' },
+  { id: 'accident_seed1', name: 'Accident', blurb: 'A truck blocks the East straight lane for nine minutes; the rest of the junction must absorb it', demand: 'heavy' },
   { id: 'emergency_response_seed1', name: 'Emergency vehicles', blurb: 'Ambulances and fire engines arrive mid-run and must get through', demand: 'moderate' },
   { id: 'rain_seed1', name: 'Rain', blurb: 'Slower, more cautious driving; the same demand takes longer to clear', demand: 'moderate' },
 ]
@@ -62,6 +62,27 @@ const BY_ID = new Map<string, ScenarioInfo>([PRODUCTION_ROUTE, ...EVAL_SCENARIOS
 export function scenarioName(id: string | null | undefined): string {
   if (!id) return '—'
   return BY_ID.get(id)?.name ?? id
+}
+
+/**
+ * Which of the two "put something into the run" controls (layout/
+ * DispatchBar.tsx for emergencies, layout/IncidentBar.tsx for accidents)
+ * leads, on the page's own scenario: the Accident scenario puts Incident
+ * first and Dispatch second; the Emergency scenario (and everything
+ * else, which had only Dispatch before Incident existed) keeps Dispatch
+ * first.
+ */
+export function leadingIncidentTool(scenario: string): 'incident' | 'dispatch' {
+  return scenario.startsWith('accident') ? 'incident' : 'dispatch'
+}
+
+/**
+ * Whether Dispatch/Incident belong on screen at all: only while the page's
+ * own scenario is Accident or Emergency vehicles — everywhere else, on the
+ * user's instruction, there's no need for them.
+ */
+export function showsIncidentControls(scenario: string): boolean {
+  return scenario.startsWith('accident') || scenario.startsWith('emergency')
 }
 
 export const DEMAND_LABEL: Record<Demand, string> = {

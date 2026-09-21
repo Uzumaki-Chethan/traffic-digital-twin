@@ -43,6 +43,12 @@ interface Props {
   /** Identity of the phase being served (utils/signal.phaseKey). When it
    * changes, the release plays once on the lanes that just went green. */
   releaseKey?: number
+  /** True only while the running scenario is Rain (data/pageContext.ts).
+   * Draws falling streaks over the whole plate — the one other exception
+   * to "no looping motion in the periphery" (the emergency beacons are
+   * the first), because it is reporting the sim's own weather rather than
+   * decorating the page. Steady under reduced motion. */
+  raining?: boolean
 }
 
 /** The stop line is the junction edge; the crossing band lies just inside it. */
@@ -54,11 +60,6 @@ const APPROACH_ORDER: Arm[] = ['N', 'S', 'W', 'E']
 
 /** A signal head needs its lane about this wide on screen to be worth drawing. */
 const MIN_LANE_PX = 8
-/** A lane NAME needs far more room than a head: it is 11px of text laid
- * along a lane that also carries traffic, so it only appears once the
- * viewer has zoomed into an approach. At the default framing the four
- * approach names carry the orientation instead. */
-const MIN_LABEL_LANE_PX = 26
 
 /**
  * The hero. A top-down map of junction C at true scale — one SVG unit is
@@ -78,6 +79,7 @@ export function JunctionPlate({
   viewBox,
   pxPerMetre,
   releaseKey = 0,
+  raining = false,
 }: Props) {
   const hoverLane = useSim((s) => s.hoverLane)
   const setHoverLane = useSim((s) => s.setHoverLane)
@@ -90,7 +92,6 @@ export function JunctionPlate({
   // Screen-space scale: inside a group scaled by this, one unit is one pixel.
   const px = 1 / Math.max(pxPerMetre, 1e-6)
   const laneDetail = LANE_W * pxPerMetre >= MIN_LANE_PX
-  const laneNames = LANE_W * pxPerMetre >= MIN_LABEL_LANE_PX
 
   const vb = useMemo(() => {
     const [x, y, w, h] = viewBox.split(' ').map(Number)
@@ -114,6 +115,13 @@ export function JunctionPlate({
         <marker id="arrowhead" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="1.6" markerHeight="1.6" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
           <path d="M 0 1.5 L 10 5 L 0 8.5 z" fill="var(--plate-marking)" />
         </marker>
+        {/* One rain streak tile, 5 x 10 m, with a slight wind-slant. The
+            overlay rect below is translated by exactly one tile height per
+            loop, which is what makes the fall seamless. */}
+        <pattern id="rainStreaks" width="5" height="10" patternUnits="userSpaceOnUse">
+          <line x1="0.5" y1="0" x2="0" y2="4" stroke="#cfe0ee" strokeWidth="0.22" />
+          <line x1="3" y1="5" x2="2.5" y2="9" stroke="#cfe0ee" strokeWidth="0.22" />
+        </pattern>
       </defs>
 
       {/* ground, well past the network so a wide window shows land, not card */}
@@ -224,50 +232,6 @@ export function JunctionPlate({
         </g>
       )}
 
-      {/* Lane names, set OUTSIDE the carriageway on the verge, reading
-          along the lane. On the road they collided with the traffic and
-          with each other — three 11px labels on lanes 9px apart — which
-          is why they only appear once an approach is zoomed in far enough
-          to give each lane real width, and why they sit on the grass
-          rather than under the cars. Barlow, not the mono face: the
-          vendored JetBrains Mono subset has no middle dot, and
-          "North · Left" is words now, not a code. */}
-      {laneNames && (
-        <g
-          fill="var(--plate-ink)"
-          fontFamily="var(--font-ui)"
-          fontSize="11"
-          fontWeight="600"
-          opacity="0.9"
-          stroke="var(--plate-ground)"
-          strokeWidth="3"
-          strokeLinejoin="round"
-          paintOrder="stroke"
-        >
-          {LANES.map((g) => {
-            const p = stopLinePoint(g)
-            // Out past the kerb on the side this carriageway faces, and
-            // staggered ALONG the verge by lane index — 26 / 52 / 78 m
-            // back from the line. All three at one distance would land on
-            // the same point now that they share an outward offset.
-            const back = 26 + g.index * 26
-            const outward = ROAD_HALF + 5
-            const side = g.approach === 'N' || g.approach === 'E' ? 1 : -1
-            const x = g.axis === 'v' ? CENTRE + outward * side : p.x - g.dir * back
-            const y = g.axis === 'v' ? p.y - g.dir * back : CENTRE + outward * side
-            // Vertical arms read top-to-bottom; horizontal ones stay level.
-            const rotate = g.axis === 'v' ? 90 * g.dir : 0
-            return (
-              <g key={g.id} transform={`translate(${x} ${y}) rotate(${rotate}) scale(${px})`}>
-                <text textAnchor="middle" dominantBaseline="middle">
-                  {laneLabel(g.id)}
-                </text>
-              </g>
-            )
-          })}
-        </g>
-      )}
-
       {/* Approach names, pinned to the edges of the CURRENT window rather
           than to the ends of the arms — at the default junction framing
           the arm ends are off screen, which left the plate with no
@@ -326,6 +290,22 @@ export function JunctionPlate({
             />
           )
         })}
+
+      {/* Rain, reporting the sim's own weather (the Rain scenario), not
+          decorating the page — drawn last so it falls over everything,
+          the way it would over a real photograph of the junction. */}
+      {raining && (
+        <rect
+          className={reduced ? undefined : 'rain-fall'}
+          x={-NET * 4}
+          y={-NET * 4}
+          width={NET * 9}
+          height={NET * 9}
+          fill="url(#rainStreaks)"
+          opacity="0.4"
+          pointerEvents="none"
+        />
+      )}
     </svg>
   )
 }

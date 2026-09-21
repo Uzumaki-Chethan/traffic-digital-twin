@@ -227,9 +227,12 @@ Five pages:
   with a button that returns there; a plain scroll scrolls the page) or an
   interactive 3D miniature (drag to orbit, Ctrl + scroll to zoom), both
   drawing the real SUMO vehicles at their real size — emergency vehicles with
-  blinking light bars — and a **Dispatch** bar to send an ambulance, fire
-  engine or police car in from any approach while a run is live (on
-  Performance it enters both simulations at once); active phase with its decision mode and reason;
+  blinking light bars, and a stalled vehicle with a hazard marker — a
+  **Dispatch** bar to send an ambulance, fire engine or police car in from any
+  approach while a run is live, and an **Incident** bar to stall a truck, bus
+  or car on any lane for two minutes — an ad hoc accident, not only the
+  scripted `Accident` scenario's own East-approach truck (on Performance
+  either enters both simulations at once); active phase with its decision mode and reason;
   the twelve lanes with live signal state; **Why this phase** (the four phase
   scores against the switch boundary — the engine's own margin, drawn) and
   the last five switches with their rule; a 60 s phase-history band; and
@@ -256,7 +259,7 @@ Five pages:
   end also writes `results/comparison_<scenario>.csv`, exactly as a
   terminal run does; one stopped early does not.
 - **Simulation Settings** — the thirteen scenarios as cards with
-  plain-language names ("Rush hour", "Stalled truck on East") and one-line
+  plain-language names ("Rush hour", "Accident") and one-line
   descriptions, shown once; a dropdown says whether a click chooses for
   Overview or for Performance, and each card marks the page(s) currently
   set to run it. Overview starts on Balanced traffic, Performance on
@@ -428,6 +431,24 @@ passes the resulting lane set straight into
 override logic (minimum-safety-green cut-in + 15 s service window)
 prioritizes those lanes. No detection or prioritization logic exists
 anywhere outside the adapter (detection) and DecisionEngine (action).
+
+## Ad hoc accidents
+
+`POST /api/control/dispatch-incident {vehicle_type, approach, turn}` queues
+one vehicle on `RunControl` the same way emergency dispatch does; the run
+loops drain it through `TrafficAdapter.stall_vehicle`, which adds the
+vehicle and immediately schedules a TraCI stop on the chosen lane for a
+fixed duration (default 120 s) — an ad hoc accident, on any of the twelve
+lanes, without touching the scripted `accident` scenario or its recorded
+13-scenario sweep. The evaluator drains it into both simulations, same
+vehicle, same lane, same step, and the supervisor skips the results CSV
+for a run with incidents, exactly as it does for dispatched emergency
+vehicles. No changes were needed anywhere in the Decision Engine or the
+ML model: a physically blocked lane is just more congestion, which the
+existing scoring already responds to. The frontend's `IncidentBar` is the
+`DispatchBar`'s sibling; both views mark the stalled vehicle with a static
+hazard icon (`isStalledVehicleId`, matched on the vehicle id — the scripted
+scenario's own `accident_vehicle` or a dispatched `incident_<n>_<type>`).
 
 ## Database logging (SQLite)
 

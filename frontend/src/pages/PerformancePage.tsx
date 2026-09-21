@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useSim } from '@/data/store'
 import { useRunStore } from '@/data/runState'
+import { usePageContext } from '@/data/pageContext'
 import { isEvaluation, type EvaluationSnapshot } from '@/data/types'
 import { getEvalSamples, useEvalHistory } from '@/data/evalHistory'
 import { verdictFor } from '@/data/verdict'
@@ -9,6 +10,8 @@ import { ControllerWindow } from '@/performance/ControllerWindow'
 import { HOME_VIEW, type View } from '@/overview/usePanZoom'
 import { EmptyMetricBlock, METRIC_KEYS, MetricBlock } from '@/performance/MetricBlock'
 import { DispatchBar } from '@/layout/DispatchBar'
+import { IncidentBar } from '@/layout/IncidentBar'
+import { leadingIncidentTool, showsIncidentControls } from '@/data/scenarios'
 
 /**
  * Trinetra against vehicle-actuated control on the identical scenario,
@@ -32,6 +35,7 @@ export function PerformancePage() {
   const link = useSim((s) => s.link)
   const run = useRunStore((s) => s.state)
   const failure = useRunStore((s) => s.failure)
+  const { scenario } = usePageContext()
   // Subscribing to `revision` is what re-renders this page as samples
   // arrive (at most once a second); the samples themselves live outside
   // the store so a 3 600-entry array is never copied per tick.
@@ -50,6 +54,9 @@ export function PerformancePage() {
   const haveResults = rows.length > 0
   const powered = frame !== null && !ended
   const dimmed = link !== 'open' && powered
+  const raining = powered && scenario.startsWith('rain')
+  const incidentFirst = leadingIncidentTool(scenario) === 'incident'
+  const showIncidentControls = showsIncidentControls(scenario)
 
   const demoActive = run?.running === true && run.kind === 'demo'
   const starting = run?.running === true && run.kind === 'evaluation' && frame === null
@@ -65,7 +72,21 @@ export function PerformancePage() {
 
   return (
     <div className={dimmed ? 'flex flex-col gap-2 opacity-70 transition-opacity' : 'flex flex-col gap-2 transition-opacity'}>
-      <DispatchBar />
+      {showIncidentControls && (
+        <div className="flex flex-wrap gap-2">
+          {incidentFirst ? (
+            <>
+              <IncidentBar />
+              <DispatchBar />
+            </>
+          ) : (
+            <>
+              <DispatchBar />
+              <IncidentBar />
+            </>
+          )}
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <Reveal index={0}>
           <ControllerWindow
@@ -77,6 +98,7 @@ export function PerformancePage() {
             simTime={frame?.sim_time}
             note={note}
             motionSide="ai"
+            raining={raining}
           />
         </Reveal>
         <Reveal index={1}>
@@ -89,6 +111,7 @@ export function PerformancePage() {
             simTime={frame?.sim_time}
             note={note}
             motionSide="baseline"
+            raining={raining}
           />
         </Reveal>
       </div>

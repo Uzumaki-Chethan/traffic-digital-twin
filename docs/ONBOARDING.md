@@ -139,7 +139,7 @@ before implementing" rule — say no, or point it back at your branch.
 | project rules, known deviations, commands | `CLAUDE.md` |
 | quick start, results, status | `README.md` |
 | the full engineering history (read the highest-numbered `SECTION N — … (CURRENT STATE)` first) | `PROJECT_ARCHITECTURE_REPORT.md` |
-| the UI design brief (data rules, banned defaults, page plan) | `docs/design/TRINETRA_UI_DESIGN_BRIEF.md` |
+| binding UI rules (data rules, content inventory, how to check a change) | `docs/UI_CHANGE_RULES.md` |
 | what's verified vs. still open in the frontend | `frontend/README.md` |
 | backend entry points | `backend/server.py` (console), `backend/app.py` (one run) |
 | the trained model (LFS) | `backend/ml/trained_models/` |

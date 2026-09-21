@@ -419,6 +419,18 @@ class PerformanceEvaluator:
                                 adapter.add_vehicle(vid, route_id, vehicle_type)
                             except Exception:
                                 logger.exception("Could not dispatch %s on %s.", vehicle_type, route_id)
+                    # Ad hoc accidents go into BOTH simulations too, same
+                    # vehicle, same lane, same step - see the dispatch
+                    # comment above for why. A run with incidents is not
+                    # the library's scenario any more either, so its CSV
+                    # is never saved (see the supervisor).
+                    for n, vehicle_type, route_id, edge_id, lane_index, duration in control.take_incidents():
+                        vid = "incident_{}_{}".format(n, vehicle_type)
+                        for adapter in (adapter_ai, adapter_base):
+                            try:
+                                adapter.stall_vehicle(vid, route_id, vehicle_type, edge_id, lane_index, duration)
+                            except Exception:
+                                logger.exception("Could not stall %s on %s.", vehicle_type, route_id)
 
                 # Motion frames between ticks for the Performance page's
                 # two plates (see snapshot_views.motion_frame): the last

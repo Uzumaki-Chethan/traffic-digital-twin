@@ -21,13 +21,14 @@ const TYPES = [
   { id: 'fire_engine', label: 'Fire engine' },
   { id: 'police_vehicle', label: 'Police' },
 ] as const
-const APPROACHES = [
+// Shared with IncidentBar — the same twelve lanes, the same picker.
+export const APPROACHES = [
   { id: 'N', label: 'North' },
   { id: 'S', label: 'South' },
   { id: 'E', label: 'East' },
   { id: 'W', label: 'West' },
 ] as const
-const TURNS = [
+export const TURNS = [
   { id: 'left', label: 'turning left' },
   { id: 'straight', label: 'going straight' },
   { id: 'right', label: 'turning right' },
@@ -85,7 +86,7 @@ export function DispatchBar() {
   )
 }
 
-function Sel({
+export function Sel({
   value,
   onChange,
   options,

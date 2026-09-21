@@ -79,6 +79,8 @@ class RunControl:
         self._lock = threading.Lock()
         self._dispatch_queue = []
         self._dispatch_seq = 0
+        self._incident_queue = []
+        self._incident_seq = 0
         self._speed = self._clean_speed(speed)
         self._anchor_wall = None
         self._anchor_sim = 0.0
@@ -115,6 +117,7 @@ class RunControl:
             "handing_over": self.handover_requested,
             "speed": self.speed,
             "dispatched": self.dispatched,
+            "incidents": self.incidents,
         }
 
     # ---- emergency dispatch ---------------------------------------------
@@ -145,6 +148,34 @@ class RunControl:
     def dispatched(self) -> int:
         """How many emergency vehicles have been dispatched into this run."""
         return self._dispatch_seq
+
+    # ---- incidents (ad hoc accidents) ------------------------------------
+    #
+    # The same idea as emergency dispatch, above, for the opposite case: a
+    # vehicle the reader chooses to stall on a lane of their choosing, for
+    # a fixed duration, rather than only the `accident` scenario's scripted
+    # East-approach truck. Its own queue, not the emergency one, because
+    # the two are drained into different TrafficAdapter calls.
+
+    def request_incident(self, vehicle_type: str, route_id: str, edge_id: str, lane_index: int, duration: float) -> int:
+        """Queue one stalled vehicle. Returns its incident number."""
+        with self._lock:
+            self._incident_seq += 1
+            n = self._incident_seq
+            self._incident_queue.append((n, vehicle_type, route_id, edge_id, lane_index, duration))
+            return n
+
+    def take_incidents(self):
+        """Run loop: everything queued since last asked, as (n, type, route, edge, lane_index, duration)."""
+        with self._lock:
+            items = list(self._incident_queue)
+            self._incident_queue.clear()
+            return items
+
+    @property
+    def incidents(self) -> int:
+        """How many vehicles have been stalled into this run on demand."""
+        return self._incident_seq
 
     # ---- called by the web side -----------------------------------------
 

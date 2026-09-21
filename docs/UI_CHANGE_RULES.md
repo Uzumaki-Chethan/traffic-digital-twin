@@ -1,9 +1,9 @@
 # UI change rules and the content inventory
 
-**Status:** binding from 2026-09-17 (tag `prototype-1`). Written for whoever
-works on the interface next — the owner, a teammate on a `design/<name>`
-branch, or Claude Code driving either — and read by Claude at the start of
-any UI task (`CLAUDE.md` points here).
+**Status:** binding from 2026-09-17 (tag `prototype-1`); the inventory below was brought
+current and re-tagged `prototype-2` on 2026-09-21 (§5). Written for whoever works on the
+interface next — the owner, a teammate on a `design/<name>` branch, or Claude Code driving
+either — and read by Claude at the start of any UI task (`CLAUDE.md` points here).
 
 ## 1. The one rule
 
@@ -35,7 +35,8 @@ each fact it carried is still shown. An item shown only on hover, in a
 tooltip, or behind a click does **not** count as present unless it was that
 way before the change.
 
-## 2. Data rules that still bind (from the design brief)
+## 2. Data rules that still bind (carried forward from the original design brief, retired
+2026-09-20 — this file is now the only one)
 
 - No invented numbers: every value comes from a field the backend sends
   (`frontend/src/data/types.ts`, `api.ts`). If a panel needs data that does
@@ -85,13 +86,27 @@ change on the page you touched (and any page you moved something to or from).
   compass that turns with the camera), with: all 12 inbound lanes filled by
   signal state, the junction box, kerbs, lane dividers, painted turn arrows,
   stop bars, signal heads with lamps, the compass, the four approach names,
-  lane names when zoomed in, every vehicle at its real size/type/position/
-  heading, emergency vehicles with their blinking light bars (both views), the
-  green **release** sweep on a confirmed green, emergency-lane hatching; panel
-  meta: green/red lane counts and vehicle count.
+  every vehicle at its real size/type/position/heading, emergency vehicles
+  with their blinking light bars (both views), the green **release** sweep on
+  a confirmed green, emergency-lane hatching, **falling rain (both views)
+  while the Rain scenario is running**; panel meta: green/red lane counts and
+  vehicle count. (Per-lane names shown on the plate itself when zoomed in
+  were removed on 2026-09-20 on the owner's explicit instruction — the four
+  approach names and the Lanes panel's own rows still carry that
+  information.)
 - **Dispatch bar** (under the plate; also above the Performance windows): send
   an emergency vehicle — vehicle type, approach, turn, Send — with the count
-  dispatched this run; shown only while the page's run is live.
+  dispatched this run. Shown only while the page's run is live **and** its
+  scenario is Accident or Emergency vehicles — on any other scenario neither
+  this nor Incident renders at all (owner's instruction, 2026-09-20:
+  `data/scenarios.ts`'s `showsIncidentControls`). Whichever of Dispatch/
+  Incident matches the page's own running scenario (Accident → Incident,
+  Emergency → Dispatch) renders first.
+- **Incident bar** (beside Dispatch, same placement, same Accident/Emergency
+  gating): stall a truck, bus or car on any lane for a fixed duration — an ad
+  hoc accident, on demand — with the count stalled this run. The
+  stalled vehicle carries a hazard marker (the road-sign triangle) in both
+  views from the moment it enters, and smoke once it has actually stopped.
 - **Active phase panel:** phase (name and plain label), decision mode chip
   with its one-sentence explanation, the engine's **reason** text, **green
   held** seconds (or amber remaining) against the min/max window with the
@@ -125,7 +140,10 @@ change on the page you touched (and any page you moved something to or from).
 
 - Two **controller windows** (Trinetra / Vehicle-actuated control), each a
   plan-view junction with its own zoom/pan and a **Match** button, header meta
-  with phase, vehicles and wait; idle/starting/other-run-active notes.
+  with phase, vehicles and wait; idle/starting/other-run-active notes; falling
+  rain in both windows while the evaluation's scenario is Rain; a Dispatch bar
+  and an Incident bar above the windows (only while the scenario is Accident
+  or Emergency vehicles), entering both sides at once.
 - The **summary line** ("Trinetra ahead or even on k of 7 metrics", so far /
   final, tick count).
 - **Seven metric blocks** (average waiting time, average travel time, worst
@@ -168,7 +186,13 @@ change on the page you touched (and any page you moved something to or from).
 
 ## 5. The revert point
 
-`git tag prototype-1` (commit `d9afd01`, 2026-09-17) is the state this
-inventory describes. To see it: `git checkout prototype-1`. To take `main`
-back to it: `git revert <bad commits>` (keeps history) or, with the owner's
-say-so, `git reset --hard prototype-1 && git push --force-with-lease`.
+`git tag prototype-2` is the current working prototype and revert point, current as of
+2026-09-21 — rain (Section 31), ad hoc accidents with a hazard marker and smoke (Section
+32-32.1), the design brief and its skills retired (Section 33), and the 3D signal head
+redesigned to match the physical hardware the owner is building (Section 34) all landed on
+`main` since `prototype-1`. To see it: `git checkout prototype-2`. To take `main` back to
+it: `git revert <bad commits>` (keeps history) or, with the owner's say-so, `git reset
+--hard prototype-2 && git push --force-with-lease`.
+
+`git tag prototype-1` (commit `d9afd01`, 2026-09-17) is the earlier prototype this one
+superseded — still there to check out, no longer the one to revert to.

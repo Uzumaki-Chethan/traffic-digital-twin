@@ -157,3 +157,22 @@ def test_dispatch_is_queued_on_the_run_control_and_refused_when_idle(console):
     assert sup.run_control.take_dispatches() == [(1, "fire_engine", "route_E_W")]
     assert sup.run_control.take_dispatches() == []
     assert client.get("/api/control/run-state").json()["dispatched"] == 1
+
+
+def test_incident_is_queued_on_the_run_control_and_refused_when_idle(console):
+    client, sup, fake = console
+    r = client.post("/api/control/dispatch-incident", json={"vehicle_type": "truck", "approach": "E", "turn": "straight"})
+    assert r.status_code == 409  # nothing running
+    client.post("/api/control/start-simulation", json={"scenario_name": "light_seed1"})
+    assert fake.started.wait(2.0)
+    r = client.post("/api/control/dispatch-incident", json={"vehicle_type": "truck", "approach": "E", "turn": "straight"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["route"] == "route_E_W" and body["incidents"] == 1 and body["duration"] == 120.0
+    r = client.post("/api/control/dispatch-incident", json={"vehicle_type": "spaceship", "approach": "E", "turn": "straight"})
+    assert r.status_code == 400
+    r = client.post("/api/control/dispatch-incident", json={"vehicle_type": "truck", "approach": "E", "turn": "straight", "duration": 5000})
+    assert r.status_code == 400
+    assert sup.run_control.take_incidents() == [(1, "truck", "route_E_W", "E_in", 1, 120.0)]
+    assert sup.run_control.take_incidents() == []
+    assert client.get("/api/control/run-state").json()["incidents"] == 1

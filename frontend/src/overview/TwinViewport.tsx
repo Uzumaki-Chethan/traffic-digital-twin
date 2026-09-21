@@ -39,6 +39,7 @@ export function TwinViewport({
   matchView,
   releaseKey,
   motionSide = 'demo',
+  raining = false,
 }: {
   lanes: LaneView[]
   emergencyLanes: string[]
@@ -55,6 +56,8 @@ export function TwinViewport({
   releaseKey?: number
   /** Which fleet to draw: the demo's, or one side of an evaluation (data/motion.ts). */
   motionSide?: MotionSide
+  /** True only while the running scenario is Rain (data/pageContext.ts). */
+  raining?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const stage = useRef<HTMLDivElement>(null)
@@ -129,12 +132,13 @@ export function TwinViewport({
             pxPerMetre={pan.pxPerMetre}
             releaseKey={releaseKey}
             motionSide={motionSide}
+            raining={raining}
           />
         ) : (
           <Suspense
             fallback={<div className="flex h-full items-center justify-center text-[13px] text-ink">Loading 3D model…</div>}
           >
-            <Junction3D lanes={lanes} vehicles={vehicles} powered={powered} motionSide={motionSide} />
+            <Junction3D lanes={lanes} vehicles={vehicles} powered={powered} motionSide={motionSide} raining={raining} />
           </Suspense>
         )}
       </div>

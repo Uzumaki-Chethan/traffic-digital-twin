@@ -327,6 +327,31 @@ class TrafficAdapter:
             depart="now", departLane="best", departSpeed="max",
         )
 
+    def stall_vehicle(
+        self, vehicle_id: str, route_id: str, type_id: str,
+        edge_id: str, lane_index: int, duration: float, pos: float = 80.0,
+    ) -> None:
+        """
+        Put one vehicle of `type_id` onto `route_id` now, exactly like
+        add_vehicle, then immediately schedule it to stop on
+        `edge_id`/`lane_index` for `duration` seconds - an ad hoc
+        accident, on whichever lane the caller chose, for the console's
+        incident dispatch. `pos` defaults to 80 m into the (178.4 m)
+        inbound edge, matching the recorded `accident` scenario's own
+        scripted stop (sumo/scenarios/demo/accident.rou.xml:
+        `<stop lane="E_in_1" endPos="80" duration="550"/>`) so a
+        dispatched incident reads the same way that one does. Like
+        add_vehicle, this is the adapter's write, not a decision: which
+        lane and for how long are the caller's choice.
+        """
+        if not self._traci_manager.is_connected:
+            raise RuntimeError("TrafficAdapter cannot stall a vehicle: not connected.")
+        self._traci.vehicle.add(
+            vehicle_id, route_id, typeID=type_id,
+            depart="now", departLane="best", departSpeed="max",
+        )
+        self._traci.vehicle.setStop(vehicle_id, edge_id, pos=pos, laneIndex=lane_index, duration=duration)
+
     def get_emergency_vehicle_lanes(self) -> frozenset:
         """
         Return the set of lane IDs that currently hold at least one

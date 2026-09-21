@@ -238,9 +238,10 @@ class SimulationSupervisor:
                 # replace the completed run's CSV that README.md cites.
                 if control.stop_requested:
                     logger.info("Evaluation stopped early; results CSV left untouched.")
-                elif control.dispatched:
-                    logger.info("Evaluation had %d dispatched vehicle(s); results CSV left "
-                                "untouched - it is not the library scenario.", control.dispatched)
+                elif control.dispatched or control.incidents:
+                    logger.info("Evaluation had %d dispatched vehicle(s) and %d stalled vehicle(s); "
+                                "results CSV left untouched - it is not the library scenario.",
+                                control.dispatched, control.incidents)
                 else:
                     PerformanceEvaluator.save_csv(result)
 

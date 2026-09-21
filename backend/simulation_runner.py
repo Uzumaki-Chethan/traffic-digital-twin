@@ -437,6 +437,19 @@ def run_simulation(store, control=None, *, gui=None, base_config=Config,
                         logger.info("Dispatched %s on %s (#%d).", vehicle_type, route_id, n)
                     except Exception:
                         logger.exception("Could not dispatch %s on %s.", vehicle_type, route_id)
+                # Ad hoc accidents: stall one vehicle on the chosen lane
+                # for a fixed duration (control_routes.py's
+                # /dispatch-incident), the same queue-and-drain shape as
+                # emergency dispatch just above.
+                for n, vehicle_type, route_id, edge_id, lane_index, duration in control.take_incidents():
+                    try:
+                        adapter.stall_vehicle(
+                            "incident_{}_{}".format(n, vehicle_type), route_id, vehicle_type,
+                            edge_id, lane_index, duration,
+                        )
+                        logger.info("Stalled %s on %s for %.0fs (#%d).", vehicle_type, route_id, duration, n)
+                    except Exception:
+                        logger.exception("Could not stall %s on %s.", vehicle_type, route_id)
             if not steps_per_tick:
                 return
             step_count[0] += 1

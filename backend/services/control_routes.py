@@ -109,12 +109,37 @@ class DispatchRequest(BaseModel):
     turn: str = "straight"
 
 
+class IncidentRequest(BaseModel):
+    """
+    Stall one vehicle on the chosen approach/turn (= lane, on this
+    network - see dispatch_route_id) for `duration` simulated seconds: an
+    ad hoc accident, on demand, on any of the twelve lanes rather than
+    only the `accident` scenario's scripted East-approach truck. Same
+    validation and the same "refused when nothing is running" rule as
+    DispatchRequest above.
+    """
+    vehicle_type: str = "truck"
+    approach: str = "N"
+    turn: str = "straight"
+    duration: float = 120.0
+
+
 # The library's emergency vTypes (sumo/vehicles/vehicle_types.add.xml) and
 # the network's turn geometry: left-hand traffic, so from the North arm
 # (travelling south) a left turn goes East.
 DISPATCH_TYPES = ("ambulance", "fire_engine", "police_vehicle")
+# Ordinary vTypes worth stalling - a broken-down truck or bus is a far
+# likelier real accident than a car, but all three are offered.
+INCIDENT_TYPES = ("truck", "bus", "car_normal")
 _LEFT_OF = {"N": "E", "S": "W", "E": "S", "W": "N"}
 _OPPOSITE = {"N": "S", "S": "N", "E": "W", "W": "E"}
+# SUMO's own lane index for each turn on this network, confirmed against
+# intersection.net.xml's <connection> elements (e.g. `from="N_in"
+# fromLane="0" dir="l"`, `fromLane="1" dir="s"`, `fromLane="2" dir="r"`) -
+# keep-left, so the kerb lane (0) is the left turn and the median lane
+# (2) is the right turn, identical on all four approaches.
+_TURN_LANE_INDEX = {"left": 0, "straight": 1, "right": 2}
+_INCIDENT_DURATION_RANGE = (5.0, 300.0)
 
 
 def dispatch_route_id(approach: str, turn: str) -> str:
@@ -281,6 +306,38 @@ def build_control_router(store: LiveStateStore, run_control=None,
             raise HTTPException(status_code=409, detail="Nothing is running to dispatch into.")
         n = run_control.request_dispatch(body.vehicle_type, route_id)
         return {"dispatched": n, "vehicle_type": body.vehicle_type, "route": route_id, **_run_state_dict()}
+
+    @router.post("/api/control/dispatch-incident")
+    async def dispatch_incident(body: IncidentRequest):
+        """
+        Stall one vehicle on the chosen lane, now, for `duration` seconds:
+        an ad hoc accident, on demand. Refused when nothing is running.
+        On an evaluation it enters both simulations, same vehicle, same
+        lane, same step, so the comparison stays a comparison.
+        """
+        _require_run_control("stall a vehicle for")
+        if body.vehicle_type not in INCIDENT_TYPES:
+            raise HTTPException(status_code=400, detail="Unknown incident vehicle type.")
+        lo, hi = _INCIDENT_DURATION_RANGE
+        if not lo <= body.duration <= hi:
+            raise HTTPException(
+                status_code=400,
+                detail="duration must be between {:.0f} and {:.0f} seconds.".format(lo, hi),
+            )
+        try:
+            route_id = dispatch_route_id(body.approach, body.turn)
+            lane_index = _TURN_LANE_INDEX[body.turn]
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        state = _run_state_dict()
+        if not state.get("running"):
+            raise HTTPException(status_code=409, detail="Nothing is running to stall a vehicle in.")
+        edge_id = "{}_in".format(body.approach)
+        n = run_control.request_incident(body.vehicle_type, route_id, edge_id, lane_index, body.duration)
+        return {
+            "incidents": n, "vehicle_type": body.vehicle_type, "route": route_id,
+            "duration": body.duration, **_run_state_dict(),
+        }
 
     @router.post("/api/control/start-simulation")
     async def start_simulation(body: StartSimulationRequest):

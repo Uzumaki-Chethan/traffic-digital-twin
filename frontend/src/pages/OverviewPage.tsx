@@ -1,5 +1,6 @@
 import { useSim } from '@/data/store'
 import { useRunStore } from '@/data/runState'
+import { usePageContext } from '@/data/pageContext'
 import { isLive, type LiveSnapshot } from '@/data/types'
 import { Panel } from '@/ui/Panel'
 import { Reveal } from '@/ui/Reveal'
@@ -12,6 +13,8 @@ import { PredictionPanel } from '@/overview/PredictionPanel'
 import { ScoreLedger } from '@/overview/ScoreLedger'
 import { RecentSwitches } from '@/overview/RecentSwitches'
 import { DispatchBar } from '@/layout/DispatchBar'
+import { IncidentBar } from '@/layout/IncidentBar'
+import { leadingIncidentTool, showsIncidentControls } from '@/data/scenarios'
 import { lampOf, phaseKey } from '@/utils/signal'
 
 const EMPTY: LiveSnapshot = {
@@ -41,6 +44,7 @@ export function OverviewPage() {
   const lastLive = useSim((s) => s.lastLive)
   const link = useSim((s) => s.link)
   const run = useRunStore((s) => s.state)
+  const { scenario } = usePageContext()
 
   const live = isLive(latest) ? latest : lastLive
   // A STOPPED run is not a paused one: the traffic it was showing no
@@ -53,6 +57,11 @@ export function OverviewPage() {
   const powered = live !== null && !ended
   const snap = powered ? (live ?? EMPTY) : EMPTY
   const dimmed = link !== 'open' && powered
+  // The scenario the run is actually playing, not the id — running the
+  // Rain scenario is the only thing that turns the falling streaks on.
+  const raining = powered && scenario.startsWith('rain')
+  const incidentFirst = leadingIncidentTool(scenario) === 'incident'
+  const showIncidentControls = showsIncidentControls(scenario)
 
   const greens = snap.lanes.filter((l) => lampOf(l.signal) === 'green').length
   const reds = snap.lanes.filter((l) => lampOf(l.signal) === 'red').length
@@ -87,10 +96,23 @@ export function OverviewPage() {
               vehicles={snap.vehicles}
               powered={powered}
               releaseKey={phaseKey(snap.sim_time, snap.decision.duration)}
+              raining={raining}
             />
-            <div className="mt-2">
-              <DispatchBar />
-            </div>
+            {showIncidentControls && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {incidentFirst ? (
+                  <>
+                    <IncidentBar />
+                    <DispatchBar />
+                  </>
+                ) : (
+                  <>
+                    <DispatchBar />
+                    <IncidentBar />
+                  </>
+                )}
+              </div>
+            )}
           </Panel>
 
           <Reveal index={3}>

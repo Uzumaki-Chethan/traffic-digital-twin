@@ -19,6 +19,7 @@ export function ControllerWindow({
   simTime,
   note,
   motionSide,
+  raining = false,
 }: {
   title: string
   side: SideView | null
@@ -27,6 +28,8 @@ export function ControllerWindow({
   note?: string
   /** Which evaluation fleet this window draws. */
   motionSide: 'ai' | 'baseline'
+  /** True only while the running evaluation's scenario is Rain. */
+  raining?: boolean
   /** The frame's simulated time, for the plate's release timing. */
   simTime?: number
   /** This window's own pan/zoom, owned by the page so the other window can read it. */
@@ -66,6 +69,7 @@ export function ControllerWindow({
         matchView={matchView}
         motionSide={motionSide}
         releaseKey={phaseKey(simTime, side?.decision.duration)}
+        raining={raining}
       />
     </Panel>
   )

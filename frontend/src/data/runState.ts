@@ -40,6 +40,9 @@ export interface RunState {
   started_at?: string | null
   /** Emergency vehicles dispatched into this run from the console (2026-09-18). */
   dispatched?: number
+  /** Vehicles stalled into this run on demand — an ad hoc accident, on
+   * whichever lane was chosen (2026-09-20). */
+  incidents?: number
   /** What the console's worker is running (2026-09-14): a demo run, an
    * evaluation (Trinetra vs a baseline, see the Performance page), or
    * nothing. Only the console reports it. */
@@ -171,6 +174,10 @@ export const runControl = {
   /** Send an emergency vehicle into the running simulation (both sides of an evaluation). */
   dispatch: (vehicleType: string, approach: string, turn: string) =>
     send('/api/control/dispatch', { vehicle_type: vehicleType, approach, turn }),
+  /** Stall a vehicle on the chosen lane — an ad hoc accident, on demand
+   * (both sides of an evaluation). */
+  stall: (vehicleType: string, approach: string, turn: string) =>
+    send('/api/control/dispatch-incident', { vehicle_type: vehicleType, approach, turn }),
   /**
    * Continue the running simulation in a SUMO window. Not a restart: the
    * run saves its state and resumes from it, so the same vehicles and

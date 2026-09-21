@@ -321,10 +321,15 @@ unprompted, but do keep this section current if that changes:
   hysteresis margin) and "Recent switches" (30.12). `decision_log` rows now store
   `phase_scores`, `margin` and `scenario` for it. No placeholder pages remain. Lane ids
   (`N_in_0`) no longer render anywhere — every lane is "North · Left"
-  (`utils/signal.laneLabel`). The design contract is
-  `docs/design/TRINETRA_UI_DESIGN_BRIEF.md` (its reference-kit process was dropped by the
-  user; its data rules, banned-defaults list and page plan still apply). Two standing rules
-  from the user: **never show prediction confidence anywhere in the UI**, and do NOT
+  (`utils/signal.laneLabel`). **`docs/design/` (the original UI design brief and its
+  archive) was retired 2026-09-20, at the user's explicit instruction** — he judged it was
+  constraining the interface's direction rather than helping it, on top of the several
+  parts it already carried that his own later choices had superseded (motion, palette,
+  the reference-kit process). `docs/UI_CHANGE_RULES.md` is now the one binding UI contract;
+  it already carries forward the brief's essential data rules (no invented numbers, no
+  confidence in the UI, no internal jargon) in its own §2, so nothing was lost when the
+  brief left. Two standing rules from the user: **never show prediction confidence
+  anywhere in the UI**, and do NOT
   reintroduce neon/glassmorphism (a Gemini prompt proposing exactly that was reviewed and
   rejected on 2026-09-11 — it also assumed a Flask/Socket.IO backend that doesn't exist).
   A 3D miniature of the junction DOES exist now, at the user's explicit request
@@ -348,16 +353,20 @@ unprompted, but do keep this section current if that changes:
   **Motion has one vocabulary (2026-09-15, Section 29):** `src/ui/motion.ts` plus the
   `--dur-*`/`--ease-*` tokens, spent on the signal release (the arrow sweep and lamp bloom
   on a confirmed green, triggered by the derived `utils/signal.phaseKey`), data tweens,
-  pointer answers, and a once-per-page arrival. The design brief's blanket motion ban was
-  lifted BY THE USER and the brief amended to match - read its status header before
-  treating any of it as binding, because several parts are superseded by his later
-  choices. Still banned: looping in the periphery, glow pulses, and depending on an
-  animation finishing for correctness. Analytics reads the LIVE stream only, by
+  pointer answers, and a once-per-page arrival. The original design brief's blanket motion
+  ban was lifted by the user well before the brief itself was retired (see above); still
+  banned: looping in the periphery (with two owner-approved exceptions so far — the
+  emergency light bars, Section 30.18, and rain, Section 31), glow pulses, and depending on
+  an animation finishing for correctness. Analytics reads the LIVE stream only, by
   explicit instruction — see PROJECT_ARCHITECTURE_REPORT.md Section 23.4 before pointing it
   back at the database. See `frontend/README.md` for what's verified vs. still open (logo
   asset lost, no visual verification in the build environment).
 - No ESP32/physical hardware integration exists (the `firmware/` directory is empty) —
-  the project is SUMO-simulation-only.
+  the project is SUMO-simulation-only. **One exception, since 2026-09-20:** the user is
+  going to build a physical signal head matching the 3D model's own design exactly
+  (`overview/Junction3D.tsx`'s mast heads — PROJECT_ARCHITECTURE_REPORT.md Section 34), so
+  changes to that specific lens layout/logic are a hardware-wiring decision, not only a
+  visual one — confirm before changing it, the way Section 34 itself was confirmed first.
 - Database has 4 tables (see above), not the guide's originally-envisioned 8.
 
 ## Working with this project
@@ -366,8 +375,9 @@ unprompted, but do keep this section current if that changes:
   binding for any interface change (recolouring, repositioning, new panels, new pages are
   all free; removing any item of its content inventory needs the owner's explicit written
   instruction naming the item — an item lost as a side effect of a redesign is a defect).
-  Read it at the start of any UI task and tick its inventory afterwards. `prototype-1`
-  (commit d9afd01, 2026-09-17) is the tagged state it describes.
+  Read it at the start of any UI task and tick its inventory afterwards. `prototype-2`
+  (tagged 2026-09-21) is the current working prototype and revert point that inventory
+  describes; `prototype-1` (commit d9afd01, 2026-09-17) is the earlier one it superseded.
 - **Explain before implementing.** If you (Claude) come up with an idea or feature beyond
   what was literally asked — even something clearly beneficial — explain it and get
   explicit approval before writing code. Things the user explicitly asks for (including
