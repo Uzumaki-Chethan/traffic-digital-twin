@@ -1,6 +1,8 @@
 @import 'tailwindcss';
 @import './styles/tokens.css';
+@import '@fontsource/orbitron/500.css';
 @import '@fontsource/orbitron/600.css';
+@import '@fontsource/orbitron/700.css';
 @import '@fontsource/orbitron/800.css';
 @import '@fontsource/poppins/300.css';
 @import '@fontsource/poppins/400.css';
@@ -105,18 +107,24 @@ small {
   letter-spacing: 0.02em;
 }
 
-/* Panel title: Poppins 600 in navy, led by a small signal-head glyph
-   (ui/Panel.tsx) instead of the old drafting tick. */
+/* Panel title: Orbitron — the product's heading face since the first
+   prototype, brought back at the owner's request — in navy, led by a
+   small signal-head glyph (ui/Panel.tsx). Anything inline after the
+   title (the twin's Live badge) drops back to the UI face. */
 .panel-title {
   display: inline-flex;
   align-items: center;
   gap: 11px;
   white-space: nowrap;
-  font-family: var(--font-ui);
-  font-size: 16px;
+  font-family: var(--font-display);
+  font-size: 14.5px;
   font-weight: 600;
-  letter-spacing: 0;
+  letter-spacing: 0.03em;
   color: var(--ink-strong);
+}
+.panel-title > span:not(.glyph) {
+  font-family: var(--font-ui);
+  letter-spacing: 0;
 }
 
 /* The one card: pale glass over the frosted container. */

@@ -87,7 +87,7 @@ export function AnalyticsPage() {
   const flowing = run?.running === true && run.paused !== true
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3.5">
       <Reveal index={0}>
         <div className="flex items-center justify-between rounded-panel border border-rule bg-plate px-3 py-2">
           <div className="text-[13px] text-ink">
@@ -118,13 +118,13 @@ export function AnalyticsPage() {
         <LanePressureHeatmap buckets={derived.lanes} width={derived.width} />
       </Reveal>
 
-      <div className="grid grid-cols-12 gap-2">
+      <div className="grid grid-cols-12 gap-3.5">
         <div className="col-span-7">
           <Reveal index={2}>
             <LaneLedger lanes={live?.lanes ?? []} waits={derived.waits} powered={live !== null} />
           </Reveal>
         </div>
-        <div className="col-span-5 flex flex-col gap-2">
+        <div className="col-span-5 flex flex-col gap-3.5">
           <Reveal index={3}>
             <NetworkTrendLines rows={derived.perf} />
           </Reveal>
@@ -134,7 +134,7 @@ export function AnalyticsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-2">
+      <div className="grid grid-cols-12 gap-3.5">
         <div className="col-span-5">
           <Reveal index={5}>
             <ModeShare rows={derived.decisions} />
@@ -152,7 +152,7 @@ export function AnalyticsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-2">
+      <div className="grid grid-cols-12 gap-3.5">
         <div className="col-span-4">
           <Reveal index={8}>
             <PhaseShare rows={derived.decisions} />
@@ -163,7 +163,7 @@ export function AnalyticsPage() {
             <PeakPeriods peaks={derived.peaks} />
           </Reveal>
         </div>
-        <div className="col-span-4 flex flex-col gap-2">
+        <div className="col-span-4 flex flex-col gap-3.5">
           <Panel title="This run so far">
             <div className="flex items-baseline justify-between py-1">
               <span className="text-[13px] text-ink">Mean wait, whole network</span>

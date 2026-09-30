@@ -181,7 +181,7 @@ function ApproachChart({ approach, series }: { approach: 'N' | 'S' | 'E' | 'W'; 
           </g>
         ))}
         {[-60, -45, -30, -15, 0].map((d) => (
-          <text key={d} x={x(end + d)} y={H - 3} textAnchor="middle" className="fill-ink-mute" fontSize="9.5" fontFamily="var(--font-num)">
+          <text key={d} x={x(end + d)} y={H - 3} textAnchor={d === 0 ? 'end' : d === -60 ? 'start' : 'middle'} className="fill-ink-mute" fontSize="9.5" fontFamily="var(--font-num)">
             {d === 0 ? 'now' : d}
           </text>
         ))}

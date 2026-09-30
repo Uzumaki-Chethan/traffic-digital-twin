@@ -61,7 +61,7 @@ export function StatusBar() {
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <div className="min-w-0">
           <h1
-            className="truncate text-[26px] font-medium leading-[1.15] text-white"
+            className="display truncate text-[23px] font-semibold leading-[1.15] tracking-[0.03em] text-white"
             style={{ textShadow: '0 2px 14px rgb(0 0 0 / 0.55)' }}
           >
             Adaptive signal control

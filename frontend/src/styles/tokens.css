@@ -128,8 +128,8 @@
   --alert-wash: #fde8e6;
 
   /* Three type roles:
-       display  Orbitron      — the wordmark only
-       ui       Poppins       — everything readable, panel titles included
+       display  Orbitron      — headings: the top-bar title, panel titles
+       ui       Poppins       — everything readable
        num      Overpass Mono — every live number, tabular */
   --font-display: 'Orbitron', 'Poppins', ui-sans-serif, sans-serif;
   --font-ui: 'Poppins', 'Barlow', ui-sans-serif, system-ui, sans-serif;

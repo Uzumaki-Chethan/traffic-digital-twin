@@ -55,7 +55,7 @@ export function SettingsPage() {
   const current = TARGETS.find((t) => t.id === target) ?? TARGETS[0]
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3.5">
       <Reveal index={0}>
         <Panel
           title="Scenario"
@@ -84,7 +84,7 @@ export function SettingsPage() {
             </label>
             <p className="min-w-0 flex-1 text-[13px] leading-[1.55] text-ink">{current.lead}</p>
           </div>
-          <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3.5 xl:grid-cols-3">
             {DEMO_SCENARIOS.map((s, i) => {
               const usedBy: ScenarioUse[] = []
               if (s.id === demoScenario) usedBy.push('overview')

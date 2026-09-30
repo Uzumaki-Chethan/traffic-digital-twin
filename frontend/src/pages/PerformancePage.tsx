@@ -71,7 +71,7 @@ export function PerformancePage() {
   const wins = rows.filter((r) => verdictFor(r.improvement).side !== 'vac').length
 
   return (
-    <div className={dimmed ? 'flex flex-col gap-2 opacity-70 transition-opacity' : 'flex flex-col gap-2 transition-opacity'}>
+    <div className={dimmed ? 'flex flex-col gap-3.5 opacity-70 transition-opacity' : 'flex flex-col gap-3.5 transition-opacity'}>
       {showIncidentControls && (
         <div className="flex flex-wrap gap-2">
           {incidentFirst ? (
@@ -87,7 +87,7 @@ export function PerformancePage() {
           )}
         </div>
       )}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-3.5">
         <Reveal index={0}>
           <ControllerWindow
             title="Trinetra"
@@ -137,7 +137,7 @@ export function PerformancePage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3.5 xl:grid-cols-3">
         {haveResults
           ? rows.map((row, i) => (
               <Reveal key={row.key} index={2 + i}>

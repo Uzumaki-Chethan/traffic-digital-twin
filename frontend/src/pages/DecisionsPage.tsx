@@ -65,8 +65,8 @@ export function DecisionsPage() {
   const empty = log.runsLoaded && log.runs.length === 0
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2">
-      <Reveal index={0}>
+    <div className="flex h-full min-h-0 flex-col gap-3.5">
+      <Reveal index={0} className="glass-card px-4 py-3">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <label className="flex items-center gap-2 text-[13px] text-ink">
             <span className="eyebrow">Run</span>
@@ -132,7 +132,7 @@ export function DecisionsPage() {
           </Panel>
         </Reveal>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)] gap-2">
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)] gap-3.5">
           <Reveal index={1} className="flex min-h-0 flex-col">
             <Panel
               title="Every decision"

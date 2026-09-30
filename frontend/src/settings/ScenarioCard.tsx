@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { Check } from 'lucide-react'
 import { DEMAND_LABEL, type ScenarioInfo } from '@/data/scenarios'
 import { DUR, EASE_OUT, EASE_SPRING, STAGGER, enter } from '@/ui/motion'
+import { ScenarioPreview } from './ScenarioPreview'
 
 /** A page a scenario can be chosen for. */
 export type ScenarioUse = 'overview' | 'performance'
@@ -57,22 +58,27 @@ export function ScenarioCard({
       whileTap={reduced || disabled ? undefined : { scale: 0.985, y: 0 }}
       transition={{ ...enter, delay: Math.min(index * STAGGER * 0.45, 0.45) }}
       className={clsx(
-        'group relative flex min-h-[96px] flex-col gap-1.5 overflow-hidden rounded-control border-2 px-3 py-2.5 text-left transition-colors',
-        selected ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : 'border-rule bg-plate hover:border-[var(--rule-strong)]',
+        'glass-card group relative flex flex-col overflow-hidden text-left transition-[border-color,box-shadow]',
         disabled && 'cursor-not-allowed opacity-60',
       )}
-      style={{ boxShadow: selected ? 'var(--shadow-panel)' : undefined }}
+      style={
+        selected
+          ? { borderColor: 'rgb(255 150 40 / 0.9)', boxShadow: '0 0 0 1px rgb(255 150 40 / 0.55), 0 18px 40px -24px rgb(255 140 20 / 0.7)' }
+          : undefined
+      }
     >
+      <ScenarioPreview id={scenario.id} seed={index} />
+      <span className="flex flex-1 flex-col gap-1.5 px-3.5 pb-3 pt-2.5">
       {/* Selection bar, drawn from the leading edge. */}
       <span
         aria-hidden
-        className="absolute inset-x-0 top-0 h-[3px] origin-left bg-[var(--accent)] transition-transform duration-200"
+        className="absolute inset-x-0 top-0 z-[1] h-[3px] origin-left bg-[var(--brand)] transition-transform duration-200"
         style={{
           transform: `scaleX(${selected ? 1 : 0})`,
           transitionTimingFunction: 'var(--ease-out)',
         }}
       />
-      <div className="flex items-start justify-between gap-2">
+      <span className="flex items-start justify-between gap-2">
         <span className="text-[15px] font-medium leading-tight text-ink-strong">{scenario.name}</span>
         {selected ? (
           <motion.span
@@ -81,12 +87,14 @@ export function ScenarioCard({
             transition={{ duration: DUR.fast, ease: EASE_SPRING }}
             className="mt-0.5 shrink-0"
           >
-            <Check size={16} className="text-[var(--accent)]" aria-hidden />
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--brand)]">
+              <Check size={13} strokeWidth={3} className="text-white" aria-hidden />
+            </span>
           </motion.span>
         ) : (
           <DemandChip demand={scenario.demand} />
         )}
-      </div>
+      </span>
       <span className="text-[12.5px] leading-[1.45] text-ink">{scenario.blurb}</span>
       {(selected || usedBy.length > 0) && (
         <motion.span
@@ -98,12 +106,13 @@ export function ScenarioCard({
           {selected && <DemandChip demand={scenario.demand} />}
           {usedBy.map((use) => (
             <span key={use} className="eyebrow flex items-center gap-1">
-              <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
+              <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--brand)]" />
               {USE_LABEL[use]}
             </span>
           ))}
         </motion.span>
       )}
+      </span>
     </motion.button>
   )
 }
@@ -111,10 +120,10 @@ export function ScenarioCard({
 /** Light / Moderate / Heavy / Ramping, coloured like the signal it stresses. */
 function DemandChip({ demand }: { demand: ScenarioInfo['demand'] }) {
   const tone = {
-    light: 'bg-[var(--accent-soft)] text-ink',
-    moderate: 'bg-[#f6dd9a] text-ink-strong',
-    heavy: 'bg-[#f0b8b8] text-[var(--signal-red)]',
-    ramping: 'bg-[#e6d3b3] text-[var(--signal-amber)]',
+    light: 'bg-[#dcf5e8] text-[#065f3a]',
+    moderate: 'bg-[#fdf0c7] text-[#7a4b00]',
+    heavy: 'bg-[#fde0e0] text-[#a3161f]',
+    ramping: 'bg-[#e3ecff] text-[#1d4ed8]',
   }[demand]
   return (
     <span className={clsx('num shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium', tone)}>

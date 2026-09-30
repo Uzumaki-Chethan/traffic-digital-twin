@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { BUILDINGS, CITY_EXTENT, GROUND_DAY, SIDEWALK_DAY, SIDEWALK_OUT, TREES, canopyTone, roofTone } from './cityscape'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { LaneView, VehicleView } from '@/data/types'
 import { useSim } from '@/data/store'
@@ -75,10 +76,11 @@ const ARM_MID = JUNCTION_HALF + ARM / 2
 
 // sumo-gui's own palette, near enough: near-black asphalt, saturated
 // green surroundings, off-white paint.
-const ASPHALT = '#1b1b1b'
-const GROUND = '#268426'
-const HORIZON = '#0d5410'
-const PAINT = '#dcdcdc'
+const ASPHALT = '#5c6168'
+const GROUND = GROUND_DAY
+const HORIZON = '#cfe2f1' // daytime sky, and the fog the city fades into
+const PAINT = '#f2f2ee'
+const CENTRE_PAINT = '#e8b923'
 const HOUSING = '#15110d'
 const LENS_OFF = '#3d352b'
 const RED = '#ff0505'
@@ -301,7 +303,7 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
     controls.addEventListener('end', release)
     renderer.domElement.addEventListener('wheel', stopAuto, { passive: true })
 
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x20401a, 1.05))
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x6f8a5a, 1.1))
     const sun = new THREE.DirectionalLight(0xfff6e0, 1.35)
     sun.position.set(120, 220, 90)
     scene.add(sun)
@@ -317,7 +319,7 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
 
     // ---- ground and carriageways ---------------------------------------
     const ground = new THREE.Mesh(
-      own(new THREE.PlaneGeometry(NET, NET)),
+      own(new THREE.PlaneGeometry(NET + CITY_EXTENT * 4, NET + CITY_EXTENT * 4)),
       own(new THREE.MeshStandardMaterial({ color: GROUND })),
     )
     ground.rotation.x = -Math.PI / 2
@@ -371,16 +373,97 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
     const paint = own(new THREE.MeshStandardMaterial({ color: PAINT, roughness: 0.7 }))
 
     // Solid: both outer edges and the centre line dividing opposing traffic.
+    const centrePaint = own(new THREE.MeshStandardMaterial({ color: CENTRE_PAINT, roughness: 0.7 }))
     const solidNS = own(new THREE.BoxGeometry(0.22, 0.08, ARM))
     const solidEW = own(new THREE.BoxGeometry(ARM, 0.08, 0.22))
-    for (const off of [-ROAD_HALF, 0, ROAD_HALF]) {
-      for (const sign of [-1, 1]) {
+    const centreNS = own(new THREE.BoxGeometry(0.15, 0.08, ARM))
+    const centreEW = own(new THREE.BoxGeometry(ARM, 0.08, 0.15))
+    for (const sign of [-1, 1]) {
+      for (const off of [-ROAD_HALF, ROAD_HALF]) {
         const ns = new THREE.Mesh(solidNS, paint)
         ns.position.set(off, PAINT_Y, sign * ARM_MID)
         const ew = new THREE.Mesh(solidEW, paint)
         ew.position.set(sign * ARM_MID, PAINT_Y, off)
         scene.add(ns, ew)
       }
+      // double yellow centre line, as on the plan
+      for (const off of [-0.22, 0.22]) {
+        const ns = new THREE.Mesh(centreNS, centrePaint)
+        ns.position.set(off, PAINT_Y, sign * ARM_MID)
+        const ew = new THREE.Mesh(centreEW, centrePaint)
+        ew.position.set(sign * ARM_MID, PAINT_Y, off)
+        scene.add(ns, ew)
+      }
+    }
+
+    // ---- the city: sidewalks, buildings, trees (overview/cityscape) ----
+    // One layout shared with the plan view: plan (x, y) -> (x - 200, y - 200).
+    {
+      const walk = own(new THREE.MeshStandardMaterial({ color: SIDEWALK_DAY, roughness: 0.9 }))
+      const stripLen = HALF_NET + CITY_EXTENT - JUNCTION_HALF
+      const stripW = SIDEWALK_OUT - ROAD_HALF
+      const stripNS = own(new THREE.BoxGeometry(stripW, 0.5, stripLen))
+      const stripEW = own(new THREE.BoxGeometry(stripLen, 0.5, stripW))
+      for (const sign of [-1, 1]) {
+        for (const side of [-1, 1]) {
+          const across = side * (ROAD_HALF + stripW / 2)
+          const along = sign * (JUNCTION_HALF + stripLen / 2)
+          const ns = new THREE.Mesh(stripNS, walk)
+          ns.position.set(across, 0.05, along)
+          const ew = new THREE.Mesh(stripEW, walk)
+          ew.position.set(along, 0.05, across)
+          scene.add(ns, ew)
+        }
+      }
+      // paved corners round the box, just under the road surface
+      const pad = new THREE.Mesh(own(new THREE.BoxGeometry(JUNCTION_HALF * 2 + 8, 0.36, JUNCTION_HALF * 2 + 8)), walk)
+      pad.position.y = 0
+      scene.add(pad)
+
+      const box = own(new THREE.BoxGeometry(1, 1, 1))
+      const wallMat = own(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 }))
+      const blocks = new THREE.InstancedMesh(box, wallMat, BUILDINGS.length)
+      const unitMat = own(new THREE.MeshStandardMaterial({ color: '#2B2F36', roughness: 0.6 }))
+      const withUnit = BUILDINGS.filter((b) => b.unit)
+      const units = new THREE.InstancedMesh(box, unitMat, withUnit.length)
+      const mm = new THREE.Matrix4()
+      const q0 = new THREE.Quaternion()
+      const col = new THREE.Color()
+      let ui = 0
+      BUILDINGS.forEach((b, i) => {
+        mm.compose(new THREE.Vector3(b.x + b.w / 2 - CENTRE, b.height / 2, b.y + b.h / 2 - CENTRE), q0, new THREE.Vector3(b.w, b.height, b.h))
+        blocks.setMatrixAt(i, mm)
+        blocks.setColorAt(i, col.set(roofTone(b.tone)))
+        if (b.unit) {
+          mm.compose(
+            new THREE.Vector3(b.x + b.w * b.unit.u - CENTRE, b.height + 0.6, b.y + b.h * b.unit.v - CENTRE),
+            q0,
+            new THREE.Vector3(1.8, 1.2, 1.8),
+          )
+          units.setMatrixAt(ui++, mm)
+        }
+      })
+      blocks.instanceMatrix.needsUpdate = true
+      if (blocks.instanceColor) blocks.instanceColor.needsUpdate = true
+      units.instanceMatrix.needsUpdate = true
+      scene.add(blocks, units)
+
+      const trunkMat = own(new THREE.MeshStandardMaterial({ color: '#6B4F36', roughness: 0.9 }))
+      const leafMat = own(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, flatShading: true }))
+      const trunks = new THREE.InstancedMesh(own(new THREE.CylinderGeometry(0.22, 0.3, 1, 6)), trunkMat, TREES.length)
+      const crowns = new THREE.InstancedMesh(own(new THREE.IcosahedronGeometry(1, 1)), leafMat, TREES.length)
+      TREES.forEach((t, i) => {
+        const trunkH = 2.2 + t.r * 0.5
+        mm.compose(new THREE.Vector3(t.x - CENTRE, trunkH / 2, t.y - CENTRE), q0, new THREE.Vector3(1, trunkH, 1))
+        trunks.setMatrixAt(i, mm)
+        mm.compose(new THREE.Vector3(t.x - CENTRE, trunkH + t.r * 0.75, t.y - CENTRE), q0, new THREE.Vector3(t.r, t.r * 0.95, t.r))
+        crowns.setMatrixAt(i, mm)
+        crowns.setColorAt(i, col.set(canopyTone(t.tone)))
+      })
+      trunks.instanceMatrix.needsUpdate = true
+      crowns.instanceMatrix.needsUpdate = true
+      if (crowns.instanceColor) crowns.instanceColor.needsUpdate = true
+      scene.add(trunks, crowns)
     }
 
     // Dashed: the four lane dividers, as one instanced mesh. About 320
@@ -1133,17 +1216,18 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
   return (
     <div className="relative h-full w-full">
       <div ref={mount} className="h-full w-full" aria-label="Interactive 3D model of the junction" role="img" />
-      <div className="pointer-events-none absolute right-3 top-3 rounded-control bg-[rgb(36_26_16/0.72)] px-2 py-1 text-[12px] text-[var(--ink-on-dark)]">
+      <div className="map-pill pointer-events-none absolute bottom-3 left-3 rounded-full px-3 py-1.5 text-[12px] text-[var(--plate-ink)]">
         drag to orbit · Ctrl + scroll to zoom · right-drag to pan
       </div>
       {/* The plan view's compass, for the same reason it has one: once
           the model is orbited nothing else says which arm is which. It
           turns with the camera so the arrow stays on north. */}
-      <div className="pointer-events-none absolute right-4 top-12" aria-label="Compass: north">
+      <div className="pointer-events-none absolute bottom-14 right-3" aria-label="Compass: north">
         <svg ref={compass} width="44" height="44" viewBox="-22 -22 44 44" style={{ transformOrigin: '50% 50%' }}>
-          <circle r="18" fill="rgb(36 26 16 / 0.55)" stroke="var(--plate-ink)" strokeWidth="1.2" opacity="0.9" />
-          <path d="M 0 -13 L -5 5 L 0 1 L 5 5 Z" fill="var(--plate-ink)" />
-          <text y="15" textAnchor="middle" fontSize="9" fontWeight="700" fontFamily="var(--font-num)" fill="var(--plate-ink)">
+          <circle r="17" fill="#fff" stroke="rgb(27 37 54 / 0.25)" strokeWidth="1" />
+          <path d="M 0 -13 L -4.5 0 L 4.5 0 Z" fill="#E5484D" />
+          <path d="M 0 13 L -4.5 0 L 4.5 0 Z" fill="#2F6BFF" />
+          <text y="-19" textAnchor="middle" fontSize="9" fontWeight="700" fontFamily="var(--font-num)" fill="var(--plate-ink)">
             N
           </text>
         </svg>
