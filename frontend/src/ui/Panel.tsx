@@ -40,13 +40,15 @@ export function Panel({
 }) {
   return (
     <section className={clsx('glass-card flex min-h-0 flex-col overflow-hidden', className)}>
-      <header className="flex h-[54px] shrink-0 items-center justify-between gap-3 px-[18px]">
+      <header className="flex min-h-[54px] shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-[18px] py-2">
         <h2 className="panel-title">
           <Glyph s={glyph} />
           {title}
           {titleExtra}
         </h2>
-        {meta && <div className="num min-w-0 text-right text-[12px] text-ink-mute">{meta}</div>}
+        {/* When title and meta don't both fit, the meta drops to its own line
+            rather than squeezing the title into two. */}
+        {meta && <div className="num ml-auto min-w-0 text-right text-[12px] text-ink-mute">{meta}</div>}
       </header>
       <div className={clsx('min-h-0 flex-1', bodyClassName ?? 'px-[18px] pb-[18px]')}>{children}</div>
     </section>

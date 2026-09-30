@@ -127,53 +127,60 @@ function Tile({
   const tone =
     pct == null || Math.abs(pct) < 0.5 || good === 'none' ? 'flat' : (pct > 0) === (good === 'up') ? 'good' : 'bad'
 
+  // Laid out in rows so nothing overlaps at any width: icon + label (the
+  // label wraps rather than truncating), then value · unit · trend, then
+  // the caption, and the sparkline as a strip along the bottom.
   return (
-    <div className="glass-card relative grid min-h-[92px] grid-cols-[48px_minmax(0,1fr)] items-center gap-x-3 overflow-hidden rounded-[18px] py-3.5 pl-3.5 pr-3">
-      <span
-        aria-hidden
-        className="row-span-2 flex h-12 w-12 items-center justify-center rounded-full text-white [&>svg]:h-[22px] [&>svg]:w-[22px] [&>svg]:stroke-2"
-        style={{
-          background: `radial-gradient(circle at 32% 26%, rgb(255 255 255 / 0.6), rgb(255 255 255 / 0) 44%), linear-gradient(150deg, ${k1}, ${k2})`,
-          boxShadow: `0 0 18px 2px color-mix(in srgb, ${k1} 55%, transparent), inset 0 -3px 6px rgb(0 0 0 / 0.18), inset 0 2px 3px rgb(255 255 255 / 0.5), 0 0 0 3px rgb(255 255 255 / 0.9)`,
-        }}
-      >
-        {icon}
-      </span>
-      <div className="relative z-[1] truncate text-[12.5px] font-medium text-ink">{label}</div>
-      <div className="relative z-[1] flex min-w-0 flex-wrap items-baseline gap-x-1.5">
-        <span className="text-[24px] font-semibold leading-tight tracking-[-0.01em] text-ink-strong">
-          {n == null ? '—' : <Num value={n} digits={digits} />}
+    <div className="glass-card flex min-w-0 flex-col gap-1.5 overflow-hidden rounded-[18px] px-3.5 pb-2.5 pt-3.5">
+      <div className="flex items-center gap-3">
+        <span
+          aria-hidden
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white [&>svg]:h-[21px] [&>svg]:w-[21px] [&>svg]:stroke-2"
+          style={{
+            background: `radial-gradient(circle at 32% 26%, rgb(255 255 255 / 0.6), rgb(255 255 255 / 0) 44%), linear-gradient(150deg, ${k1}, ${k2})`,
+            boxShadow: `0 0 18px 2px color-mix(in srgb, ${k1} 55%, transparent), inset 0 -3px 6px rgb(0 0 0 / 0.18), inset 0 2px 3px rgb(255 255 255 / 0.5), 0 0 0 3px rgb(255 255 255 / 0.9)`,
+          }}
+        >
+          {icon}
         </span>
-        {unit && <span className="text-[11.5px] font-medium text-ink-mute">{unit}</span>}
-        {pct != null && (
-          <span
-            className="num text-[11px] font-medium"
-            style={{ color: tone === 'good' ? '#067647' : tone === 'bad' ? '#C4252F' : 'var(--ink-mute)' }}
-            title="Change against 30 s earlier"
-          >
-            {pct >= 0 ? '▲' : '▼'}
-            {Math.abs(pct).toFixed(0)}%
-          </span>
-        )}
-        {sub && <span className="basis-full truncate pr-[70px] text-[11.5px] text-ink-mute">{sub}</span>}
+        <div className="min-w-0">
+          <div className="text-[12.5px] font-medium leading-tight text-ink">{label}</div>
+          <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5">
+            <span className="text-[23px] font-semibold leading-tight tracking-[-0.01em] text-ink-strong">
+              {n == null ? '—' : <Num value={n} digits={digits} />}
+            </span>
+            {unit && <span className="text-[11.5px] font-medium text-ink-mute">{unit}</span>}
+            {pct != null && (
+              <span
+                className="num whitespace-nowrap text-[11px] font-medium"
+                style={{ color: tone === 'good' ? '#067647' : tone === 'bad' ? '#C4252F' : 'var(--ink-mute)' }}
+                title="Change against 30 s earlier"
+              >
+                {pct >= 0 ? '▲' : '▼'}
+                {Math.abs(pct).toFixed(0)}%
+              </span>
+            )}
+          </div>
+        </div>
       </div>
+      <div className="min-h-[16px] text-[11.5px] leading-tight text-ink-mute">{sub ?? ''}</div>
       <Spark series={series} color={k2} />
     </div>
   )
 }
 
 function Spark({ series, color }: { series: number[]; color: string }) {
-  if (series.length < 3) return null
-  const W = 64
-  const H = 34
+  if (series.length < 3) return <div className="h-7" aria-hidden />
+  const W = 200
+  const H = 28
   const lo = Math.min(...series)
   const hi = Math.max(...series)
   const r = hi - lo || 1
   const pts = series.map((v, i) => `${((i / (series.length - 1)) * W).toFixed(1)},${(H - 3 - ((v - lo) / r) * (H - 6)).toFixed(1)}`)
   return (
-    <svg aria-hidden viewBox={`0 0 ${W} ${H}`} className="pointer-events-none absolute bottom-3 right-3 h-[34px] w-16 overflow-visible opacity-90">
+    <svg aria-hidden viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="pointer-events-none block h-7 w-full overflow-visible opacity-90">
       <polygon points={`0,${H} ${pts.join(' ')} ${W},${H}`} fill={color} opacity={0.12} />
-      <polyline points={pts.join(' ')} fill="none" stroke={color} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
+      <polyline points={pts.join(' ')} fill="none" stroke={color} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
     </svg>
   )
 }

@@ -26,7 +26,9 @@ import { leadingIncidentTool, showsIncidentControls } from '@/data/scenarios'
  * Start is in the top bar, which on this page starts the evaluation.
  */
 export function PerformancePage() {
-  const latest = useSim((s) => s.latest)
+  // Per decision tick (see OverviewPage); the two plates read vehicle
+  // positions from the motion buffer themselves.
+  const latest = useSim((s) => s.latestTick)
   // Each window has its own pan/zoom, so one junction can be studied up
   // close while the other keeps its frame. Each window's "Match" button
   // copies the other's framing across for a like-for-like look.

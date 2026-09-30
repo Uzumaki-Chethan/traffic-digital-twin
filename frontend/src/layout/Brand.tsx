@@ -16,17 +16,20 @@ export function Brand({ collapsed }: { collapsed: boolean }) {
     <Link
       to="/"
       aria-label="Trinetra — Overview"
-      className={clsx('flex shrink-0 flex-col items-center justify-center', collapsed ? 'h-[84px] px-2' : 'gap-1 px-4 pb-2 pt-4')}
+      className={clsx(
+        'flex shrink-0 flex-col items-center justify-center',
+        collapsed ? 'h-[84px] px-2' : 'gap-1 px-4 pb-2 pt-4 [@media(max-height:760px)]:pt-2',
+      )}
     >
       <img
         src={eye}
         alt=""
         draggable={false}
-        className={clsx('block h-auto select-none', collapsed ? 'w-[64px]' : 'w-[208px]')}
+        className={clsx('block h-auto select-none', collapsed ? 'w-[64px]' : 'w-[208px] [@media(max-height:760px)]:w-[160px]')}
         style={{ filter: 'drop-shadow(0 0 10px rgb(255 150 60 / 0.25))' }}
       />
       {!collapsed && (
-        <img src={wordmark} alt="Trinetra" draggable={false} className="block h-auto w-[176px] select-none" />
+        <img src={wordmark} alt="Trinetra" draggable={false} className="block h-auto w-[176px] select-none [@media(max-height:760px)]:w-[150px]" />
       )}
     </Link>
   )

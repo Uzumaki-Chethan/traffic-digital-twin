@@ -41,6 +41,7 @@ export function TrafficCursor() {
       x = e.clientX
       y = e.clientY
       last = performance.now()
+      wake()
       const t = e.target as Element | null
       el.classList.toggle('ui', !!t?.closest?.(CLICKABLE))
       el.classList.toggle('gone', !!t?.closest?.(TEXT_ENTRY))
@@ -48,6 +49,7 @@ export function TrafficCursor() {
     const onDown = (e: PointerEvent) => {
       if (e.pointerType === 'touch') return
       down = true
+      wake()
       const r = document.createElement('div')
       r.className = 'tc-ripple'
       r.style.left = `${e.clientX}px`
@@ -57,6 +59,7 @@ export function TrafficCursor() {
     }
     const onUp = () => {
       down = false
+      wake()
     }
     const onLeave = () => el.classList.add('gone')
     const onEnter = () => el.classList.remove('gone')
@@ -78,9 +81,15 @@ export function TrafficCursor() {
       tv = (tv + (target - tilt) * 0.2) * 0.7
       tilt += tv
       el.style.transform = `translate3d(${x - 8}px, ${y - 2}px, 0) rotate(${tilt.toFixed(2)}deg)`
-      raf = requestAnimationFrame(frame)
+      // Sleep once the pointer is still, the lean has settled and the lamp
+      // is back on red; the next pointer event wakes it. No per-frame work
+      // while nobody is moving the mouse.
+      const settled = s === 'red' && Math.abs(tilt) < 0.05 && Math.abs(tv) < 0.05
+      raf = settled ? 0 : requestAnimationFrame(frame)
     }
-    raf = requestAnimationFrame(frame)
+    function wake() {
+      if (!raf) raf = requestAnimationFrame(frame)
+    }
 
     addEventListener('pointermove', onMove, { passive: true })
     addEventListener('pointerdown', onDown, { passive: true })

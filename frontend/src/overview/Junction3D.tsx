@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { BUILDINGS, CITY_EXTENT, GROUND_DAY, SIDEWALK_DAY, SIDEWALK_OUT, TREES, canopyTone, roofTone } from './cityscape'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import type { LaneView, VehicleView } from '@/data/types'
 import { useSim } from '@/data/store'
 import { DisplayClock, motionBuffer, type MotionSide, type Pose } from '@/data/motion'
@@ -276,6 +278,13 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
       return
     }
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio))
+    // A soft studio environment for reflections — applied to the vehicles'
+    // paint, glass and chrome only (envMap per material), so they read as
+    // paint and glass while the road, buildings and ground keep their
+    // lighting exactly. Built once per mount.
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    pmrem.dispose()
     el.appendChild(renderer.domElement)
     renderer.domElement.style.touchAction = 'none'
     renderer.domElement.style.cursor = 'grab'
@@ -319,7 +328,7 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
 
     // ---- ground and carriageways ---------------------------------------
     const ground = new THREE.Mesh(
-      own(new THREE.PlaneGeometry(NET + CITY_EXTENT * 4, NET + CITY_EXTENT * 4)),
+      own(new THREE.PlaneGeometry(NET * 3, NET * 3)),
       own(new THREE.MeshStandardMaterial({ color: GROUND })),
     )
     ground.rotation.x = -Math.PI / 2
@@ -598,7 +607,94 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
     // and material are cached by type and shared between every vehicle of
     // it — a hundred motorcycles cost one geometry, not a hundred.
     const paintCache = new Map<string, THREE.MeshStandardMaterial>()
-    const glassMat = own(new THREE.MeshStandardMaterial({ color: '#2b3038', roughness: 0.25 }))
+    const glassMat = own(new THREE.MeshStandardMaterial({ color: '#1c2633', roughness: 0.08, metalness: 0.6, envMap: envTex, envMapIntensity: 1.2 }))
+    const headMat = own(new THREE.MeshStandardMaterial({ color: '#fffbe8', emissive: '#fff4c8', emissiveIntensity: 0.9, roughness: 0.2 }))
+    const tailMat = own(new THREE.MeshStandardMaterial({ color: '#c01020', emissive: '#ff1a2a', emissiveIntensity: 0.7, roughness: 0.3 }))
+    const trimMat = own(new THREE.MeshStandardMaterial({ color: '#23262b', roughness: 0.6, metalness: 0.2 }))
+    const hubMat = own(new THREE.MeshStandardMaterial({ color: '#c9ced6', roughness: 0.3, metalness: 0.8, envMap: envTex }))
+    const lampGeom = own(new THREE.BoxGeometry(1, 1, 1))
+    // A soft contact shadow under every vehicle: one radial texture, one
+    // plane geometry, scaled per vehicle — far cheaper than real shadows.
+    const shadowTex = (() => {
+      const c = document.createElement('canvas')
+      c.width = c.height = 64
+      const g = c.getContext('2d')!
+      const grad = g.createRadialGradient(32, 32, 4, 32, 32, 32)
+      grad.addColorStop(0, 'rgba(0,0,0,0.55)')
+      grad.addColorStop(1, 'rgba(0,0,0,0)')
+      g.fillStyle = grad
+      g.fillRect(0, 0, 64, 64)
+      return own(new THREE.CanvasTexture(c))
+    })()
+    const shadowMat = own(new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }))
+    const shadowGeom = own(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2))
+    function shadowFor(shape: VehicleShape): THREE.Mesh {
+      const m = new THREE.Mesh(shadowGeom, shadowMat)
+      m.scale.set(shape.width * 1.5, 1, shape.length * 1.25)
+      m.position.y = 0.035
+      m.renderOrder = -1
+      return m
+    }
+    /** A pair of lamps across the front (head) or back (tail) of a body. */
+    function lampPair(mat: THREE.Material, halfW: number, y: number, z: number, size: [number, number, number]): THREE.Mesh[] {
+      return [-1, 1].map((side) => {
+        const m = new THREE.Mesh(lampGeom, mat)
+        m.scale.set(...size)
+        m.position.set(side * halfW, y, z)
+        return m
+      })
+    }
+    /**
+     * A car's side profile, extruded across its width with softened edges:
+     * bumper, bonnet, raked windscreen, roof, rear window, boot. Length along
+     * +z (front), height up +y, centred on x. Built in the (u = along, v = up)
+     * plane and turned so u runs to +z.
+     */
+    function carProfile(L: number, H: number, W: number, inset = 0): THREE.BufferGeometry {
+      const sh = new THREE.Shape()
+      const u = (f: number) => f * L
+      const v = (f: number) => f * H
+      sh.moveTo(u(-0.5), v(0.18))
+      sh.lineTo(u(-0.5), v(0.5))
+      sh.quadraticCurveTo(u(-0.49), v(0.56), u(-0.42), v(0.57))
+      sh.lineTo(u(-0.3), v(0.58))
+      sh.quadraticCurveTo(u(-0.24), v(0.93), u(-0.16), v(0.97))
+      sh.lineTo(u(0.08), v(0.98))
+      sh.quadraticCurveTo(u(0.15), v(0.95), u(0.24), v(0.62))
+      sh.lineTo(u(0.44), v(0.55))
+      sh.quadraticCurveTo(u(0.5), v(0.52), u(0.5), v(0.42))
+      sh.lineTo(u(0.5), v(0.18))
+      sh.quadraticCurveTo(u(0.5), v(0.04), u(0.44), v(0.04))
+      sh.lineTo(u(-0.44), v(0.04))
+      sh.quadraticCurveTo(u(-0.5), v(0.04), u(-0.5), v(0.18))
+      const bevel = Math.min(0.08, W * 0.06)
+      const geo = new THREE.ExtrudeGeometry(sh, {
+        depth: W - bevel * 2 - inset,
+        bevelEnabled: true,
+        bevelThickness: bevel,
+        bevelSize: bevel,
+        bevelSegments: 3,
+        curveSegments: 8,
+      })
+      geo.rotateY(-Math.PI / 2)
+      geo.translate((W - bevel * 2 - inset) / 2, 0, 0)
+      return geo
+    }
+    /** The glasshouse: side windows and both screens, proud of the body. */
+    function carGlass(L: number, H: number, W: number): THREE.BufferGeometry {
+      const sh = new THREE.Shape()
+      const u = (f: number) => f * L
+      const v = (f: number) => f * H
+      sh.moveTo(u(-0.285), v(0.6))
+      sh.quadraticCurveTo(u(-0.23), v(0.9), u(-0.155), v(0.935))
+      sh.lineTo(u(0.075), v(0.945))
+      sh.quadraticCurveTo(u(0.14), v(0.915), u(0.225), v(0.64))
+      sh.lineTo(u(-0.285), v(0.6))
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: W + 0.02, bevelEnabled: false, curveSegments: 6 })
+      geo.rotateY(-Math.PI / 2)
+      geo.translate((W + 0.02) / 2, 0, 0)
+      return geo
+    }
     const rubberMat = own(new THREE.MeshStandardMaterial({ color: '#1a1a1a', roughness: 0.9 }))
     const canopyMat = own(new THREE.MeshStandardMaterial({ color: '#1f1f1f', roughness: 0.8 }))
     // Wheels, shared: a motorcycle's two and an auto-rickshaw's three.
@@ -629,18 +725,18 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
         // low chassis; the box is the vType colour, the cab a shade darker.
         const cabL = L * 0.27
         built = {
-          body: own(new THREE.BoxGeometry(Wd * 0.94, Ht * 0.58, cabL)), // the cab
+          body: own(new RoundedBoxGeometry(Wd * 0.94, Ht * 0.58, cabL, 3, 0.18)), // the cab
           cab: null,
           screen: own(new THREE.BoxGeometry(Wd * 0.8, Ht * 0.22, 0.08)),
           windows: null,
-          cargo: own(new THREE.BoxGeometry(Wd, Ht * 0.78, L - cabL - 0.3)),
+          cargo: own(new RoundedBoxGeometry(Wd, Ht * 0.78, L - cabL - 0.3, 3, 0.12)),
           chassis: own(new THREE.BoxGeometry(Wd * 0.8, 0.35, L * 0.96)),
         }
       } else if (kind === 'bus') {
         // One long body with a dark window band along both sides and a
         // windscreen across the front.
         built = {
-          body: own(new THREE.BoxGeometry(Wd, Ht * 0.84, L)),
+          body: own(new RoundedBoxGeometry(Wd, Ht * 0.84, L, 3, 0.3)),
           cab: null,
           screen: own(new THREE.BoxGeometry(Wd * 0.9, Ht * 0.34, 0.08)),
           windows: own(new THREE.BoxGeometry(Wd + 0.04, Ht * 0.3, L * 0.86)),
@@ -650,9 +746,10 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
       } else {
         // A car (and the smaller emergency vehicles): a lower body with a
         // glazed cabin on top, wheels below.
+        // A real side profile (carProfile) and a glasshouse proud of it.
         built = {
-          body: own(new THREE.BoxGeometry(Wd, Ht * 0.5, L)),
-          cab: own(new THREE.BoxGeometry(Wd * 0.86, Ht * 0.42, L * 0.46)),
+          body: own(carProfile(L, Ht * 0.92, Wd)),
+          cab: own(carGlass(L, Ht * 0.92, Wd)),
           screen: null,
           windows: null,
           cargo: null,
@@ -672,15 +769,23 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
     function paintFor(colour: string) {
       const hit = paintCache.get(colour)
       if (hit) return hit
-      const mat = own(new THREE.MeshStandardMaterial({ color: colour, roughness: 0.45 }))
+      const mat = own(new THREE.MeshStandardMaterial({ color: colour, roughness: 0.35, metalness: 0.25, envMap: envTex, envMapIntensity: 0.7 }))
       paintCache.set(colour, mat)
       return mat
     }
 
+    const hubGeom = own(new THREE.CylinderGeometry(0.62, 0.62, 1.04, 14))
     function wheel(geom: THREE.BufferGeometry, x: number, y: number, z: number) {
       const m = new THREE.Mesh(geom, rubberMat)
       m.rotation.z = Math.PI / 2
       m.position.set(x, y, z)
+      // hubcap: a bright disc inset in the tyre, scaled to it
+      const p = (geom as THREE.CylinderGeometry).parameters
+      if (p) {
+        const hub = new THREE.Mesh(hubGeom, hubMat)
+        hub.scale.set(p.radiusTop, p.height, p.radiusTop)
+        m.add(hub)
+      }
       return m
     }
 
@@ -727,7 +832,7 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
       const { length: L, width: Wd, height: Ht, colour } = shape
       const coat = paintFor(colour)
       const parts = partsFor(shape, () => ({
-        cab: new THREE.BoxGeometry(Wd, Ht * 0.7, L * 0.7),
+        cab: new RoundedBoxGeometry(Wd, Ht * 0.7, L * 0.7, 3, 0.15),
         nose: new THREE.BoxGeometry(Wd * 0.5, Ht * 0.45, L * 0.3),
         canopy: new THREE.BoxGeometry(Wd * 1.04, 0.08, L * 0.8),
         screen: new THREE.BoxGeometry(Wd * 0.8, Ht * 0.3, 0.05),
@@ -773,6 +878,8 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
         const cargo = new THREE.Mesh(parts.cargo, coat)
         cargo.position.set(0, R + Ht * 0.39, -cabL / 2 - 0.15)
         g.add(chassis, cab, screen, cargo)
+        g.add(...lampPair(headMat, Wd * 0.34, R + Ht * 0.12, L / 2 + 0.02, [0.32, 0.18, 0.06]))
+        g.add(...lampPair(tailMat, Wd * 0.4, R + 0.25, -L / 2 + 0.12, [0.22, 0.14, 0.06]))
         for (const z of [L * 0.36, -L * 0.18, -L * 0.36]) {
           g.add(wheel(wheelG, Wd * 0.42, axle, z), wheel(wheelG, -Wd * 0.42, axle, z))
         }
@@ -786,17 +893,30 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
         band.position.set(0, R + Ht * 0.58, -L * 0.03)
         const screen = new THREE.Mesh(parts.screen!, glassMat)
         screen.position.set(0, R + Ht * 0.55, L / 2 + 0.01)
-        g.add(chassis, body, band, screen)
+        const board = new THREE.Mesh(lampGeom, headMat)
+        board.scale.set(Wd * 0.6, 0.22, 0.05)
+        board.position.set(0, R + Ht * 0.78, L / 2 + 0.02)
+        g.add(chassis, body, band, screen, board)
+        g.add(...lampPair(headMat, Wd * 0.36, R + Ht * 0.12, L / 2 + 0.02, [0.3, 0.18, 0.06]))
+        g.add(...lampPair(tailMat, Wd * 0.4, R + Ht * 0.2, -L / 2 - 0.02, [0.2, 0.3, 0.06]))
         for (const z of [L * 0.32, -L * 0.3]) {
           g.add(wheel(wheelG, Wd * 0.42, axle, z), wheel(wheelG, -Wd * 0.42, axle, z))
         }
       } else {
-        // Car: lower body, glazed cabin, four wheels.
+        // Car: profiled body, glasshouse, bumpers, lamps, four wheels.
+        const base = R * 0.55
         const body = new THREE.Mesh(parts.body, coat)
-        body.position.y = R + Ht * 0.25
-        const cabin = new THREE.Mesh(parts.cab!, glassMat)
-        cabin.position.set(0, R + Ht * 0.5 + Ht * 0.21, -L * 0.04)
-        g.add(body, cabin)
+        body.position.y = base
+        const glass = new THREE.Mesh(parts.cab!, glassMat)
+        glass.position.y = base
+        const bumperF = new THREE.Mesh(lampGeom, trimMat)
+        bumperF.scale.set(Wd * 0.96, 0.16, 0.12)
+        bumperF.position.set(0, base + Ht * 0.18, L / 2 + 0.02)
+        const bumperR = bumperF.clone()
+        bumperR.position.z = -L / 2 - 0.02
+        g.add(body, glass, bumperF, bumperR)
+        g.add(...lampPair(headMat, Wd * 0.34, base + Ht * 0.4, L / 2 + 0.01, [0.3, 0.1, 0.05]))
+        g.add(...lampPair(tailMat, Wd * 0.36, base + Ht * 0.42, -L / 2 - 0.01, [0.26, 0.1, 0.05]))
         for (const z of [L * 0.32, -L * 0.32]) {
           g.add(wheel(wheelG, Wd * 0.44, axle, z), wheel(wheelG, -Wd * 0.44, axle, z))
         }
@@ -1102,6 +1222,7 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
           if (!car) {
             const shape = shapeOf(p.type)
             const group = buildVehicle(shape, p.type ?? '')
+            group.add(shadowFor(shape))
             let smoke: Car['smoke']
             if (isStalledVehicleId(p.id)) {
               const hazard = new THREE.Sprite(hazardMat)
@@ -1208,6 +1329,7 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
           else mat?.dispose?.()
         }
       })
+      envTex.dispose()
       renderer.dispose()
       if (renderer.domElement.parentNode === el) el.removeChild(renderer.domElement)
     }

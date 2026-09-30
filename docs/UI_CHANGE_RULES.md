@@ -82,7 +82,10 @@ change on the page you touched (and any page you moved something to or from).
   on 2026-09-18 on the owner's explicit instruction; the plate's lane hatching
   and the light bars carry that information.)
 - **Nav rail:** Overview, Analytics, Performance, Decisions, Simulation
-  Settings; the active item marked; collapse control; simulation link state.
+  Settings; the active item marked; collapse control. (The rail's "Simulation
+  link: ONLINE" card was removed on 2026-09-30 on the owner's explicit
+  instruction — the top bar's link pill and the footer's stream state carry the
+  same fact.)
 - **Footer:** the page's name and one-line description on the left; on the
   right the data source (SUMO · TraCI · console/host) and stream state.
 

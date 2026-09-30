@@ -35,9 +35,12 @@
   --rule-strong: rgb(18 30 56 / 0.26);
 
   /* Card glass: two stops, top brighter. */
-  --glass-a: rgb(255 255 255 / 0.9);
-  --glass-b: rgb(238 245 255 / 0.8);
-  --glass-edge: rgb(255 255 255 / 0.85);
+  /* Cool blue-grey, translucent enough for the frosted city to show
+     through (owner: "too whiteish", 2026-09-30) — still ≥ 5:1 for
+     ink-mute over the darkest part of the photo. */
+  --glass-a: rgb(238 243 251 / 0.8);
+  --glass-b: rgb(222 231 244 / 0.74);
+  --glass-edge: rgb(255 255 255 / 0.42);
 
   /* Ink — navy, never grey-on-grey. */
   --ink-strong: #0f1930;
@@ -52,8 +55,8 @@
   --chrome-ink: #ffffff;
   --chrome-mute: #d3dbe8;
   --chrome-rule: rgb(255 255 255 / 0.16);
-  --control-a: rgb(24 32 52 / 0.78);
-  --control-b: rgb(10 14 26 / 0.82);
+  --control-a: rgb(24 32 52 / 0.84);
+  --control-b: rgb(10 14 26 / 0.88);
   --control-edge: rgb(255 255 255 / 0.2);
 
   /* The brand warm: the active nav item, Start, the Plan/3D toggle,
@@ -140,8 +143,8 @@
   --r-control: 10px;
   --r-chip: 999px;
   --shadow-panel:
-    inset 0 1px 0 #fff, inset 0 0 22px rgb(255 255 255 / 0.35), 0 0 0 3px rgb(255 255 255 / 0.12),
-    0 0 26px -6px rgb(255 220 170 / 0.35), 0 16px 36px -20px rgb(3 8 24 / 0.7);
+    inset 0 1px 0 rgb(255 255 255 / 0.55), inset 0 0 18px rgb(255 255 255 / 0.12),
+    0 16px 36px -20px rgb(3 8 24 / 0.65);
   --shadow-control: inset 0 1px 0 rgb(255 255 255 / 0.12), 0 10px 22px -12px rgb(0 0 0 / 0.8);
   --shadow-pop: 0 24px 60px -24px rgb(4 10 28 / 0.55);
 

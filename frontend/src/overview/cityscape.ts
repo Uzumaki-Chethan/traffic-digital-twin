@@ -21,8 +21,9 @@ export const SIDEWALK_OUT = ROAD_HALF + 4.2
 const TREE_LINE = SIDEWALK_OUT + 3.4
 /** Nothing is built closer to the road than this. */
 const SETBACK = TREE_LINE + 5
-/** How far past the network edge the city continues, so a zoomed-out view shows city, not void. */
-export const CITY_EXTENT = 60
+/** How far past the network edge the city continues. Zero: the scenery and
+ * the roads end together at the network's 400 m edge (owner, 2026-09-30). */
+export const CITY_EXTENT = 0
 
 export interface Building {
   x: number

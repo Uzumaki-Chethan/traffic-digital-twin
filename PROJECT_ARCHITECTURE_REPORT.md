@@ -3939,3 +3939,44 @@ Settings. `tsc -b`, oxlint (clean), vitest 18/18 and `npm run build` all pass. E
 inventory item of `docs/UI_CHANGE_RULES.md` was checked present. Items not re-exercised
 visually in this pass: the rain overlay and the smoke on a stalled vehicle (their code is
 untouched).
+
+**37.6 Second round (same day): lag, fit and finish.** The owner reported lag at higher
+speeds. Measured against the pre-redesign build (a checkout of `b67fc7a` run beside this
+one, both against a private backend on :8001, Extreme traffic): main-thread long tasks
+were about 6× the old build's. Profiling, not guessing, found three causes, and each was fixed:
+- **Live `backdrop-filter`.** Every glass layer re-blurred what was behind it on every
+  frame a vehicle moved. It's now baked: `assets/city-night-frost.jpg` is a pre-blurred
+  copy of the photo, drawn as the fixed background of the frosted container and the rail.
+  The cards and pills have no live blur, which at 80–90 % opacity was invisible anyway.
+- **One big SVG for the map.** The city, roads and paint were repainted with every
+  vehicle move. `JunctionPlate` is now two stacked SVGs with one viewBox. The bottom one
+  holds the map; its never-changing part is the memoised `RoadBase`/`CityLayer`. The top
+  one, on its own compositor layer, holds the vehicles, release sweep, heads, compass and
+  rain. SVG drop-shadow filters became plain offset shapes.
+- **Per-motion-frame React renders.** Motion frames (`tick: false`, up to 30/s) replaced
+  `latest` and re-rendered every panel. The store now also keeps `latestTick` (the newest
+  non-motion frame). The Overview, Analytics and Performance pages and the top bar read
+  it; vehicles and the clock keep their own per-frame paths. (`useDeferredValue` was tried
+  and backed out: continuous motion frames starved the deferred render.)
+
+The traffic-light cursor's loop now sleeps when the pointer is still. After the fixes the
+new build matches the old one's frame rate at 5×. The remaining per-tick cost is
+`VehicleLayer`, which is unchanged.
+
+Also in this round, at the owner's request:
+- The rail's Simulation-link card is gone, and the rail scrolls/compacts on short screens
+  so Collapse is always visible.
+- KPI tiles are laid out in rows, with the sparkline as a bottom strip, so nothing
+  overlaps at laptop widths.
+- Panel titles wrap instead of being cut off, and the panel meta drops to its own line
+  when tight.
+- The scenario pill lost its chevron.
+- Cards are tinted, translucent blue-grey rather than near-white.
+- Scenario cards got the prototype's pointer tilt, lift and glare.
+- "Choose for" is a styled listbox (`settings/TargetPicker`) instead of a native select.
+- The city now ends at the network edge (`CITY_EXTENT = 0`), with no road continuation.
+  A continuation was tried and rejected: it read as pasted on.
+- 3D vehicles: cars have an extruded side profile with a glasshouse; buses, truck boxes
+  and rickshaw cabs have rounded edges. Every vehicle has headlights and tail-lights,
+  hubcaps and a contact shadow, and paint, glass and chrome reflect a RoomEnvironment.
+  The environment is applied per material, so the road and buildings keep their lighting.

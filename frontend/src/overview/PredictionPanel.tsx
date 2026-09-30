@@ -162,7 +162,7 @@ function ApproachChart({ approach, series }: { approach: 'N' | 'S' | 'E' | 'W'; 
   const line = (k: 'pred' | 'act') => pts.map((p) => `${x(p.t).toFixed(1)},${y(p[k][approach]).toFixed(1)}`).join(' ')
   const last = pts[pts.length - 1]
   return (
-    <div className="min-w-0 rounded-[14px] border border-[rgb(18_30_56/0.08)] bg-white px-2.5 pb-1.5 pt-2.5 shadow-[0_6px_16px_-12px_rgb(3_8_24/0.45)]">
+    <div className="min-w-0 rounded-[14px] border border-white/50 bg-white/55 px-2.5 pb-1.5 pt-2.5 shadow-[0_6px_16px_-12px_rgb(3_8_24/0.45)]">
       <div className="flex items-baseline justify-between px-0.5">
         <span className="text-[13.5px] font-semibold text-ink-strong">{APPROACH_NAME[approach]}</span>
         {last && (

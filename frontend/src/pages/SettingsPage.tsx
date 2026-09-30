@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom'
-import { ChevronDown } from 'lucide-react'
 import { Panel } from '@/ui/Panel'
 import { Reveal } from '@/ui/Reveal'
 import { ScenarioCard, type ScenarioUse } from '@/settings/ScenarioCard'
+import { TargetPicker } from '@/settings/TargetPicker'
 import { DEMO_SCENARIOS, scenarioName } from '@/data/scenarios'
 import { useSettings, type Target } from '@/data/settings'
 import { useRunStore } from '@/data/runState'
@@ -66,22 +66,11 @@ export function SettingsPage() {
           }
           bodyClassName="px-3 pb-3"
         >
-          <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-            <label className="flex items-center gap-2 text-[13px] text-ink">
+          <div className="mb-3.5 flex flex-wrap items-center gap-x-5 gap-y-2">
+            <div className="flex items-center gap-2.5">
               <span className="eyebrow">Choose for</span>
-              <span className="relative">
-                <select
-                  value={target}
-                  onChange={(e) => setTarget(e.target.value as Target)}
-                  className="appearance-none rounded-control border border-rule bg-plate py-1 pl-2.5 pr-7 text-[13px] font-medium text-ink-strong hover:border-[var(--rule-strong)]"
-                >
-                  {TARGETS.map((t) => (
-                    <option key={t.id} value={t.id}>{t.label}</option>
-                  ))}
-                </select>
-                <ChevronDown size={14} aria-hidden className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-ink-mute" />
-              </span>
-            </label>
+              <TargetPicker value={target} onChange={setTarget} />
+            </div>
             <p className="min-w-0 flex-1 text-[13px] leading-[1.55] text-ink">{current.lead}</p>
           </div>
           <div className="grid grid-cols-2 gap-3.5 xl:grid-cols-3">

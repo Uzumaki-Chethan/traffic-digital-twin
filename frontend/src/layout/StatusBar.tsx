@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { Link } from 'react-router-dom'
-import { ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { SlidersHorizontal } from 'lucide-react'
 import { useSim } from '@/data/store'
 import { isEvaluation, isLive } from '@/data/types'
 import { useLiveClock } from '@/data/useLiveClock'
@@ -22,7 +22,7 @@ import { RunControls } from './RunControls'
  * and simply "Simulation paused" while it doesn't.
  */
 export function StatusBar() {
-  const latest = useSim((s) => s.latest)
+  const latest = useSim((s) => s.latestTick)
   const lastLive = useSim((s) => s.lastLive)
   const link = useSim((s) => s.link)
   const { simTime, staleSeconds, tickAge, rate } = useLiveClock()
@@ -94,7 +94,6 @@ export function StatusBar() {
           <SlidersHorizontal size={16} aria-hidden />
           <span style={{ color: '#F5B632' }}>Scenario:</span>
           <span className="whitespace-nowrap font-medium">{page.scenarioLabel}</span>
-          <ChevronDown size={14} strokeWidth={2.2} aria-hidden className="ml-1" />
         </Link>
 
         <RunControls />

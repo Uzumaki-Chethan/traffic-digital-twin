@@ -78,10 +78,10 @@ export function RecentSwitches({ history, powered }: { history: PhaseHistoryEntr
                   <span className="h-[9px] w-[9px] shrink-0 rounded-full border-[1.5px] border-ink-mute" />
                   {clock(s.t)}
                 </span>
-                <span className="flex min-w-0 items-center gap-1 text-ink">
-                  <span className="truncate">{phaseLabel(s.from)}</span>
+                <span className="flex min-w-0 flex-wrap items-center gap-x-1 leading-tight text-ink">
+                  <span>{phaseLabel(s.from)}</span>
                   <ArrowRight size={11} aria-hidden className="shrink-0 text-ink-mute" />
-                  <span className="truncate font-medium text-ink-strong">{phaseLabel(s.to)}</span>
+                  <span className="font-medium text-ink-strong">{phaseLabel(s.to)}</span>
                 </span>
                 <span className="flex shrink-0 items-center gap-1.5">
                   <span className="num text-ink-mute">{s.held != null ? `${Math.round(s.held)} s` : '—'}</span>

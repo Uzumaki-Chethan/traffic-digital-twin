@@ -8,6 +8,15 @@ export type LinkState = 'connecting' | 'open' | 'closed'
 interface SimState {
   link: LinkState
   latest: Snapshot | null
+  /**
+   * The newest frame that is NOT a motion frame — a decision tick, or any
+   * non-running frame. Motion frames (tick: false, up to 30/s) repeat the
+   * last tick with only vehicle positions and the clock moved; the vehicle
+   * layers and useLiveClock read those directly, so the page panels follow
+   * this instead and re-render per tick, not per motion frame
+   * (Section 37.6).
+   */
+  latestTick: Snapshot | null
   /** performance.now() when `latest` arrived — drives staleness. */
   receivedAt: number
   /** Last live snapshot, kept through a link drop so the screen never blanks. */
@@ -57,6 +66,7 @@ export const SMOOTH_MAX_SIM_SECONDS = 1.6
 
 const FRESH = {
   latest: null,
+  latestTick: null,
   receivedAt: 0,
   lastLive: null,
   rate: null,
@@ -85,7 +95,8 @@ export const useSim = create<SimState>((set) => ({
       // interpolation window need all of them. Only a demo frame becomes
       // lastLive - that is Overview's "keep the last picture" fallback.
       const ticking = isLive(snapshot) || isEvaluation(snapshot)
-      if (!ticking) return { latest: snapshot, receivedAt: now }
+      const motion = (snapshot as { tick?: boolean }).tick === false
+      if (!ticking) return { latest: snapshot, latestTick: snapshot, receivedAt: now }
 
       let { rate, tickSim, tickAt, tickInterval, simPerFrame } = prev
       if (snapshot.sim_time !== tickSim) {
@@ -105,9 +116,10 @@ export const useSim = create<SimState>((set) => ({
         tickAt = now
       }
       return {
-        latest: snapshot, receivedAt: now, rate, tickSim, tickAt, tickInterval, simPerFrame,
+        latest: snapshot, latestTick: motion ? prev.latestTick : snapshot,
+        receivedAt: now, rate, tickSim, tickAt, tickInterval, simPerFrame,
         smooth: simPerFrame <= SMOOTH_MAX_SIM_SECONDS,
-        lastLive: isLive(snapshot) ? snapshot : prev.lastLive,
+        lastLive: isLive(snapshot) && !motion ? snapshot : prev.lastLive,
       }
     }),
 }))

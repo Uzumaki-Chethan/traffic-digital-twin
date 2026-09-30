@@ -115,7 +115,12 @@ small {
   display: inline-flex;
   align-items: center;
   gap: 11px;
-  white-space: nowrap;
+  min-width: 0;
+  flex-shrink: 1;
+  /* Orbitron is wide: in a narrow card the title wraps to a second line
+     rather than being cut off. */
+  line-height: 1.3;
+  overflow-wrap: anywhere;
   font-family: var(--font-display);
   font-size: 14.5px;
   font-weight: 600;
@@ -127,14 +132,14 @@ small {
   letter-spacing: 0;
 }
 
-/* The one card: pale glass over the frosted container. */
+/* The one card: pale glass over the frosted container. No live
+   backdrop-filter: at 80–90 % white it was invisible, and it re-blurred on
+   every frame the map moved (Section 37.6). */
 .glass-card {
   border-radius: var(--r-panel);
   border: 1px solid var(--glass-edge);
   background-image: linear-gradient(180deg, var(--glass-a), var(--glass-b));
   box-shadow: var(--shadow-panel);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
 }
 
 /* Dark glass pill: every control that sits directly on the frosted
@@ -144,8 +149,6 @@ small {
   border: 1px solid var(--control-edge);
   background: linear-gradient(180deg, var(--control-a), var(--control-b));
   box-shadow: var(--shadow-control);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   transition: border-color var(--dur-fast), background var(--dur-fast);
 }
 .glass-control:hover:not(:disabled) {
@@ -404,8 +407,6 @@ button.rail-card:hover {
 .scenario-pill {
   background: linear-gradient(180deg, var(--control-a), rgb(10 14 26 / 0.84));
   box-shadow: inset 0 0 0 1.5px rgb(245 176 50 / 0.9), 0 0 18px -4px rgb(245 170 40 / 0.55);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   transition: box-shadow var(--dur-fast);
 }
 .scenario-pill:hover {
@@ -440,6 +441,30 @@ button.rail-card:hover {
   background: rgb(255 255 255 / 0.9);
   border: 1px solid rgb(27 37 54 / 0.1);
   box-shadow: 0 4px 12px -4px rgb(0 0 0 / 0.3);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Scenario cards (settings/ScenarioCard): tilt toward the pointer, lift on
+   hover, a glare that follows the pointer — the prototype's card feel. */
+.scenario-card {
+  transform: perspective(1100px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(var(--ty, 0px));
+  transition: transform 0.28s var(--ease-out), border-color 0.2s, box-shadow 0.28s;
+}
+.scenario-card:hover:not(:disabled) {
+  --ty: -4px;
+  box-shadow: var(--shadow-panel), 0 22px 40px -20px rgb(3 8 24 / 0.55), 0 0 0 1px rgb(255 176 32 / 0.18);
+}
+.scenario-card:active:not(:disabled) {
+  --ty: -1px;
+}
+.scenario-glare {
+  background: radial-gradient(420px circle at var(--gx, 50%) var(--gy, -40%), rgb(255 255 255 / 0.55), transparent 45%);
+  opacity: 0;
+  mix-blend-mode: soft-light;
+  transition: opacity 0.25s;
+}
+.scenario-card:hover:not(:disabled) .scenario-glare {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scenario-card { transform: none; }
 }

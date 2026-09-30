@@ -46,19 +46,38 @@ export function ScenarioCard({
   index?: number
 }) {
   const reduced = useReducedMotion()
+  // The prototype's card feel: the card tilts toward the pointer (up to
+  // ~4.5° / 3.5°), lifts 4 px, and a soft glare follows the pointer across
+  // it. CSS variables written on pointer move; the transform lives on the
+  // button, the entrance on the wrapper, so framer and the tilt never
+  // fight over the same transform.
+  const onMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (reduced || disabled) return
+    const el = e.currentTarget
+    const b = el.getBoundingClientRect()
+    const u = (e.clientX - b.left) / b.width
+    const v = (e.clientY - b.top) / b.height
+    el.style.setProperty('--gx', `${u * 100}%`)
+    el.style.setProperty('--gy', `${v * 100}%`)
+    el.style.setProperty('--ry', `${((u - 0.5) * 9).toFixed(2)}deg`)
+    el.style.setProperty('--rx', `${((0.5 - v) * 7).toFixed(2)}deg`)
+  }
   return (
-    <motion.button
+    <motion.div
+      initial={reduced ? false : { opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ ...enter, delay: Math.min(index * STAGGER * 0.45, 0.45) }}
+      className="flex"
+    >
+    <button
       type="button"
       onClick={onSelect}
       disabled={disabled}
       aria-pressed={selected}
-      initial={reduced ? false : { opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={reduced || disabled ? undefined : { y: -2 }}
-      whileTap={reduced || disabled ? undefined : { scale: 0.985, y: 0 }}
-      transition={{ ...enter, delay: Math.min(index * STAGGER * 0.45, 0.45) }}
+      onPointerMove={onMove}
+      onPointerLeave={onLeave}
       className={clsx(
-        'glass-card group relative flex flex-col overflow-hidden text-left transition-[border-color,box-shadow]',
+        'scenario-card glass-card group relative flex w-full flex-col overflow-hidden text-left',
         disabled && 'cursor-not-allowed opacity-60',
       )}
       style={
@@ -113,8 +132,18 @@ export function ScenarioCard({
         </motion.span>
       )}
       </span>
-    </motion.button>
+      {/* the glare that follows the pointer */}
+      <span aria-hidden className="scenario-glare pointer-events-none absolute inset-0 z-[2]" />
+    </button>
+    </motion.div>
   )
+}
+
+/** Pointer left: the card eases back flat. */
+function onLeave(e: React.PointerEvent<HTMLButtonElement>) {
+  const el = e.currentTarget
+  el.style.removeProperty('--rx')
+  el.style.removeProperty('--ry')
 }
 
 /** Light / Moderate / Heavy / Ramping, coloured like the signal it stresses. */

@@ -41,7 +41,11 @@ const EMPTY: LiveSnapshot = {
  * pointing elsewhere or replaying the last demo frame.
  */
 export function OverviewPage() {
-  const latest = useSim((s) => s.latest)
+  // Per decision tick, not per motion frame (Section 37.6): vehicles and
+  // the clock have their own paths. (Not useDeferredValue — with motion
+  // frames arriving continuously the deferred render was starved and the
+  // page stuck on "not running".)
+  const latest = useSim((s) => s.latestTick)
   const lastLive = useSim((s) => s.lastLive)
   const link = useSim((s) => s.link)
   const run = useRunStore((s) => s.state)

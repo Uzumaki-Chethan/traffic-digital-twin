@@ -21,7 +21,7 @@ import {
   type LaneGeom,
 } from './plateGeometry'
 import { VehicleLayer } from './VehicleLayer'
-import { BUILDINGS, CITY_EXTENT, SIDEWALK_OUT, TREES, canopyTone, roofTone } from './cityscape'
+import { BUILDINGS, SIDEWALK_OUT, TREES, canopyTone, roofTone } from './cityscape'
 import type { MotionSide } from '@/data/motion'
 import { DUR, EASE_OUT } from '@/ui/motion'
 
@@ -102,13 +102,15 @@ export function JunctionPlate({
     return { x, y, w, h }
   }, [viewBox])
 
-  const a = CENTRE - JUNCTION_HALF // 178.4
-  const b = CENTRE + JUNCTION_HALF // 221.6
-  const lo = CENTRE - ROAD_HALF // 190.4
-  const hi = CENTRE + ROAD_HALF // 209.6
-
   return (
-    <svg viewBox={viewBox} className="h-full w-full select-none" role="img" aria-label={plateSummary(lanes, powered)}>
+    // Two stacked layers with the same viewBox. The bottom one is the map
+    // — ground, city, roads, paint, lane fills, labels — and repaints only
+    // when a signal changes (1 Hz) or the view pans/zooms. The top one holds
+    // everything that moves every frame (vehicles, the release sweep, rain)
+    // plus the heads and compass, on its own compositor layer, so a moving
+    // car no longer forces the whole city to repaint (Section 37.6).
+    <div className="relative h-full w-full">
+    <svg viewBox={viewBox} className="absolute inset-0 h-full w-full select-none" role="img" aria-label={plateSummary(lanes, powered)}>
       <defs>
         {/* The box junction's yellow cross-hatch, as painted on a real one. */}
         <pattern id="boxHatch" width="3.2" height="3.2" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -121,81 +123,9 @@ export function JunctionPlate({
         <marker id="arrowhead" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="1.6" markerHeight="1.6" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
           <path d="M 0 1.5 L 10 5 L 0 8.5 z" fill="var(--plate-marking)" />
         </marker>
-        {/* One rain streak tile, 5 x 10 m, with a slight wind-slant. The
-            overlay rect below is translated by exactly one tile height per
-            loop, which is what makes the fall seamless. */}
-        <pattern id="rainStreaks" width="5" height="10" patternUnits="userSpaceOnUse">
-          <line x1="0.5" y1="0" x2="0" y2="4" stroke="#cfe0ee" strokeWidth="0.22" />
-          <line x1="3" y1="5" x2="2.5" y2="9" stroke="#cfe0ee" strokeWidth="0.22" />
-        </pattern>
       </defs>
 
-      {/* ground, well past the network so a wide window shows land, not card */}
-      <rect x={-NET * 4} y={-NET * 4} width={NET * 9} height={NET * 9} fill="var(--plate-ground)" />
-
-      {/* sidewalks along every arm, and the paved corners round the box */}
-      <g fill="var(--plate-sidewalk)">
-        <rect x={CENTRE - SIDEWALK_OUT} y={-CITY_EXTENT} width={SIDEWALK_OUT * 2} height={NET + CITY_EXTENT * 2} />
-        <rect x={-CITY_EXTENT} y={CENTRE - SIDEWALK_OUT} width={NET + CITY_EXTENT * 2} height={SIDEWALK_OUT * 2} />
-        <rect x={a - 4} y={a - 4} width={b - a + 8} height={b - a + 8} rx={6} />
-      </g>
-
-      <CityLayer />
-
-      {/* carriageways and the junction, exactly the network's shapes */}
-      {ARM_RECTS.map(([x, y, w, h]) => (
-        <rect key={`${x},${y}`} x={x} y={y} width={w} height={h} fill="var(--plate-road)" />
-      ))}
-      <path d={junctionOutline()} fill="var(--plate-road)" />
-
-      {/* kerb edge lines: each corner is arm edge -> 12 m fillet -> arm edge */}
-      <g fill="none" stroke="var(--plate-kerb)" strokeWidth="1.5" vectorEffect="non-scaling-stroke">
-        <path d={`M ${hi} 0 L ${hi} ${a} A ${KERB_R} ${KERB_R} 0 0 0 ${b} ${lo} L ${NET} ${lo}`} vectorEffect="non-scaling-stroke" />
-        <path d={`M ${NET} ${hi} L ${b} ${hi} A ${KERB_R} ${KERB_R} 0 0 0 ${hi} ${b} L ${hi} ${NET}`} vectorEffect="non-scaling-stroke" />
-        <path d={`M ${lo} ${NET} L ${lo} ${b} A ${KERB_R} ${KERB_R} 0 0 0 ${a} ${hi} L 0 ${hi}`} vectorEffect="non-scaling-stroke" />
-        <path d={`M 0 ${lo} L ${a} ${lo} A ${KERB_R} ${KERB_R} 0 0 0 ${lo} ${a} L ${lo} 0`} vectorEffect="non-scaling-stroke" />
-      </g>
-
-      {/* junction box — hatched, dashed boundary, as on a signal plan */}
-      <path d={junctionOutline()} fill="url(#boxHatch)" stroke="var(--plate-centre)" strokeWidth="0.35" opacity="0.85" />
-
-      {/* pedestrian crossings: zebra bars in a 3 m band just inside each stop line */}
-      <g fill="var(--plate-marking)" opacity="0.92">
-        {zebra(lo, hi, a + CROSSING_IN, 'h')}
-        {zebra(lo, hi, b - CROSSING_IN - CROSSING_W, 'h')}
-        {zebra(lo, hi, a + CROSSING_IN, 'v')}
-        {zebra(lo, hi, b - CROSSING_IN - CROSSING_W, 'v')}
-      </g>
-
-      {/* centre lines — double yellow, 0.15 m each */}
-      <g stroke="var(--plate-centre)" strokeWidth="0.15">
-        {[-0.22, 0.22].map((o) => (
-          <g key={o}>
-            <line x1={CENTRE + o} y1={0} x2={CENTRE + o} y2={a} />
-            <line x1={CENTRE + o} y1={b} x2={CENTRE + o} y2={NET} />
-            <line x1={0} y1={CENTRE + o} x2={a} y2={CENTRE + o} />
-            <line x1={b} y1={CENTRE + o} x2={NET} y2={CENTRE + o} />
-          </g>
-        ))}
-      </g>
-
-      {/* lane dividers — 3 m dash, 3 m gap; inbound stronger than outbound */}
-      <g stroke="var(--plate-lane)" strokeWidth="0.18" fill="none" strokeDasharray="3 3">
-        {[LANE_W, 2 * LANE_W].map((d) => (
-          <g key={d}>
-            {/* inbound: N east of centre, S west, W north (-y), E south (+y) */}
-            <line x1={CENTRE + d} y1={0} x2={CENTRE + d} y2={a} opacity="0.85" />
-            <line x1={CENTRE - d} y1={b} x2={CENTRE - d} y2={NET} opacity="0.85" />
-            <line x1={0} y1={CENTRE - d} x2={a} y2={CENTRE - d} opacity="0.85" />
-            <line x1={b} y1={CENTRE + d} x2={NET} y2={CENTRE + d} opacity="0.85" />
-            {/* outbound */}
-            <line x1={CENTRE - d} y1={0} x2={CENTRE - d} y2={a} opacity="0.4" />
-            <line x1={CENTRE + d} y1={b} x2={CENTRE + d} y2={NET} opacity="0.4" />
-            <line x1={0} y1={CENTRE + d} x2={a} y2={CENTRE + d} opacity="0.4" />
-            <line x1={b} y1={CENTRE - d} x2={NET} y2={CENTRE - d} opacity="0.4" />
-          </g>
-        ))}
-      </g>
+      <RoadBase />
 
       {/* per-lane live layer: fill, hover, stop bar */}
       {LANES.map((g) => (
@@ -217,6 +147,45 @@ export function JunctionPlate({
           <path key={g.id} d={arrowPath(g.index)} transform={laneTransform(g)} />
         ))}
       </g>
+
+      {/* Approach names, pinned to the edges of the CURRENT window rather
+          than to the ends of the arms — at the default junction framing
+          the arm ends are off screen, which left the plate with no
+          orientation label at all except the compass. Each sits on the
+          verge beside its own inbound carriageway, so it names the side
+          the traffic arrives from. */}
+      <g fontFamily="var(--font-ui)" fontSize="12" fontWeight="600" display={showLabels ? undefined : 'none'}>
+        {APPROACH_ORDER.map((arm) => {
+          // White pills on each road's own line at the window's edge,
+          // the way a map labels a road.
+          const inset = 20 * px
+          const w = APPROACH_NAMES[arm].length * 7.4 + 20
+          const x = arm === 'W' ? vb.x + inset + (w / 2) * px : arm === 'E' ? vb.x + vb.w - inset - (w / 2) * px : CENTRE
+          const y = arm === 'N' ? vb.y + inset : arm === 'S' ? vb.y + vb.h - inset : CENTRE
+          return (
+            <g key={arm} transform={`translate(${x} ${y}) scale(${px})`}>
+              <rect x={-w / 2} y={-9.5} width={w} height={22} rx={11} fill="rgb(0 0 0 / 0.16)" />
+              <rect x={-w / 2} y={-11} width={w} height={22} rx={11} fill="#fff" opacity="0.97" />
+              <text textAnchor="middle" dominantBaseline="central" fill="var(--plate-ink)">
+                {APPROACH_NAMES[arm]}
+              </text>
+            </g>
+          )
+        })}
+      </g>
+
+    </svg>
+
+    <svg viewBox={viewBox} aria-hidden className="pointer-events-none absolute inset-0 h-full w-full select-none" style={{ willChange: 'transform' }}>
+      <defs>
+        {/* One rain streak tile, 5 x 10 m, with a slight wind-slant. The
+            overlay rect below is translated by exactly one tile height per
+            loop, which is what makes the fall seamless. */}
+        <pattern id="rainStreaks" width="5" height="10" patternUnits="userSpaceOnUse">
+          <line x1="0.5" y1="0" x2="0" y2="4" stroke="#cfe0ee" strokeWidth="0.22" />
+          <line x1="3" y1="5" x2="2.5" y2="9" stroke="#cfe0ee" strokeWidth="0.22" />
+        </pattern>
+      </defs>
 
       {/* THE RELEASE. On the confirmed green, light runs once along the
           painted arrow in the direction of travel — drawn as the path's
@@ -247,31 +216,6 @@ export function JunctionPlate({
         </g>
       )}
 
-      {/* Approach names, pinned to the edges of the CURRENT window rather
-          than to the ends of the arms — at the default junction framing
-          the arm ends are off screen, which left the plate with no
-          orientation label at all except the compass. Each sits on the
-          verge beside its own inbound carriageway, so it names the side
-          the traffic arrives from. */}
-      <g fontFamily="var(--font-ui)" fontSize="12" fontWeight="600" display={showLabels ? undefined : 'none'}>
-        {APPROACH_ORDER.map((arm) => {
-          // White pills on each road's own line at the window's edge,
-          // the way a map labels a road.
-          const inset = 20 * px
-          const w = APPROACH_NAMES[arm].length * 7.4 + 20
-          const x = arm === 'W' ? vb.x + inset + (w / 2) * px : arm === 'E' ? vb.x + vb.w - inset - (w / 2) * px : CENTRE
-          const y = arm === 'N' ? vb.y + inset : arm === 'S' ? vb.y + vb.h - inset : CENTRE
-          return (
-            <g key={arm} transform={`translate(${x} ${y}) scale(${px})`}>
-              <rect x={-w / 2} y={-11} width={w} height={22} rx={11} fill="#fff" opacity="0.96" style={{ filter: 'drop-shadow(0 2px 3px rgb(0 0 0 / 0.25))' }} />
-              <text textAnchor="middle" dominantBaseline="central" fill="var(--plate-ink)">
-                {APPROACH_NAMES[arm]}
-              </text>
-            </g>
-          )
-        })}
-      </g>
-
       {/* Real vehicles at their real size, from the motion buffer: one
           element per vehicle, its transform written every animation
           frame at the display clock's time (see VehicleLayer). Size
@@ -281,7 +225,8 @@ export function JunctionPlate({
 
       {/* north arrow, pinned to the window's bottom-right, above the zoom pills */}
       <g transform={`translate(${vb.x + vb.w} ${vb.y + vb.h}) scale(${px}) translate(-33 -78)`}>
-        <circle r="14" fill="#fff" stroke="rgb(27 37 54 / 0.25)" strokeWidth="1" style={{ filter: 'drop-shadow(0 2px 3px rgb(0 0 0 / 0.25))' }} />
+        <circle r="14" cy="1.5" fill="rgb(0 0 0 / 0.16)" />
+        <circle r="14" fill="#fff" stroke="rgb(27 37 54 / 0.25)" strokeWidth="1" />
         <path d="M 0 -11 L -4 0 L 4 0 Z" fill="#E5484D" />
         <path d="M 0 11 L -4 0 L 4 0 Z" fill="#2F6BFF" />
         <text y="-19" textAnchor="middle" fontSize="11" fontWeight="700" fontFamily="var(--font-num)" fill="var(--plate-ink)">
@@ -321,6 +266,7 @@ export function JunctionPlate({
         />
       )}
     </svg>
+    </div>
   )
 }
 
@@ -457,6 +403,90 @@ function SignalHead({
     </g>
   )
 }
+
+/**
+ * Everything on the map that never changes — ground, sidewalks, the city,
+ * the carriageways (and their scenery continuation), kerbs, the hatched
+ * box, zebras and lane paint. Built once and memoised, so a decision tick
+ * re-renders only the lane fills, arrows and labels (Section 37.6).
+ */
+const RoadBase = memo(function RoadBase() {
+  const a = CENTRE - JUNCTION_HALF
+  const b = CENTRE + JUNCTION_HALF
+  const lo = CENTRE - ROAD_HALF
+  const hi = CENTRE + ROAD_HALF
+  return (
+    <>
+      {/* ground, well past the network so a wide window shows land, not card */}
+      <rect x={-NET * 4} y={-NET * 4} width={NET * 9} height={NET * 9} fill="var(--plate-ground)" />
+
+      {/* sidewalks along every arm, and the paved corners round the box */}
+      <g fill="var(--plate-sidewalk)">
+        <rect x={CENTRE - SIDEWALK_OUT} y={0} width={SIDEWALK_OUT * 2} height={NET} />
+        <rect x={0} y={CENTRE - SIDEWALK_OUT} width={NET} height={SIDEWALK_OUT * 2} />
+        <rect x={a - 4} y={a - 4} width={b - a + 8} height={b - a + 8} rx={6} />
+      </g>
+
+      <CityLayer />
+
+      {/* carriageways and the junction, exactly the network's shapes */}
+      {ARM_RECTS.map(([x, y, w, h]) => (
+        <rect key={`${x},${y}`} x={x} y={y} width={w} height={h} fill="var(--plate-road)" />
+      ))}
+      <path d={junctionOutline()} fill="var(--plate-road)" />
+
+      {/* kerb edge lines: each corner is arm edge -> 12 m fillet -> arm edge */}
+      <g fill="none" stroke="var(--plate-kerb)" strokeWidth="1.5" vectorEffect="non-scaling-stroke">
+        <path d={`M ${hi} 0 L ${hi} ${a} A ${KERB_R} ${KERB_R} 0 0 0 ${b} ${lo} L ${NET} ${lo}`} vectorEffect="non-scaling-stroke" />
+        <path d={`M ${NET} ${hi} L ${b} ${hi} A ${KERB_R} ${KERB_R} 0 0 0 ${hi} ${b} L ${hi} ${NET}`} vectorEffect="non-scaling-stroke" />
+        <path d={`M ${lo} ${NET} L ${lo} ${b} A ${KERB_R} ${KERB_R} 0 0 0 ${a} ${hi} L 0 ${hi}`} vectorEffect="non-scaling-stroke" />
+        <path d={`M 0 ${lo} L ${a} ${lo} A ${KERB_R} ${KERB_R} 0 0 0 ${lo} ${a} L ${lo} 0`} vectorEffect="non-scaling-stroke" />
+      </g>
+
+      {/* junction box — hatched, dashed boundary, as on a signal plan */}
+      <path d={junctionOutline()} fill="url(#boxHatch)" stroke="var(--plate-centre)" strokeWidth="0.35" opacity="0.85" />
+
+      {/* pedestrian crossings: zebra bars in a 3 m band just inside each stop line */}
+      <g fill="var(--plate-marking)" opacity="0.92">
+        {zebra(lo, hi, a + CROSSING_IN, 'h')}
+        {zebra(lo, hi, b - CROSSING_IN - CROSSING_W, 'h')}
+        {zebra(lo, hi, a + CROSSING_IN, 'v')}
+        {zebra(lo, hi, b - CROSSING_IN - CROSSING_W, 'v')}
+      </g>
+
+      {/* centre lines — double yellow, 0.15 m each */}
+      <g stroke="var(--plate-centre)" strokeWidth="0.15">
+        {[-0.22, 0.22].map((o) => (
+          <g key={o}>
+            <line x1={CENTRE + o} y1={0} x2={CENTRE + o} y2={a} />
+            <line x1={CENTRE + o} y1={b} x2={CENTRE + o} y2={NET} />
+            <line x1={0} y1={CENTRE + o} x2={a} y2={CENTRE + o} />
+            <line x1={b} y1={CENTRE + o} x2={NET} y2={CENTRE + o} />
+          </g>
+        ))}
+      </g>
+
+      {/* lane dividers — 3 m dash, 3 m gap; inbound stronger than outbound */}
+      <g stroke="var(--plate-lane)" strokeWidth="0.18" fill="none" strokeDasharray="3 3">
+        {[LANE_W, 2 * LANE_W].map((d) => (
+          <g key={d}>
+            {/* inbound: N east of centre, S west, W north (-y), E south (+y) */}
+            <line x1={CENTRE + d} y1={0} x2={CENTRE + d} y2={a} opacity="0.85" />
+            <line x1={CENTRE - d} y1={b} x2={CENTRE - d} y2={NET} opacity="0.85" />
+            <line x1={0} y1={CENTRE - d} x2={a} y2={CENTRE - d} opacity="0.85" />
+            <line x1={b} y1={CENTRE + d} x2={NET} y2={CENTRE + d} opacity="0.85" />
+            {/* outbound */}
+            <line x1={CENTRE - d} y1={0} x2={CENTRE - d} y2={a} opacity="0.4" />
+            <line x1={CENTRE + d} y1={b} x2={CENTRE + d} y2={NET} opacity="0.4" />
+            <line x1={0} y1={CENTRE + d} x2={a} y2={CENTRE + d} opacity="0.4" />
+            <line x1={b} y1={CENTRE - d} x2={NET} y2={CENTRE - d} opacity="0.4" />
+          </g>
+        ))}
+      </g>
+
+    </>
+  )
+})
 
 /** Zebra bars across one crossing band: 0.5 m bars, 0.6 m gaps, 3 m long. */
 function zebra(from: number, to: number, at: number, dir: 'h' | 'v') {

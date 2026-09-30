@@ -48,7 +48,11 @@ import { LiveDataSource } from '@/analytics/LiveDataSource'
  * for spread, and a scatter for a relationship.
  */
 export function AnalyticsPage() {
-  const latest = useSim((s) => s.latest)
+  // Per decision tick, not per motion frame (Section 37.6): vehicles and
+  // the clock have their own paths. (Not useDeferredValue — with motion
+  // frames arriving continuously the deferred render was starved and the
+  // page stuck on "not running".)
+  const latest = useSim((s) => s.latestTick)
   const lastLive = useSim((s) => s.lastLive)
   const revision = useLiveHistory((s) => s.revision)
   const count = useLiveHistory((s) => s.count)
