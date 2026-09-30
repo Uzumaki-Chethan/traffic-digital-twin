@@ -112,10 +112,12 @@ enter. It is spent in four places, in priority order:
    bars that scale from the leading edge, 0.97 press scales.
 4. **Arrival, once per page** - `Reveal`, 14px over 420ms, 70ms apart, on mount only.
 
-Still banned: anything looping in the periphery (the amber lamp excepted), glow pulses,
-spinners past 300ms, and any code whose correctness depends on an animation finishing.
-Everything honours `prefers-reduced-motion`. See `PROJECT_ARCHITECTURE_REPORT.md`
-Section 29 and section 5.4 of the design brief.
+Still banned: spinners past 300ms, and any code whose correctness depends on an animation
+finishing. The looping-in-the-periphery/glow-pulse ban that used to sit here was lifted by
+the owner on 2026-09-21 (`docs/UI_CHANGE_RULES.md` §2) ahead of a planned animated redesign
+and a highly-animated home screen. Everything still honours `prefers-reduced-motion`. See
+`PROJECT_ARCHITECTURE_REPORT.md` Section 29 (the original design brief this pointed to was
+retired 2026-09-20).
 
 ## Things verified against source, not assumed
 

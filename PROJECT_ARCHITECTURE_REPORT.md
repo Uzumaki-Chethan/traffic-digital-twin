@@ -3762,3 +3762,111 @@ not three.
   red circle lit, arrows dark (fully stopped, waiting its turn). All three states matched
   the confirmed design exactly. `tsc -b`, `oxlint`, all 18 Vitest cases, and the production
   build are clean; the plan view's own per-lane lamps were not touched.
+
+## SECTION 35 — The aesthetic motion ban lifted (2026-09-21) (CURRENT STATE)
+
+Requested: with an animated redesign of the existing pages coming, plus a separately-briefed
+"highly animated" home screen, the user had `docs/UI_CHANGE_RULES.md` §2 read back to him
+and recognized its written line — "no neon, glow pulses, glassmorphism, looping motion in
+the periphery" — as a real part of what had been constraining design work on this project,
+not just the retired brief and its skills (Section 33). He removed it outright.
+
+- **This was always the owner's own stated taste, not an artifact of tooling.** Unlike the
+  design brief and the `ui-ux-pro-max`/`design`/`design-system`/`ui-styling` skills (Section
+  33, both removed because they were external references imposing a direction), this ban
+  traces to Chethan's own direct, repeated rejections in conversation — the first redesign
+  attempt's neon-glow/glassmorphism look ("not a good design... need something that doesn't
+  look ai at all"), and a 2026-09-11 Gemini prompt proposing the same look, rejected again.
+  `docs/UI_CHANGE_RULES.md` §2 had simply written that personal preference down as a
+  checklist item, which is exactly what made it visible as "a rule" rather than "his taste
+  today" — and exactly why reading it back surfaced the tension.
+- **What's lifted, what isn't.** Gone: the ban on neon, glow pulses, glassmorphism, and
+  looping motion in the periphery. Unchanged: the two data-integrity rules beside it in §2
+  (no invented numbers, never show prediction confidence) and the one motion rule that is
+  functional rather than aesthetic — nothing's correctness may depend on an animation
+  finishing. `frontend/src/ui/motion.ts`'s existing `--dur-*`/`--ease-*` vocabulary
+  (Section 29) is not removed either; it is now a starting point for the next round, not a
+  ceiling on it.
+- **Updated:** `docs/UI_CHANGE_RULES.md` §2 (the rule itself, with the lift recorded in
+  place), `CLAUDE.md`'s two mentions (the "standing rules" bullet and the "Motion has one
+  vocabulary" paragraph, both reworded to past tense where the ban no longer applies), and
+  `frontend/README.md`'s "still banned" line. Historical sections describing when the ban
+  was in force (29, 30, 31, 32.1, 34) are left as accurate history, per this file's own
+  rule against editing the record away — they were true when written.
+- **Memory updated the same way**, since two long-lived memory entries had encoded this as
+  an ongoing constraint for future sessions: `feedback_frontend_design_restraint.md` (the
+  original restraint feedback — now marked historical, its description rewritten so it
+  cannot be mistaken for a live rule) and `ui-motion-vocabulary.md` (which had said "still
+  genuinely banned: looping in the periphery, glow pulses" — corrected). Nothing about the
+  actual codebase changed in this section; it is a documentation-and-memory correction
+  clearing the way for the work that comes next.
+
+## SECTION 36 — Physical rig bring-up begins; the signal head reverts to four lenses, this time as one real glyph (2026-09-26) (CURRENT STATE)
+
+Track: physical hardware, per a separately-supplied hardware design & BOM doc (v1.1, USB
+serial, solderless) — an acrylic scale model of junction C with four signal heads, driven
+live by the AI over a single USB cable to an ESP32 (WS2811 addressable pixels, no WiFi).
+`firmware/` is no longer empty.
+
+**Toolchain bring-up (bench, not yet wired to any pixels):**
+- Arduino IDE 2.x + ESP32 (WROOM-32) board support + Adafruit NeoPixel library installed.
+- First real obstacle: the stock `Blink` example failed to compile (`'LED_BUILTIN' was not
+  declared in this scope`) — this specific ESP32 DevKit variant doesn't define it. Fixed by
+  hardcoding `#define LED_BUILTIN 2`, which is also the correct pin independently (Section
+  5.5 of the hardware doc lists GPIO 2 as the onboard serial-link indicator LED).
+- Second obstacle: compiled fine but upload failed (`no upload port provided`) — Windows had
+  no driver for the board's CP2102 USB-UART chip (Device Manager showed it under "Other
+  devices", code 28). Fixed with Silicon Labs' CP210x Universal Windows Driver, installed
+  manually via Device Manager → Update Driver → point at the extracted folder (no `.exe`
+  installer ships in that particular package). Board now enumerates as COM3; Blink uploaded
+  and the onboard LED confirmed blinking — the whole toolchain is proven end to end.
+- `firmware/bench_test/bench_test.ino` added: cycles each pixel in a chain through
+  red/amber/green one at a time (GPIO 13, 60% brightness cap per the doc's brownout
+  mitigation), for the doc's Section 8 steps 1–2 (bench-test a few pixels, then the full
+  chain) before any acrylic is cut.
+
+**The signal head design changed again — and this time it's actually right.** Section 34
+(2026-09-20) deliberately moved OFF a combined left+ahead arrow onto five independent
+lenses. Wiring the physical rig forced re-examining that: this junction's left turn and
+straight movement run in the exact same phase on every approach (Section 25), so they will
+*always* show the same colour — a separate physical LED for each buys nothing but doubles
+the pixel count and the wiring. The user's call: merge them back, 4 lenses per head (shared
+red circle, shared amber circle, one combined left+ahead arrow, one right arrow) — 16
+pixels for the intersection, not Section 34's 20 or the hardware doc's original,
+independently-drafted 12 (which didn't share circles at all).
+
+- **The first attempt at the combined arrow was wrong and caught before shipping.** The
+  obvious-looking implementation reused `arrowShape(TURN_LEFT)` and `arrowShape(TURN_AHEAD)`
+  (Section 34's own per-arrow geometry) and merged the two into one `THREE.BufferGeometry`
+  via `BufferGeometryUtils.mergeGeometries`. Each template arrow carries a tail extending
+  *away* from its own head, through the shared pivot — merging two put both tails sticking
+  out past centre in directions with no arrowhead at the end, which reads as a confusing
+  plus/cross, not a legible combined glyph. The user flagged it on sight ("it should clearly
+  show both directions") before it was ever screenshotted from the actual 3D view.
+- **Replaced with `combinedLeftAheadShape()`** (`Junction3D.tsx`): one hand-authored,
+  single-path polygon — a shared vertical stem forking partway up into a left branch and an
+  ahead branch, each ending in its own arrowhead. This is the same shape real combined-
+  movement traffic signal lenses actually use. Verified by rendering the exact point list as
+  a standalone SVG before touching the 3D scene (a green forked left+up glyph, unambiguous)
+  — cheaper than round-tripping through the full three.js pipeline to catch a geometry
+  mistake a second time.
+- `Head.arrows` is now `[combinedArrow, rightArrow]` (length 2, not 3). The tick loop reads
+  `lamps = [left, straight, right]` as before (still needed for the shared-circle
+  quiet-approach logic and the per-lane stop-line bars, both unchanged), but now derives one
+  `combinedLamp` from `lamps[0]`/`lamps[1]` — defensively taking whichever ranks more
+  "active" (green > amber > red) as a tie-break, rather than assuming the two lanes can
+  never differ for even one tick.
+- `LENS_X` went from five positions to four (`[-2.25, -0.75, 0.75, 2.25]`), same 1.5 m
+  spacing, centred in the unchanged 7.2 m head housing.
+- Verified: `tsc -b --noEmit`, `npx vitest run` (18/18), `npm run lint` (oxlint, clean), and
+  `npm run build` all clean. Visual check was the SVG glyph render above, not yet a live run
+  against a real backend (none was running during this session) — a live-run visual check
+  of the mast heads (per Section 34's own verification) is still owed once a scenario is run
+  with this build.
+- **`firmware/` will need its own signal-string sketch matching 4 lenses/head (16 total),
+  not the hardware doc's original 12** — the doc's Section 2.2/7 wire format (`raw_state`,
+  SUMO's 12-character per-lane link-state string) still gives the ONLY authoritative
+  per-lane colour; the ESP32 firmware maps it down to 16 physical pixels (each arrow lens
+  driven by whichever of its constituent lane characters is more "active", same tie-break
+  rule as the 3D view above) rather than driving 12 lenses 1:1. Not yet written — next step
+  after the bench test passes on a few loose pixels.

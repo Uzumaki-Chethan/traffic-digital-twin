@@ -328,10 +328,12 @@ unprompted, but do keep this section current if that changes:
   the reference-kit process). `docs/UI_CHANGE_RULES.md` is now the one binding UI contract;
   it already carries forward the brief's essential data rules (no invented numbers, no
   confidence in the UI, no internal jargon) in its own §2, so nothing was lost when the
-  brief left. Two standing rules from the user: **never show prediction confidence
-  anywhere in the UI**, and do NOT
-  reintroduce neon/glassmorphism (a Gemini prompt proposing exactly that was reviewed and
-  rejected on 2026-09-11 — it also assumed a Flask/Socket.IO backend that doesn't exist).
+  brief left. One standing rule from the user: **never show prediction confidence
+  anywhere in the UI**. (The neon/glassmorphism ban that used to sit here too — rejected on
+  2026-09-11 when a Gemini prompt proposed exactly that, among other reasons — was itself
+  lifted by the user on 2026-09-21, along with the "no looping motion" rule below; see
+  `docs/UI_CHANGE_RULES.md` §2. Real animated work, including a planned highly-animated home
+  screen, is coming and wants motion and effects freely.)
   A 3D miniature of the junction DOES exist now, at the user's explicit request
   (`overview/Junction3D.tsx`) — three.js, true network scale, sumo-gui's own look; that is
   not the rejected neon "3D cyberpunk" direction. Since 2026-09-14 the plan view is ALSO
@@ -350,23 +352,35 @@ unprompted, but do keep this section current if that changes:
   there); when the other kind is running, Start ends it first
   (`runState.replaceWith*`). Performance idle is the full dark layout, never a
   placeholder card (Section 30.6–30.7).
-  **Motion has one vocabulary (2026-09-15, Section 29):** `src/ui/motion.ts` plus the
+  **Motion had one vocabulary (2026-09-15, Section 29):** `src/ui/motion.ts` plus the
   `--dur-*`/`--ease-*` tokens, spent on the signal release (the arrow sweep and lamp bloom
   on a confirmed green, triggered by the derived `utils/signal.phaseKey`), data tweens,
-  pointer answers, and a once-per-page arrival. The original design brief's blanket motion
-  ban was lifted by the user well before the brief itself was retired (see above); still
-  banned: looping in the periphery (with two owner-approved exceptions so far — the
-  emergency light bars, Section 30.18, and rain, Section 31), glow pulses, and depending on
-  an animation finishing for correctness. Analytics reads the LIVE stream only, by
+  pointer answers, and a once-per-page arrival — a deliberately restrained set, not a ban
+  on going further. The original design brief's blanket motion ban was lifted by the user
+  well before the brief itself was retired (see above); looping in the periphery had two
+  owner-approved exceptions by 2026-09-21 (the emergency light bars, Section 30.18, and
+  rain, Section 31) before the "no looping"/"no glow pulses" rule itself was lifted
+  entirely that same day (`docs/UI_CHANGE_RULES.md` §2) — the animated redesign and home
+  screen coming next are not bound by it. The one rule still standing: nothing's
+  correctness may depend on an animation finishing. Analytics reads the LIVE stream only, by
   explicit instruction — see PROJECT_ARCHITECTURE_REPORT.md Section 23.4 before pointing it
   back at the database. See `frontend/README.md` for what's verified vs. still open (logo
   asset lost, no visual verification in the build environment).
-- No ESP32/physical hardware integration exists (the `firmware/` directory is empty) —
-  the project is SUMO-simulation-only. **One exception, since 2026-09-20:** the user is
-  going to build a physical signal head matching the 3D model's own design exactly
-  (`overview/Junction3D.tsx`'s mast heads — PROJECT_ARCHITECTURE_REPORT.md Section 34), so
-  changes to that specific lens layout/logic are a hardware-wiring decision, not only a
-  visual one — confirm before changing it, the way Section 34 itself was confirmed first.
+- **ESP32/physical hardware bring-up started 2026-09-26** (`firmware/` is no longer empty)
+  — an acrylic scale model of junction C with four signal heads, driven live by the AI over
+  USB serial to an ESP32 (WS2811 addressable pixels, no WiFi), per a separately-supplied
+  hardware design & BOM doc. `firmware/bench_test/bench_test.ino` is the current bench-test
+  sketch (Section 8 steps 1-2 of that doc); the toolchain (Arduino IDE + ESP32 board support
+  + Adafruit NeoPixel + the CP210x USB driver) is confirmed working end to end. The
+  signal-string-reading production sketch (Section 7 of that doc) is not yet written.
+  The physical signal head must match `overview/Junction3D.tsx`'s mast heads exactly
+  (PROJECT_ARCHITECTURE_REPORT.md **Section 36**, current — supersedes Section 34's 5-lens
+  design): **4 lenses per head**, not 5 or the BOM doc's originally-drafted 12 total — a
+  shared red circle, a shared amber circle, one combined left+ahead arrow (one physical
+  lens/LED, since left and straight always run in the same phase together on this
+  junction), and a right arrow. 16 pixels total for the intersection. Changes to that lens
+  layout/logic are a hardware-wiring decision, not only a visual one — confirm before
+  changing it again, the way this design itself was confirmed first.
 - Database has 4 tables (see above), not the guide's originally-envisioned 8.
 
 ## Working with this project

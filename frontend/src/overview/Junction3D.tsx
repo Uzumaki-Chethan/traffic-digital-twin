@@ -173,14 +173,15 @@ const HEAD_ALONG = HEAD_ALONG_ARM[1]
 const MAST_HEIGHT = 10.6
 const HEAD_CENTRE_Y = 8.7
 /**
- * Five lenses in a row: a shared red circle, a shared amber circle, then
- * three independent arrows (left, straight, right) - the hardware design
- * (Section 34): an arrow carries its own movement's red/amber/green
- * whenever another movement on the same approach is still active, and the
- * two shared circles take over - arrows dark - only once nothing on this
- * approach is being served at all (see the tick loop's own comment).
+ * Four aspects in a row (Section 34.1): a shared red circle, a shared
+ * amber circle, one combined left+ahead arrow, and a right arrow - real
+ * signal hardware for a "turn together" movement uses a single physical
+ * lens carrying one glyph with both an upward and a leftward arrowhead,
+ * not two separate pictograms lit together. The two shared circles take
+ * over - arrows dark - only once nothing on this approach is being served
+ * at all (see the tick loop's own comment).
  */
-const LENS_X = [-3.0, -1.5, 0, 1.5, 3.0]
+const LENS_X = [-2.25, -0.75, 0.75, 2.25]
 
 /**
  * An arrow lens in the xy plane facing +z. The head faces the driver
@@ -209,9 +210,38 @@ function arrowShape(turn: number): THREE.Shape {
   return turned
 }
 
-const TURN_LEFT = Math.PI
-const TURN_AHEAD = Math.PI / 2
 const TURN_RIGHT = 0
+
+/**
+ * A single combined "left + ahead" arrow glyph (Section 34.1): one shared
+ * stem forking into an upward arrowhead and a left arrowhead - the shape
+ * a real combined-movement signal lens actually uses, not two of
+ * arrowShape()'s own arrows (each of which carries a tail pointing away
+ * from its own head) overlaid on each other, which reads as a confusing
+ * cross rather than a single legible glyph.
+ */
+function combinedLeftAheadShape(): THREE.Shape {
+  const s = new THREE.Shape()
+  const pts: [number, number][] = [
+    [-0.08, -0.45], // stem, bottom-left
+    [0.08, -0.45], // stem, bottom-right
+    [0.08, 0.16], // stem's right edge, straight up (untouched by the left fork)
+    [0.22, 0.16], // out to the ahead-arrowhead's base
+    [0, 0.5], // ahead tip
+    [-0.22, 0.16], // ahead-arrowhead's other base corner
+    [-0.08, 0.16], // back in to stem width
+    [-0.08, 0.03], // down to where the left branch forks off
+    [-0.34, 0.03], // out along the left branch's top edge
+    [-0.34, 0.15], // flare up for the left-arrowhead's base
+    [-0.55, -0.05], // left tip
+    [-0.34, -0.25], // left-arrowhead's other base corner
+    [-0.34, -0.13], // back in to the left branch's width
+    [-0.08, -0.13], // back to the stem
+  ]
+  pts.forEach(([x, y], i) => (i === 0 ? s.moveTo(x, y) : s.lineTo(x, y)))
+  s.closePath()
+  return s
+}
 
 export function Junction3D({ lanes, powered, motionSide = 'demo', raining = false }: Props) {
   const mount = useRef<HTMLDivElement>(null)
@@ -398,9 +428,8 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
     const mastGeom = own(new THREE.BoxGeometry(HEAD_ALONG + 0.8, 0.26, 0.26))
     const headGeom = own(new THREE.BoxGeometry(7.2, 2.0, 0.85))
     const discGeom = own(new THREE.CircleGeometry(0.58, 20))
-    const aheadGeom = own(new THREE.ShapeGeometry(arrowShape(TURN_AHEAD)))
-    const leftGeom = own(new THREE.ShapeGeometry(arrowShape(TURN_LEFT)))
     const rightGeom = own(new THREE.ShapeGeometry(arrowShape(TURN_RIGHT)))
+    const combinedGeom = own(new THREE.ShapeGeometry(combinedLeftAheadShape()))
     const barNS = own(new THREE.BoxGeometry(LANE_W - 0.5, 0.12, 0.75))
     const barEW = own(new THREE.BoxGeometry(0.75, 0.12, LANE_W - 0.5))
 
@@ -412,9 +441,11 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
        * is being served at all (see the tick loop). */
       redCircle: THREE.MeshStandardMaterial
       amberCircle: THREE.MeshStandardMaterial
-      /** One independent arrow per movement, in lane order (left, straight,
-       * right) - each carries its OWN red/amber/green whenever a sibling
-       * movement on this approach is still active. */
+      /** One material per ARROW LENS, not per movement: [combined, right].
+       * Left and straight always run in the same phase together on this
+       * junction (Section 34.1), so they share one physical lens: a single
+       * merged glyph (combinedGeom) with both an upward and a leftward
+       * arrowhead, exactly like a real "left+ahead" signal aspect. */
       arrows: THREE.MeshStandardMaterial[]
       bars: { lane: string; mat: THREE.MeshStandardMaterial }[]
     }
@@ -435,24 +466,32 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
       head.position.set(HEAD_ALONG, HEAD_CENTRE_Y, 0)
       mast.add(pole, arm, head)
 
-      // Five lenses in a row: a shared red circle, a shared amber circle,
-      // then one independent arrow per movement (left, straight, right) -
-      // the hardware design (Section 34). Every lens gets its own
-      // material, since an arrow now needs to carry red or amber, not
-      // only green.
-      const lensGeoms: THREE.BufferGeometry[] = [discGeom, discGeom, leftGeom, aheadGeom, rightGeom]
-      const mats = lensGeoms.map((geom, i) => {
-        const mat = new THREE.MeshStandardMaterial({
+      // Four aspects in a row (Section 34.1): a shared red circle, a
+      // shared amber circle, one combined left+ahead arrow lens (single
+      // glyph, single material - see combinedGeom above), and a right
+      // arrow. Left and straight always run in the same phase together on
+      // this junction, so one physical lens for both is accurate, not a
+      // simplification.
+      const makeLensMat = () =>
+        new THREE.MeshStandardMaterial({
           color: LENS_OFF,
           emissive: '#000000',
           side: THREE.DoubleSide,
         })
+      const placeLens = (geom: THREE.BufferGeometry, mat: THREE.MeshStandardMaterial, x: number) => {
         const lens = new THREE.Mesh(geom, mat)
-        lens.position.set(HEAD_ALONG + LENS_X[i], HEAD_CENTRE_Y, 0.46)
+        lens.position.set(HEAD_ALONG + x, HEAD_CENTRE_Y, 0.46)
         mast.add(lens)
-        return mat
-      })
-      const [redCircle, amberCircle, ...arrows] = mats
+      }
+      const redCircle = makeLensMat()
+      const amberCircle = makeLensMat()
+      const combinedArrow = makeLensMat()
+      const rightArrow = makeLensMat()
+      placeLens(discGeom, redCircle, LENS_X[0])
+      placeLens(discGeom, amberCircle, LENS_X[1])
+      placeLens(combinedGeom, combinedArrow, LENS_X[2])
+      placeLens(rightGeom, rightArrow, LENS_X[3])
+      const arrows = [combinedArrow, rightArrow]
 
       const stopAt = Math.sign(a.kerb[a.vertical ? 1 : 0]) * (JUNCTION_HALF - 0.6)
       const bars = a.lanePos.map((lanePos, i) => {
@@ -907,29 +946,38 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
       if (!on && cars.size > 0) clearFleet()
 
       // ---- signals ----
-      // The hardware design (Section 34, confirmed with the owner): each
-      // movement (left/straight/right) has its OWN arrow, carrying that
-      // movement's own red/amber/green, for as long as anything else on
-      // the same approach is still green. Only once NOTHING on the whole
-      // approach is green does it collapse to the two shared circles -
-      // arrows dark, one plain red (waiting its turn) or one plain amber
-      // (the approach's last green just ended) - because at that point
-      // three individual reds would say nothing three individually cannot
-      // already say once, and a real signal head only needs the one bulb.
-      // This is deliberately read fresh from the CURRENT tick only, with
-      // no lookahead into the next phase - exactly what physical hardware
-      // reading live signal state would have available too.
+      // The hardware design (Section 34.1, confirmed with the owner): the
+      // left and straight movements on one approach always run in the same
+      // phase together on this junction, so they share ONE arrow lens
+      // (head.arrows[0], the combined glyph) - never two independently-lit
+      // pictograms. The right turn keeps its own arrow (head.arrows[1]).
+      // Either arrow carries its own movement's red/amber/green for as
+      // long as anything else on the same approach is still green. Only
+      // once NOTHING on the whole approach is green does it collapse to
+      // the two shared circles - arrows dark, one plain red (waiting its
+      // turn) or one plain amber (the approach's last green just ended) -
+      // because at that point separate reds would say nothing one shared
+      // bulb cannot already say, and a real signal head only needs the one
+      // bulb. This is deliberately read fresh from the CURRENT tick only,
+      // with no lookahead into the next phase - exactly what physical
+      // hardware reading live signal state would have available too.
       const byLane = new Map(ls.map((l) => [l.lane_id, l]))
       const lampFor = (id: string) => (on ? lampOf(byLane.get(id)?.signal ?? 'r') : 'off')
       for (const head of heads) {
-        const lamps = head.lanes.map(lampFor)
+        const lamps = head.lanes.map(lampFor) // [left, straight, right]
         const dark = lamps[0] === 'off'
         const anyGreen = lamps.includes('green')
         const anyAmber = lamps.includes('amber')
         const wholeApproachQuiet = !anyGreen
         setLens(head.redCircle, !dark && wholeApproachQuiet && !anyAmber ? RED : null)
         setLens(head.amberCircle, !dark && wholeApproachQuiet && anyAmber ? AMBER : null)
-        lamps.forEach((lamp, i) => {
+        // left and straight are the same phase, so either lamp reads the
+        // combined arrow's true state; take whichever is most "active" as
+        // a defensive tie-break rather than assuming they can never differ.
+        const rank = { green: 2, amber: 1, red: 0, off: -1 } as const
+        const combinedLamp = rank[lamps[0]] >= rank[lamps[1]] ? lamps[0] : lamps[1]
+        const arrowLamps = [combinedLamp, lamps[2]]
+        arrowLamps.forEach((lamp, i) => {
           const colour =
             dark || wholeApproachQuiet
               ? null

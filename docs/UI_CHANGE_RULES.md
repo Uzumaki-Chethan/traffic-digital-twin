@@ -49,10 +49,18 @@ way before the change.
   exception still on screen is the raw phase id in the Active-phase panel's
   headline and in the engine's reason sentences — a candidate to clean up,
   not a licence to add more.)
-- No neon, glow pulses, glassmorphism, looping motion in the periphery, or
-  anything whose correctness depends on an animation finishing.
+- Nothing's correctness may depend on an animation finishing (a purely
+  functional rule, not a style one — kept).
 - A page shows only its own run: Overview/Analytics the demo, Performance the
   evaluation, Decisions whichever run is picked.
+
+**Lifted 2026-09-21, on the owner's explicit instruction:** the aesthetic ban that used to
+sit here ("no neon, glow pulses, glassmorphism, looping motion in the periphery") is gone.
+It was the owner's own repeatedly-stated taste, not an artifact of the retired design brief
+(§ above) — real design work is coming that wants motion and effects freely, including a
+planned "highly animated" home screen, and a written rule banning exactly that would just
+be fought around. Nothing replaces it; there is no new aesthetic constraint here. If a
+future direction turns out wrong, that gets said directly, the way it always has.
 
 ## 3. The content inventory
 
