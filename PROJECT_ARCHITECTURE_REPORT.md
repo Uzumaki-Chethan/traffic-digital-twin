@@ -3984,3 +3984,9 @@ Also in this round, at the owner's request:
 **37.7 One dropdown.** `ui/GlassSelect` replaces both native selects: Settings' "Choose for" (`settings/TargetPicker` is now a thin wrapper) and the Decisions run picker, where each run shows its date · scenario · length with its decision and switch counts beneath. It has keyboard support, closes on an outside click, and long lists scroll inside the menu.
 
 **37.8 Finish.** Inset, hover and plate surfaces are translucent tints of the card glass, not solid whites: the Decisions list, the Analytics ledger, the page strips and the Dispatch/Incident bars now match their cards. The dropdown menu is tinted glass. The rail collapses as one piece: everything stays mounted, the logo eases between sizes, the wordmark folds, labels fade, icons stay put and one arrow turns. `usePanZoom` applies a resize only once it settles (100 ms), so the plate doesn't re-render on every frame of the animation. The tab icon is a vector (`assets/favicon.svg`: the eye trail with the signal as its iris, legible at 16 px), with a PNG fallback rendered from it.
+
+**37.9 Controls and small fixes.**
+- The run verbs are in signal colours: Start/Play green, Pause orange, Stop red.
+- "Zoom to the stop lines" is a toggle: a second press returns to the previous view, and the button shows pressed while zoomed.
+- Approach labels sit beside their roads (N east of its road, S west, W north, E south), not on them. The compass moved to bottom-left, clear of the East label.
+- Two regressions from 37.6, fixed: a page opened during a pause showed "waiting" because motion frames never filled `latestTick` (a motion frame now stands in until the first tick); and a view opened or switched (Plan ↔ 3D) while paused replayed about 1 s of motion. `MotionBuffer.latestAt` lets `DisplayClock` start on the newest frame when the stream has stalled.

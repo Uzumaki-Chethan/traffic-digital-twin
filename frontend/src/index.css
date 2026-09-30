@@ -502,3 +502,27 @@ button.rail-card:hover {
 @media (prefers-reduced-motion: reduce) {
   .rail, .rail-fade, .brand-eye, .brand-word { transition: none !important; }
 }
+
+/* Run verbs in signal colours (layout/RunControls): Start / Play green,
+   Pause orange, Stop red — solid, white text, each with its own glow. */
+.run-go, .run-hold, .run-halt {
+  color: #fff;
+  border: 0;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+  transition: filter var(--dur-fast), box-shadow var(--dur-fast);
+}
+.run-go {
+  background: linear-gradient(180deg, #34d399, #0e9f6e);
+  box-shadow: inset 0 1px 0 rgb(220 255 236 / 0.7), 0 0 0 1px rgb(110 231 183 / 0.6), 0 10px 28px -8px rgb(16 185 129 / 0.85);
+}
+.run-hold {
+  background: linear-gradient(180deg, #ffb443, #ff8a12);
+  box-shadow: inset 0 1px 0 rgb(255 236 190 / 0.8), 0 0 0 1px rgb(255 190 100 / 0.6), 0 10px 28px -8px rgb(255 140 20 / 0.85);
+}
+.run-halt {
+  background: linear-gradient(180deg, #ff6b6b, #e11d48);
+  box-shadow: inset 0 1px 0 rgb(255 214 214 / 0.7), 0 0 0 1px rgb(255 130 130 / 0.55), 0 10px 28px -8px rgb(225 29 72 / 0.85);
+}
+.run-go:hover:not(:disabled), .run-hold:hover:not(:disabled), .run-halt:hover:not(:disabled) {
+  filter: brightness(1.08);
+}

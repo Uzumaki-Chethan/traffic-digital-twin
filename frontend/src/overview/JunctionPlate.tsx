@@ -156,12 +156,30 @@ export function JunctionPlate({
           the traffic arrives from. */}
       <g fontFamily="var(--font-ui)" fontSize="12" fontWeight="600" display={showLabels ? undefined : 'none'}>
         {APPROACH_ORDER.map((arm) => {
-          // White pills on each road's own line at the window's edge,
-          // the way a map labels a road.
+          // White pills BESIDE each road (owner, 2026-09-30), not on it:
+          // on the ground just past the sidewalk, on the side the
+          // approach's inbound traffic uses (N east of its road, S west,
+          // W north, E south), pinned to the window's edge.
           const inset = 20 * px
           const w = APPROACH_NAMES[arm].length * 7.4 + 20
-          const x = arm === 'W' ? vb.x + inset + (w / 2) * px : arm === 'E' ? vb.x + vb.w - inset - (w / 2) * px : CENTRE
-          const y = arm === 'N' ? vb.y + inset : arm === 'S' ? vb.y + vb.h - inset : CENTRE
+          const gap = 8 * px
+          const beside = SIDEWALK_OUT + gap
+          const x =
+            arm === 'W'
+              ? vb.x + inset + (w / 2) * px
+              : arm === 'E'
+                ? vb.x + vb.w - inset - (w / 2) * px
+                : arm === 'N'
+                  ? CENTRE + beside + (w / 2) * px
+                  : CENTRE - beside - (w / 2) * px
+          const y =
+            arm === 'N'
+              ? vb.y + inset
+              : arm === 'S'
+                ? vb.y + vb.h - inset
+                : arm === 'W'
+                  ? CENTRE - beside - 11 * px
+                  : CENTRE + beside + 11 * px
           return (
             <g key={arm} transform={`translate(${x} ${y}) scale(${px})`}>
               <rect x={-w / 2} y={-9.5} width={w} height={22} rx={11} fill="rgb(0 0 0 / 0.16)" />
@@ -223,8 +241,9 @@ export function JunctionPlate({
           plate colour already means signal state. */}
       <VehicleLayer side={motionSide} powered={powered} />
 
-      {/* north arrow, pinned to the window's bottom-right, above the zoom pills */}
-      <g transform={`translate(${vb.x + vb.w} ${vb.y + vb.h}) scale(${px}) translate(-33 -78)`}>
+      {/* north arrow, pinned to the window's bottom-left — clear of the
+          zoom pills (bottom-right) and of the East label beside its road */}
+      <g transform={`translate(${vb.x} ${vb.y + vb.h}) scale(${px}) translate(33 -78)`}>
         <circle r="14" cy="1.5" fill="rgb(0 0 0 / 0.16)" />
         <circle r="14" fill="#fff" stroke="rgb(27 37 54 / 0.25)" strokeWidth="1" />
         <path d="M 0 -11 L -4 0 L 4 0 Z" fill="#E5484D" />

@@ -116,10 +116,12 @@ export const useSim = create<SimState>((set) => ({
         tickAt = now
       }
       return {
-        latest: snapshot, latestTick: motion ? prev.latestTick : snapshot,
+        // A motion frame only stands in when there is no tick yet — e.g. a
+        // page opened while the run is paused, when no ticks arrive.
+        latest: snapshot, latestTick: motion && prev.latestTick ? prev.latestTick : snapshot,
         receivedAt: now, rate, tickSim, tickAt, tickInterval, simPerFrame,
         smooth: simPerFrame <= SMOOTH_MAX_SIM_SECONDS,
-        lastLive: isLive(snapshot) && !motion ? snapshot : prev.lastLive,
+        lastLive: isLive(snapshot) && (!motion || !prev.lastLive) ? snapshot : prev.lastLive,
       }
     }),
 }))

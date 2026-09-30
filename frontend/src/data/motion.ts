@@ -97,6 +97,9 @@ export class MotionBuffer {
   private laneChanges = new Map<string, LaneChange>()
   /** Bumped on every push and reset, so a view can tell new data cheaply. */
   version = 0
+  /** performance.now() when the newest frame arrived — lets a view tell a
+   * flowing stream from a paused/stopped one. */
+  latestAt = 0
 
   push(t: number, vehicles: VehicleView[] | undefined): void {
     if (!vehicles) return
@@ -112,6 +115,7 @@ export class MotionBuffer {
     if (prev) this.noteLaneChanges(prev, frame)
     this.frames.push(frame)
     if (this.frames.length > KEEP_FRAMES) this.frames.shift()
+    this.latestAt = performance.now()
     this.version++
   }
 
@@ -291,7 +295,11 @@ export class DisplayClock {
     const dt = this.lastNow ? Math.min(0.25, (now - this.lastNow) / 1000) : 0
     this.lastNow = now
     if (this.tau === null) {
-      this.tau = target
+      // A view opening (or switching Plan <-> 3D) while no frames are
+      // arriving — paused, stopped — must show the last picture as it is,
+      // not start a lag behind and replay its way forward to it.
+      const stalled = now - buffer.latestAt > LAG_WALL_SECONDS * 1000 + 300
+      this.tau = stalled ? latest : target
     } else {
       // Run at the sim rate, and lean gently toward the target so
       // drift is corrected without a visible speed change.

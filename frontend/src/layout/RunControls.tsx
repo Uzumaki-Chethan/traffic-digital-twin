@@ -69,7 +69,7 @@ export function RunControls() {
       return (
         <div className="flex items-center gap-1.5">
           <Button
-            primary
+            tone="go"
             onClick={() => {
               goHome()
               void (other ? runControl.replaceWithEvaluation(page.scenario) : runControl.startEvaluation(page.scenario))
@@ -85,7 +85,7 @@ export function RunControls() {
     return (
       <div className="flex items-center gap-1.5">
         <Button
-          primary
+          tone="go"
           onClick={() => {
             goHome()
             void (other ? runControl.replaceWithDemo(false, page.scenario) : runControl.start(false, page.scenario))
@@ -133,13 +133,14 @@ export function RunControls() {
               label={state.paused ? 'Play' : 'Pause'}
               title={state.paused ? 'Resume the simulation' : 'Pause the simulation'}
               icon={state.paused ? <Play size={13} aria-hidden /> : <Pause size={16} aria-hidden />}
-              primary={state.paused}
+              tone={state.paused ? 'go' : 'hold'}
             />
           </motion.div>
         )}
       </AnimatePresence>
 
       <Button
+        tone="halt"
         onClick={() => void (state.managed ? runControl.stop() : runControl.halt())}
         disabled={busy || stopping}
         label={stopping ? 'Stopping' : 'Stop'}
@@ -231,7 +232,7 @@ function Button({
   label,
   title,
   icon,
-  primary,
+  tone,
   mono,
 }: {
   onClick: () => void
@@ -239,7 +240,9 @@ function Button({
   label: string
   title: string
   icon: React.ReactNode
-  primary?: boolean
+  /** Signal colour for the three run verbs: go (Start / Play) green,
+   * hold (Pause) orange, halt (Stop) red. Everything else is dark glass. */
+  tone?: 'go' | 'hold' | 'halt'
   /** Numeric labels only — words belong in the UI face, not the mono one. */
   mono?: boolean
 }) {
@@ -254,8 +257,8 @@ function Button({
       className={clsx(
         'flex h-11 items-center justify-center gap-2 rounded-full text-[13.5px] font-medium',
         disabled && 'cursor-not-allowed opacity-50',
-        primary ? 'brand-button pl-[22px] pr-[26px] text-[14.5px]' : 'glass-control',
-        !primary && (label ? 'px-4' : 'w-[46px]'),
+        tone ? `run-${tone} ${label ? 'pl-[18px] pr-[22px]' : 'w-[46px]'} text-[14px]` : 'glass-control',
+        !tone && (label ? 'px-4' : 'w-[46px]'),
       )}
     >
       {icon}

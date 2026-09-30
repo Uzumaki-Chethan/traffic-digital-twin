@@ -62,10 +62,13 @@ export function TwinViewport({
   const stage = useRef<HTMLDivElement>(null)
   const [isFull, setIsFull] = useState(false)
   const [labels, setLabels] = useState(true)
+  // The view before "zoom to the stop lines", so a second press returns.
+  const beforeFocus = useRef<View | null>(null)
   const [mode, setMode] = useState<'plan' | '3d'>('plan')
   // Ctrl + scroll to zoom, drag to pan, in metres. Narrows the SVG
   // viewBox, so the drawing stays sharp at any magnification.
   const pan = usePanZoom(stage, sharedView, { wheelZoomsPlain: isFull })
+  const focused = sameView(pan.view, FOCUS_VIEW)
 
   // In 3D, OrbitControls owns the wheel and would zoom on any turn. A
   // capturing listener on the stage runs before the canvas's own, so a
@@ -154,9 +157,20 @@ export function TwinViewport({
           />
           <IconButton onClick={pan.home} label="Frame the junction" icon={<Crosshair size={16} aria-hidden />} disabled={pan.atHome} />
           <IconButton
-            onClick={() => pan.setView({ ...HOME_VIEW, h: HOME_VIEW.h / 2.2 })}
-            label="Zoom in to the stop lines"
+            onClick={() => {
+              // A toggle: in to the stop lines, and back to exactly where
+              // the view was before.
+              if (focused) {
+                pan.setView(beforeFocus.current ?? HOME_VIEW)
+                beforeFocus.current = null
+              } else {
+                beforeFocus.current = pan.view
+                pan.setView(FOCUS_VIEW)
+              }
+            }}
+            label={focused ? 'Back to the previous view' : 'Zoom in to the stop lines'}
             icon={<ScanSearch size={16} aria-hidden />}
+            pressed={focused}
           />
         </div>
       )}
@@ -197,6 +211,9 @@ export function TwinViewport({
     </div>
   )
 }
+
+/** "Zoom in to the stop lines": the junction framing, 2.2x closer. */
+const FOCUS_VIEW: View = { ...HOME_VIEW, h: HOME_VIEW.h / 2.2 }
 
 function sameView(a: View, b: View): boolean {
   return Math.abs(a.cx - b.cx) < 0.01 && Math.abs(a.cy - b.cy) < 0.01 && Math.abs(a.h - b.h) < 0.01
