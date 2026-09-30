@@ -82,17 +82,21 @@
   --predicted: #f5b800;
   --actual: #2f6bff;
 
-  /* The junction plate at night: a dark carriageway so signal colours
-     on it stay unmistakable. Ground is deep park green, roads are
-     asphalt under sodium light. */
-  --plate-ground: #16281c;
-  --plate-ink: #f4f7fb;
-  --plate-road: #2a2e35;
-  --plate-kerb: #56645a;
-  --plate-lane: #7d8794;
-  --plate-marking: #eef2f7;
+  /* The junction plate: a daytime city map (owner's reference, 2026-09-30)
+     — pale park-green ground, pale sidewalks, mid-grey asphalt, white
+     lane paint, yellow centre lines and a yellow-hatched junction box.
+     Mid-grey road keeps the signal-coloured lane fills and the lit heads
+     unmistakable. --plate-ink is the text on the white label pills. */
+  --plate-ground: #c9ddb4;
+  --plate-sidewalk: #e7e5de;
+  --plate-ink: #1b2536;
+  --plate-road: #737880;
+  --plate-kerb: #f4f2ec;
+  --plate-lane: #f2f4f6;
+  --plate-marking: #ffffff;
+  --plate-centre: #e8b923;
   --plate-vehicle: #f4f7fb;
-  --plate-fill-alpha: 0.34;
+  --plate-fill-alpha: 0.3;
 
   /* Signal — TEXT weight (chips, labels) on the pale cards. */
   --signal-red: #b42318;

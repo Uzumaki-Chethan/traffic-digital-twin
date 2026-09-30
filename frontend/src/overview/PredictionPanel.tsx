@@ -1,6 +1,6 @@
 import { api, hasModelInfo } from '@/data/api'
 import { useAsync } from '@/data/useAnalytics'
-import { useLiveHistory } from '@/data/liveHistory'
+import { getPredictionSeries, useLiveHistory, type PredictionPoint } from '@/data/liveHistory'
 import type { PredictionView } from '@/data/types'
 import { LANE_IDS } from '@/data/types'
 import { Panel } from '@/ui/Panel'
@@ -32,6 +32,8 @@ const ERROR_SCALE = 6
 
 export function PredictionPanel({ prediction, powered }: { prediction: PredictionView | null; powered: boolean }) {
   const mae = useLiveHistory((s) => s.predMae)
+  useLiveHistory((s) => s.revision)
+  const series = powered ? getPredictionSeries() : []
   const pairs = useLiveHistory((s) => s.predPairs)
   // Mount-once: the horizon is a property of the trained model, not of
   // the run, so it is read from the model's own metadata rather than
@@ -43,6 +45,7 @@ export function PredictionPanel({ prediction, powered }: { prediction: Predictio
 
   const meta = (
     <span className="flex items-center gap-3">
+      <Legend />
       {horizon != null && <span>{horizon}s horizon</span>}
       {mae != null && (
         <span>
@@ -54,7 +57,7 @@ export function PredictionPanel({ prediction, powered }: { prediction: Predictio
 
   if (!powered || prediction === null || prediction.rows.length === 0) {
     return (
-      <Panel title="Prediction vs actual" meta={horizon != null ? `${horizon}s horizon` : undefined}>
+      <Panel title="Prediction vs actual" glyph="amber" meta={horizon != null ? `${horizon}s horizon` : undefined}>
         <div className="py-4 text-center text-[13px] leading-[1.5] text-ink-mute">
           {!powered ? (
             <>No simulation running.</>
@@ -72,8 +75,13 @@ export function PredictionPanel({ prediction, powered }: { prediction: Predictio
   }
 
   return (
-    <Panel title="Prediction vs actual" meta={meta}>
-      <div className="grid grid-cols-4 gap-x-3 gap-y-1">
+    <Panel title="Prediction vs actual" meta={meta} glyph="amber">
+      <div className="mb-4 grid grid-cols-4 gap-3 max-[1100px]:grid-cols-2">
+        {(['N', 'S', 'E', 'W'] as const).map((a) => (
+          <ApproachChart key={a} approach={a} series={series} />
+        ))}
+      </div>
+      <div className="grid grid-cols-4 gap-x-3 gap-y-1 max-[1100px]:grid-cols-2">
         {(['N', 'S', 'E', 'W'] as const).map((approach) => (
           <div key={approach} className="min-w-0">
             <div className="mb-0.5 flex items-baseline justify-between border-b border-rule pb-0.5">
@@ -113,6 +121,82 @@ export function PredictionPanel({ prediction, powered }: { prediction: Predictio
         expected more traffic than turned up.
       </div>
     </Panel>
+  )
+}
+
+function Legend() {
+  return (
+    <span className="flex items-center gap-3 font-[family-name:var(--font-ui)] text-[11.5px] text-ink">
+      <span className="flex items-center gap-1.5">
+        <i className="inline-block h-0 w-4 rounded border-t-[2.5px]" style={{ borderColor: 'var(--predicted)' }} />
+        Predicted
+      </span>
+      <span className="flex items-center gap-1.5">
+        <i className="inline-block h-0 w-4 rounded border-t-[2.5px]" style={{ borderColor: 'var(--actual)' }} />
+        Actual
+      </span>
+    </span>
+  )
+}
+
+/** Window the charts show, simulated seconds back from the newest pair. */
+const WINDOW = 60
+
+/**
+ * One approach, the last minute: the model's predicted vehicle total (for
+ * the time each prediction targeted) against the total that actually
+ * arrived. Every point is a matured pair from data/liveHistory — the chart
+ * draws nothing the backend did not pair up.
+ */
+function ApproachChart({ approach, series }: { approach: 'N' | 'S' | 'E' | 'W'; series: readonly PredictionPoint[] }) {
+  const end = series.length ? series[series.length - 1].t : 0
+  const pts = series.filter((p) => p.t >= end - WINDOW)
+  const W = 170
+  const H = 96
+  const L = 20
+  const B = 15
+  const hi = Math.max(1, ...pts.map((p) => Math.max(p.pred[approach], p.act[approach])))
+  const top = Math.ceil(hi / 2) * 2
+  const x = (t: number) => L + ((t - (end - WINDOW)) / WINDOW) * (W - L - 4)
+  const y = (v: number) => H - B - (v / top) * (H - B - 6)
+  const line = (k: 'pred' | 'act') => pts.map((p) => `${x(p.t).toFixed(1)},${y(p[k][approach]).toFixed(1)}`).join(' ')
+  const last = pts[pts.length - 1]
+  return (
+    <div className="min-w-0 rounded-[14px] border border-[rgb(18_30_56/0.08)] bg-white px-2.5 pb-1.5 pt-2.5 shadow-[0_6px_16px_-12px_rgb(3_8_24/0.45)]">
+      <div className="flex items-baseline justify-between px-0.5">
+        <span className="text-[13.5px] font-semibold text-ink-strong">{APPROACH_NAME[approach]}</span>
+        {last && (
+          <span className="num text-[11px] text-ink-mute">
+            {f1(last.pred[approach])} → {last.act[approach]}
+          </span>
+        )}
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 block h-[96px] w-full" aria-label={`${APPROACH_NAME[approach]}: predicted against actual vehicles, last ${WINDOW} s`}>
+        {[0, top / 2, top].map((v) => (
+          <g key={v}>
+            <line x1={L} x2={W - 4} y1={y(v)} y2={y(v)} stroke="rgb(18 30 56 / 0.08)" />
+            <text x={L - 4} y={y(v) + 3} textAnchor="end" className="fill-ink-mute" fontSize="9.5" fontFamily="var(--font-num)">
+              {v}
+            </text>
+          </g>
+        ))}
+        {[-60, -45, -30, -15, 0].map((d) => (
+          <text key={d} x={x(end + d)} y={H - 3} textAnchor="middle" className="fill-ink-mute" fontSize="9.5" fontFamily="var(--font-num)">
+            {d === 0 ? 'now' : d}
+          </text>
+        ))}
+        {pts.length > 1 ? (
+          <>
+            <polyline points={line('act')} fill="none" stroke="var(--actual)" strokeWidth="1.8" strokeLinejoin="round" />
+            <polyline points={line('pred')} fill="none" stroke="var(--predicted)" strokeWidth="1.8" strokeLinejoin="round" />
+          </>
+        ) : (
+          <text x={(W + L) / 2} y={H / 2} textAnchor="middle" className="fill-ink-mute" fontSize="10">
+            gathering pairs…
+          </text>
+        )}
+      </svg>
+    </div>
   )
 }
 

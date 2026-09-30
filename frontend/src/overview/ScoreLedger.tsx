@@ -39,24 +39,43 @@ export function ScoreLedger({ decision, powered }: { decision: DecisionView; pow
         ) : undefined
       }
       className="w-full"
-      bodyClassName="px-3.5 pb-3 pt-1"
+      bodyClassName="px-[18px] pb-4 pt-1"
     >
       {!powered ? (
         <div className="py-3 text-center text-[12.5px] text-ink-mute">No simulation running.</div>
       ) : (
         <div>
-          <div className="relative flex flex-col gap-1.5">
+          <div className="relative flex flex-col gap-1.5 pt-3">
             {PHASE_NAMES.map((p) => {
               const s = scores[p] ?? 0
               const isServed = p === served
               return (
-                <div key={p} className="grid grid-cols-[132px_1fr_40px] items-center gap-2 text-[12px]">
+                <div
+                  key={p}
+                  className="-mx-2 grid grid-cols-[132px_1fr_40px] items-center gap-2 rounded-lg px-2 py-1 text-[12.5px] transition-[background] duration-300"
+                  style={
+                    isServed
+                      ? {
+                          background: 'linear-gradient(90deg, rgb(255 196 40 / 0.5), rgb(255 214 70 / 0.2) 60%, rgb(255 214 70 / 0))',
+                          boxShadow: '0 0 22px -6px rgb(255 190 40 / 0.8)',
+                        }
+                      : undefined
+                  }
+                >
                   <span className={clsx('truncate', isServed ? 'font-semibold text-ink-strong' : 'text-ink')}>
                     {phaseLabel(p)}
                   </span>
-                  <div className="relative h-[9px] overflow-hidden rounded-full bg-inset">
+                  <div className="relative h-[11px] overflow-hidden rounded-full bg-[rgb(18_30_56/0.08)]">
                     <motion.div
-                      className={clsx('h-full rounded-full', isServed ? 'bg-[var(--signal-green)]' : 'bg-[var(--series-4)]')}
+                      className="h-full rounded-full"
+                      style={{
+                        background: isServed
+                          ? 'linear-gradient(90deg, #FFC23A, #FFAE00)'
+                          : s > boundary && margin > 0
+                            ? 'linear-gradient(90deg, #FFC1AE, #FF7A59)'
+                            : 'linear-gradient(90deg, #C6CEDC, #B3BDCF)',
+                        boxShadow: isServed ? '0 0 14px rgb(255 176 0 / 0.85)' : undefined,
+                      }}
                       initial={false}
                       animate={{ width: pct(s) }}
                       transition={reduced ? { duration: 0 } : value}
@@ -73,16 +92,18 @@ export function ScoreLedger({ decision, powered }: { decision: DecisionView; pow
             {margin > 0 && (
               <motion.div
                 aria-hidden
-                className="pointer-events-none absolute top-[-2px] bottom-[-2px] w-0 border-l-2 border-dashed border-[var(--signal-red)]"
+                className="pointer-events-none absolute top-1 bottom-[-2px] w-0 border-l-[1.5px] border-dashed border-[#E5484D]"
                 initial={false}
                 animate={{ left: `calc(132px + 0.5rem + (100% - 132px - 40px - 1rem) * ${boundary / scale})` }}
                 transition={reduced ? { duration: 0 } : value}
-              />
+              >
+                <span className="absolute -top-3.5 left-0 -translate-x-1/2 whitespace-nowrap text-[10.5px] font-medium text-[#E5484D]">boundary</span>
+              </motion.div>
             )}
           </div>
-          <div className="mt-1.5 flex items-center justify-between gap-2 text-[11.5px] text-ink-mute">
+          <div className="mt-3 flex items-center justify-between gap-2 text-[11.5px] text-ink">
             <span className="flex items-center gap-1.5">
-              <span className="inline-block h-[2px] w-3 border-t-2 border-dashed border-[var(--signal-red)]" />
+              <span className="inline-block h-[2px] w-3 border-t-2 border-dashed border-[#E5484D]" />
               boundary {boundary.toFixed(2)} — a challenger past this line takes the junction
             </span>
             <span className={clsx('shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5', mode.loud ? 'border-[var(--signal-red)] text-[var(--signal-red)]' : 'border-rule text-ink')}>

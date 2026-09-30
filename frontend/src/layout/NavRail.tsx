@@ -50,7 +50,7 @@ export function NavRail() {
     <aside
       className={clsx(
         'relative z-[4] flex shrink-0 flex-col overflow-hidden rounded-[26px] transition-[width] duration-300',
-        collapsed ? 'w-20' : 'w-[250px]',
+        collapsed ? 'w-20' : 'w-[262px]',
       )}
       style={{
         transitionTimingFunction: 'var(--ease-out)',
@@ -73,8 +73,8 @@ export function NavRail() {
             title={collapsed ? label : undefined}
             className={({ isActive }) =>
               clsx(
-                'group relative flex h-[52px] items-center rounded-[15px] text-[14.5px] transition-colors',
-                collapsed ? 'justify-center px-0' : 'gap-[13px] px-3',
+                'group relative flex h-[52px] items-center rounded-[15px] text-[14px] transition-colors',
+                collapsed ? 'justify-center px-0' : 'gap-3 px-3',
                 isActive ? 'font-medium text-white' : 'text-[#F1F4FA] hover:text-white',
               )
             }
@@ -106,7 +106,7 @@ export function NavRail() {
                 />
                 {!collapsed && (
                   <>
-                    <span className="relative z-10 truncate">{label}</span>
+                    <span className="relative z-10 whitespace-nowrap">{label}</span>
                     <MiniSignal active={isActive} />
                   </>
                 )}

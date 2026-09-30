@@ -53,7 +53,8 @@ export function RecentSwitches({ history, powered }: { history: PhaseHistoryEntr
       title="Recent switches"
       meta={powered && switches.length > 0 ? 'last 60 s' : undefined}
       className="w-full"
-      bodyClassName="px-3.5 pb-3 pt-1"
+      bodyClassName="px-[18px] pb-4 pt-1"
+      glyph="amber"
     >
       {!powered ? (
         <div className="py-3 text-center text-[12.5px] text-ink-mute">No simulation running.</div>
@@ -66,18 +67,21 @@ export function RecentSwitches({ history, powered }: { history: PhaseHistoryEntr
             return (
               <li
                 key={s.t}
-                className="grid grid-cols-[56px_1fr_auto] items-center gap-2 border-b border-rule-soft py-[3px] text-[12px] last:border-b-0"
+                className="grid grid-cols-[84px_1fr_auto] items-center gap-2 border-b border-[rgb(18_30_56/0.06)] py-[7px] text-[12px] last:border-b-0"
                 title={
                   `${phaseLabel(s.from)} gave way to ${phaseLabel(s.to)}` +
                   (s.held != null ? ` after ${Math.round(s.held)} s` : '') +
                   (mode ? ` (${mode.label.toLowerCase()})` : '')
                 }
               >
-                <span className="num text-ink-mute">{clock(s.t)}</span>
+                <span className="num flex items-center gap-1.5 text-ink">
+                  <span className="h-[9px] w-[9px] shrink-0 rounded-full border-[1.5px] border-ink-mute" />
+                  {clock(s.t)}
+                </span>
                 <span className="flex min-w-0 items-center gap-1 text-ink">
                   <span className="truncate">{phaseLabel(s.from)}</span>
                   <ArrowRight size={11} aria-hidden className="shrink-0 text-ink-mute" />
-                  <span className="truncate font-semibold text-ink-strong">{phaseLabel(s.to)}</span>
+                  <span className="truncate font-medium text-ink-strong">{phaseLabel(s.to)}</span>
                 </span>
                 <span className="flex shrink-0 items-center gap-1.5">
                   <span className="num text-ink-mute">{s.held != null ? `${Math.round(s.held)} s` : '—'}</span>

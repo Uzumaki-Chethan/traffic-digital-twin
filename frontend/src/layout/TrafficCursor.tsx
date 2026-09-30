@@ -4,30 +4,23 @@ import { useEffect, useRef } from 'react'
  * The pointer as a small signal head. Red while the mouse rests, green
  * while it moves, amber while a button is held; the housing turns gold and
  * grows a little over anything clickable, and it leans into fast sideways
- * moves. A soft pool of the lit lamp's colour trails it across the page,
- * and a click leaves a brief amber ripple.
+ * moves. A click leaves a brief amber ripple. No glow trails it (the
+ * owner's call, 2026-09-30).
  *
  * Mouse and pen only: on a touch screen, or with reduced motion asked for
- * (where the lean and trailing glow would be motion for its own sake), the
+ * (where the lean would be motion for its own sake), the
  * system cursor stays and none of this mounts. Text fields get the normal
  * I-beam back, since a signal head is no way to place a caret.
  */
 const CLICKABLE = 'a,button,select,input,label[for],[role="button"],[data-clickable]'
 const TEXT_ENTRY = 'input[type="text"],input[type="search"],input[type="number"],textarea'
-const GLOW: Record<string, string> = {
-  red: 'rgb(255 59 71 / 0.11)',
-  amber: 'rgb(255 176 32 / 0.14)',
-  green: 'rgb(42 242 142 / 0.11)',
-}
 
 export function TrafficCursor() {
   const head = useRef<HTMLDivElement>(null)
-  const cast = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const el = head.current
-    const pool = cast.current
-    if (!el || !pool) return
+    if (!el) return
     if (!matchMedia('(hover: hover) and (pointer: fine)').matches) return
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const root = document.documentElement
@@ -36,8 +29,6 @@ export function TrafficCursor() {
     let x = -200
     let y = -200
     let px = -200
-    let cx = -200
-    let cy = -200
     let last = 0
     let down = false
     let state = ''
@@ -72,7 +63,6 @@ export function TrafficCursor() {
     // Fullscreen shows only one element's subtree: carry the cursor into it.
     const onFs = () => {
       const host = document.fullscreenElement ?? document.body
-      host.appendChild(pool)
       host.appendChild(el)
     }
 
@@ -81,7 +71,6 @@ export function TrafficCursor() {
       if (s !== state) {
         state = s
         el.dataset.s = s
-        pool.style.background = `radial-gradient(closest-side, ${GLOW[s]}, transparent)`
       }
       const vx = x - px
       px = x
@@ -89,9 +78,6 @@ export function TrafficCursor() {
       tv = (tv + (target - tilt) * 0.2) * 0.7
       tilt += tv
       el.style.transform = `translate3d(${x - 8}px, ${y - 2}px, 0) rotate(${tilt.toFixed(2)}deg)`
-      cx += (x - cx) * 0.14
-      cy += (y - cy) * 0.14
-      pool.style.transform = `translate3d(${cx.toFixed(1)}px, ${cy.toFixed(1)}px, 0)`
       raf = requestAnimationFrame(frame)
     }
     raf = requestAnimationFrame(frame)
@@ -118,7 +104,6 @@ export function TrafficCursor() {
 
   return (
     <>
-      <div ref={cast} aria-hidden className="tc-cast" />
       <div ref={head} aria-hidden className="tc-head" data-s="red">
         <svg width="40" height="52" viewBox="-8 -2 40 52">
           <g className="tc-body">

@@ -84,6 +84,22 @@ export const useLiveHistory = create<HistoryState>(() => ({
   predPairs: 0,
 }))
 
+/** One matured prediction, totalled per approach: what the model said the
+ * approach would hold at `t`, and what it actually held. */
+export interface PredictionPoint {
+  t: number
+  pred: Record<'N' | 'S' | 'E' | 'W', number>
+  act: Record<'N' | 'S' | 'E' | 'W', number>
+}
+/** The last few minutes of matured predictions — the Overview's charts. */
+const PRED_CAPACITY = 240
+let predPoints: PredictionPoint[] = []
+
+/** Matured predictions this run, oldest first. */
+export function getPredictionSeries(): readonly PredictionPoint[] {
+  return predPoints
+}
+
 /** Running |predicted - actual| total for this run, and the pair it last counted. */
 let predError = 0
 let predPairs = 0
@@ -101,6 +117,7 @@ export function clearLiveHistory(): void {
   predError = 0
   predPairs = 0
   lastPredictionAt = null
+  predPoints = []
   useLiveHistory.setState((s) => ({
     revision: s.revision + 1,
     count: 0,
@@ -151,10 +168,18 @@ export function pushLiveSample(snapshot: Snapshot): void {
   const prediction = snapshot.prediction
   if (prediction && prediction.target_time !== lastPredictionAt) {
     lastPredictionAt = prediction.target_time
+    const point: PredictionPoint = { t: prediction.target_time, pred: { N: 0, S: 0, E: 0, W: 0 }, act: { N: 0, S: 0, E: 0, W: 0 } }
     for (const row of prediction.rows) {
       predError += Math.abs(row.pred_veh - row.act_veh)
       predPairs += 1
+      const a = String(row.lane).charAt(0) as keyof PredictionPoint['pred']
+      if (a in point.pred) {
+        point.pred[a] += row.pred_veh
+        point.act[a] += row.act_veh
+      }
     }
+    predPoints.push(point)
+    if (predPoints.length > PRED_CAPACITY) predPoints = predPoints.slice(-PRED_CAPACITY)
   }
 
   const byId = new Map(snapshot.lanes.map((l) => [l.lane_id, l]))

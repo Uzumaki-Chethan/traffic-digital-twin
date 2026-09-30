@@ -30,8 +30,9 @@ const EMPTY: LiveSnapshot = {
 }
 
 /**
- * Stitch's approved layout: plate-dominant 8/4 split, instrument stack
- * on the right, history and metrics as low bands below. Before the first
+ * Plate-dominant split (≈ 1.78 : 1), the instrument stack on the right,
+ * then the phase history and — at the bottom, where the owner keeps them —
+ * the five KPI tiles. Before the first
  * tick the plate renders unpowered with one line of instruction — never
  * a spinner. On a link drop the last live snapshot stays on screen.
  *
@@ -68,27 +69,29 @@ export function OverviewPage() {
 
   return (
     <div className={dimmed ? 'opacity-70 transition-opacity' : 'transition-opacity'}>
-      <div className="grid grid-cols-12 gap-2">
+      <div className="grid grid-cols-[minmax(0,1.78fr)_minmax(0,1fr)] gap-3.5 max-[1100px]:grid-cols-1">
         {/* The twin and, under it, the ML layer — stacked as siblings so
             the prediction panel fills the space the plate leaves rather
             than sitting as a card inside a card. */}
-        <div className="col-span-8 flex min-w-0 flex-col gap-2">
+        <div className="flex min-w-0 flex-col gap-3.5">
           <Panel
-            title="Digital Twin"
+            title="Digital twin"
+            glyph={powered ? (greens > 0 ? 'green' : 'red') : 'red'}
+            titleExtra={<LiveBadge on={powered && !dimmed} />}
             meta={
               powered ? (
                 <span className="flex items-center gap-3">
                   <span className="flex items-center gap-1">
-                    <span className="h-2 w-2 rounded-full bg-signal-green" /> green {greens}
+                    <span className="h-2 w-2 rounded-full bg-dot-green" /> green {greens}
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="h-2 w-2 rounded-full bg-signal-red" /> red {reds}
+                    <span className="h-2 w-2 rounded-full bg-dot-red" /> red {reds}
                   </span>
                   <span>{snap.metrics.vehicles} vehicles</span>
                 </span>
               ) : undefined
             }
-            bodyClassName="px-2 pb-2"
+            bodyClassName="px-3.5 pb-3.5"
           >
             <TwinViewport
               lanes={snap.lanes}
@@ -99,7 +102,7 @@ export function OverviewPage() {
               raining={raining}
             />
             {showIncidentControls && (
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-2.5">
                 {incidentFirst ? (
                   <>
                     <IncidentBar />
@@ -122,7 +125,7 @@ export function OverviewPage() {
           {/* The explainability row: the decision boundary and the last
               few switches. Fills the column to the lane table's height
               rather than leaving the space under the prediction empty. */}
-          <div className="grid flex-1 grid-cols-2 items-stretch gap-2">
+          <div className="grid flex-1 grid-cols-2 items-stretch gap-3.5 max-[860px]:grid-cols-1">
             <Reveal index={4} className="flex min-h-0">
               <ScoreLedger decision={snap.decision} powered={powered} />
             </Reveal>
@@ -132,7 +135,7 @@ export function OverviewPage() {
           </div>
         </div>
 
-        <div className="col-span-4 flex min-h-0 flex-col gap-2">
+        <div className="flex min-h-0 min-w-0 flex-col gap-3.5">
           <Reveal index={1}>
             <PhasePanel decision={snap.decision} signal={snap.signal} powered={powered} />
           </Reveal>
@@ -142,7 +145,7 @@ export function OverviewPage() {
         </div>
       </div>
 
-      <div className="mt-2 flex flex-col gap-2">
+      <div className="mt-3.5 flex flex-col gap-3.5">
         <Reveal index={5}>
           <RingBarrierHistory history={snap.phase_history} />
         </Reveal>
@@ -151,5 +154,15 @@ export function OverviewPage() {
         </Reveal>
       </div>
     </div>
+  )
+}
+
+/** "Live simulation" beside the twin's title: a beating dot while frames flow. */
+function LiveBadge({ on }: { on: boolean }) {
+  return (
+    <span className={on ? 'ml-1 inline-flex items-center gap-2 text-[12.5px] font-normal text-[#12A150]' : 'ml-1 inline-flex items-center gap-2 text-[12.5px] font-normal text-ink-mute'}>
+      <span className={on ? 'status-dot status-dot-green status-dot-beat !h-[9px] !w-[9px]' : 'h-[9px] w-[9px] rounded-full bg-[#C9D1DE]'} />
+      {on ? 'Live simulation' : 'Not running'}
+    </span>
   )
 }

@@ -1,12 +1,10 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { Box, Crosshair, Link2, Map, Maximize2, Minimize2, Minus, Plus } from 'lucide-react'
+import { Crosshair, Layers, Link2, Maximize2, Minimize2, Minus, Plus, ScanSearch } from 'lucide-react'
 import clsx from 'clsx'
 import type { LaneView, VehicleView } from '@/data/types'
 import type { MotionSide } from '@/data/motion'
-import { DUR, EASE_OUT } from '@/ui/motion'
 import { JunctionPlate } from './JunctionPlate'
-import { usePanZoom, wheelIsZoom, type View, type ViewState } from './usePanZoom'
+import { HOME_VIEW, usePanZoom, wheelIsZoom, type View, type ViewState } from './usePanZoom'
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 /** How to zoom, in the reader's own keys - a tooltip on the readout, never printed on the map. */
@@ -21,9 +19,10 @@ const Junction3D = lazy(() => import('./Junction3D').then((m) => ({ default: m.J
  * The twin viewport and its controls. Two modes: the plan (default — a
  * true-scale map with a map's zoom: Ctrl + scroll, drag, and a button
  * that frames the junction; zooming right out shows the whole network)
- * and a to-scale 3D miniature. Controls sit bottom-left and appear on
- * hover or keyboard focus, so nothing covers the drawing while it is
- * being read.
+ * and a to-scale 3D miniature. Controls float over the map as small
+ * glass pills: the view toggle top-left, the map tools (approach labels,
+ * frame the junction, zoom to the stop lines) top-right, zoom and
+ * fullscreen bottom-right.
  *
  * A plain wheel turn scrolls the page in both modes — the map is one
  * panel in a column, not the page. Fullscreen has nothing to scroll, so
@@ -62,7 +61,7 @@ export function TwinViewport({
   const ref = useRef<HTMLDivElement>(null)
   const stage = useRef<HTMLDivElement>(null)
   const [isFull, setIsFull] = useState(false)
-  const [hovered, setHovered] = useState(false)
+  const [labels, setLabels] = useState(true)
   const [mode, setMode] = useState<'plan' | '3d'>('plan')
   // Ctrl + scroll to zoom, drag to pan, in metres. Narrows the SVG
   // viewBox, so the drawing stays sharp at any magnification.
@@ -97,19 +96,13 @@ export function TwinViewport({
       })
   }, [])
 
-  const controlsVisible = hovered || isFull
-
   return (
     <div
       ref={ref}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onFocus={() => setHovered(true)}
-      onBlur={() => setHovered(false)}
       className={
         isFull
-          ? 'relative flex h-full w-full items-center justify-center bg-plate p-4'
-          : 'relative aspect-[920/540] w-full overflow-hidden rounded-control bg-inset'
+          ? 'relative flex h-full w-full items-center justify-center bg-[var(--plate-ground)] p-4'
+          : 'relative aspect-[920/540] w-full overflow-hidden rounded-[16px] bg-[var(--plate-ground)] shadow-[0_0_0_1px_rgb(15_25_48/0.18),0_12px_26px_-16px_rgb(0_0_0/0.7)]'
       }
     >
       <div
@@ -133,6 +126,7 @@ export function TwinViewport({
             releaseKey={releaseKey}
             motionSide={motionSide}
             raining={raining}
+            showLabels={labels}
           />
         ) : (
           <Suspense
@@ -143,52 +137,59 @@ export function TwinViewport({
         )}
       </div>
 
-      <AnimatePresence>
-        {controlsVisible && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 6 }}
-            transition={{ duration: DUR.fast, ease: EASE_OUT }}
-            className="absolute bottom-3 left-3 flex items-center gap-1.5"
-          >
-            {allow3d && (
-              <div className="flex overflow-hidden rounded-control border border-rule bg-plate shadow-[var(--shadow-panel)]">
-                <ModeButton active={mode === 'plan'} onClick={() => setMode('plan')} icon={<Map size={14} aria-hidden />} label="Plan" />
-                <ModeButton active={mode === '3d'} onClick={() => setMode('3d')} icon={<Box size={14} aria-hidden />} label="3D" />
-              </div>
-            )}
+      {allow3d && (
+        <div className="absolute left-3 top-3 flex rounded-full p-[3px] map-pill">
+          <ModeButton active={mode === 'plan'} onClick={() => setMode('plan')} label="Plan" />
+          <ModeButton active={mode === '3d'} onClick={() => setMode('3d')} label="3D" />
+        </div>
+      )}
 
-            {mode === 'plan' && (
-              <div className="flex items-center overflow-hidden rounded-control border border-rule bg-plate shadow-[var(--shadow-panel)]">
-                <IconButton onClick={() => pan.zoomBy(1 / 1.6)} label="Zoom out" icon={<Minus size={14} aria-hidden />} disabled={!pan.canZoomOut} />
-                <span className="num w-[46px] px-1 text-center text-[12px] text-ink-mute" title={ZOOM_TITLE}>
-                  {pan.zoom.toFixed(1)}×
-                </span>
-                <IconButton onClick={() => pan.zoomBy(1.6)} label="Zoom in" icon={<Plus size={14} aria-hidden />} disabled={!pan.canZoomIn} />
-                <IconButton onClick={pan.home} label="Frame the junction" icon={<Crosshair size={13} aria-hidden />} disabled={pan.atHome} />
-                {matchView && (
-                  <IconButton
-                    onClick={() => pan.setView(matchView.view)}
-                    label={`Match ${matchView.label}'s view`}
-                    icon={<Link2 size={13} aria-hidden />}
-                    disabled={sameView(pan.view, matchView.view)}
-                  />
-                )}
-              </div>
+      {mode === 'plan' && (
+        <div className="absolute right-3 top-3 flex flex-col gap-0.5 rounded-[14px] p-1 map-pill">
+          <IconButton
+            onClick={() => setLabels((v) => !v)}
+            label={labels ? 'Hide the approach names' : 'Show the approach names'}
+            icon={<Layers size={16} aria-hidden />}
+            pressed={labels}
+          />
+          <IconButton onClick={pan.home} label="Frame the junction" icon={<Crosshair size={16} aria-hidden />} disabled={pan.atHome} />
+          <IconButton
+            onClick={() => pan.setView({ ...HOME_VIEW, h: HOME_VIEW.h / 2.2 })}
+            label="Zoom in to the stop lines"
+            icon={<ScanSearch size={16} aria-hidden />}
+          />
+        </div>
+      )}
+
+      <div className="absolute bottom-3 right-3 flex items-center gap-2">
+        {mode === 'plan' && (
+          <>
+            <IconButton round onClick={() => pan.zoomBy(1 / 1.6)} label="Zoom out" icon={<Minus size={16} aria-hidden />} disabled={!pan.canZoomOut} />
+            <span className="map-pill num flex h-[34px] min-w-[58px] items-center justify-center rounded-full px-2 text-[12.5px] font-medium text-[#8A5A00]" title={ZOOM_TITLE}>
+              {pan.zoom.toFixed(1)}×
+            </span>
+            <IconButton round onClick={() => pan.zoomBy(1.6)} label="Zoom in" icon={<Plus size={16} aria-hidden />} disabled={!pan.canZoomIn} />
+            {matchView && (
+              <button
+                type="button"
+                onClick={() => pan.setView(matchView.view)}
+                disabled={sameView(pan.view, matchView.view)}
+                title={`Match ${matchView.label}'s view`}
+                className="map-pill flex h-[34px] items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium text-[var(--plate-ink)] disabled:opacity-45"
+              >
+                <Link2 size={14} aria-hidden />
+                Match
+              </button>
             )}
-            <button
-              type="button"
-              onClick={toggleFull}
-              aria-label={isFull ? 'Exit fullscreen' : 'View fullscreen'}
-              className="flex items-center gap-2 rounded-control border border-rule bg-plate px-2.5 py-1.5 text-[12.5px] font-medium text-ink-strong shadow-[var(--shadow-panel)]"
-            >
-              {isFull ? <Minimize2 size={14} aria-hidden /> : <Maximize2 size={14} aria-hidden />}
-              {isFull ? 'Exit fullscreen' : 'Fullscreen'}
-            </button>
-          </motion.div>
+          </>
         )}
-      </AnimatePresence>
+        <IconButton
+          round
+          onClick={toggleFull}
+          label={isFull ? 'Exit fullscreen' : 'View fullscreen'}
+          icon={isFull ? <Minimize2 size={16} aria-hidden /> : <Maximize2 size={16} aria-hidden />}
+        />
+      </div>
     </div>
   )
 }
@@ -202,11 +203,16 @@ function IconButton({
   label,
   icon,
   disabled,
+  round,
+  pressed,
 }: {
   onClick: () => void
   label: string
   icon: React.ReactNode
   disabled?: boolean
+  /** A free-standing round pill; otherwise an item in the tool stack. */
+  round?: boolean
+  pressed?: boolean
 }) {
   return (
     <button
@@ -214,10 +220,13 @@ function IconButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
+      aria-pressed={pressed}
       title={label}
       className={clsx(
-        'flex items-center px-2 py-1.5 text-ink-strong transition-colors',
-        disabled ? 'cursor-not-allowed opacity-40' : 'hover:bg-hover',
+        'flex items-center justify-center text-[var(--plate-ink)] transition-colors',
+        round ? 'map-pill h-[34px] w-[34px] rounded-full' : 'h-9 w-9 rounded-[10px]',
+        !round && (pressed ? 'bg-[rgb(18_183_106/0.16)] text-[#067647]' : 'hover:bg-[rgb(27_37_54/0.08)]'),
+        disabled ? 'cursor-not-allowed opacity-40' : round && 'hover:bg-white',
       )}
     >
       {icon}
@@ -225,28 +234,22 @@ function IconButton({
   )
 }
 
-function ModeButton({
-  active,
-  onClick,
-  icon,
-  label,
-}: {
-  active: boolean
-  onClick: () => void
-  icon: React.ReactNode
-  label: string
-}) {
+function ModeButton({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
       className={clsx(
-        'flex items-center gap-1.5 px-2.5 py-1.5 text-[12.5px] font-medium transition-colors',
-        active ? 'bg-ink-strong text-ink-on-dark' : 'text-ink-strong hover:bg-hover',
+        'h-8 rounded-full px-5 text-[13.5px] font-medium transition-colors',
+        active ? 'text-white' : 'text-[var(--plate-ink)] hover:bg-[rgb(27_37_54/0.07)]',
       )}
+      style={
+        active
+          ? { background: 'linear-gradient(180deg, var(--brand-hi), var(--brand))', boxShadow: '0 0 16px -2px rgb(255 140 20 / 0.85)' }
+          : undefined
+      }
     >
-      {icon}
       {label}
     </button>
   )

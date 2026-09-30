@@ -78,7 +78,7 @@ function Track({ label, axis, segs, span }: { label: string; axis: 'NS' | 'EW'; 
   return (
     <div className="mb-1 flex h-7 items-center gap-2">
       <div className="w-[88px] shrink-0 text-[12px] font-medium text-ink-mute">{label}</div>
-      <div className="flex h-full flex-1 overflow-hidden rounded-control bg-inset">
+      <div className="flex h-full flex-1 overflow-hidden rounded-[9px] bg-[rgb(18_30_56/0.06)]">
         {segs.map((s, i) => {
           const w = ((s.end - s.start) / span) * 100
           const mine = phaseAxis(s.phase) === axis
@@ -88,13 +88,17 @@ function Track({ label, axis, segs, span }: { label: string; axis: 'NS' | 'EW'; 
               key={i}
               title={`${s.phase}${s.yellow ? ' (clearance)' : ''} · ${(s.end - s.start).toFixed(0)} s`}
               className={clsx(
-                'flex h-full items-center overflow-hidden whitespace-nowrap border-r border-rule-soft px-1.5 text-[12px]',
-                mine && !s.yellow && 'bg-signal-green text-white',
-                mine && s.yellow && 'bg-signal-amber text-ink-strong',
+                'flex h-full items-center overflow-hidden whitespace-nowrap border-r border-white/60 px-1.5 text-[12px]',
+                mine && !s.yellow && 'font-medium text-white',
+                mine && s.yellow && 'text-[#5c3a00]',
                 !mine && 'text-ink-mute',
-                last && mine && !s.yellow && 'ring-1 ring-inset ring-ink-strong',
+                last && mine && !s.yellow && 'ring-1 ring-inset ring-white/70',
               )}
-              style={{ width: `${w}%`, transition: 'width var(--dur-value) var(--ease-out)' }}
+              style={{
+                width: `${w}%`,
+                transition: 'width var(--dur-value) var(--ease-out)',
+                background: mine ? (s.yellow ? 'linear-gradient(180deg, #FCD34D, #F5B800)' : 'linear-gradient(180deg, #1FC98E, #0E9F6E)') : undefined,
+              }}
             >
               {mine && !s.yellow && w > 8 && (
                 <span className="truncate">
