@@ -2,142 +2,144 @@
  * Trinetra design tokens — the single source of truth for colour, type,
  * space and motion. Components never hard-code a hex or a px.
  *
- * Palette: the user's traffic-light idea — RED rail, AMBER ground, GREEN
- * cards — at values that survive contrast and keep the signal encoding
- * intact. The saturated signal colours were measured first and rejected
- * as surfaces:
- *     #22C55E card on #F0A81E page = 1.12:1  (cards invisible)
- *     white on #E24B37 rail        = 3.97:1  (fails body text)
- * Depth carries the hue instead of saturation, so the only fully
- * saturated things on screen remain the signal lamps themselves.
+ * Palette: "glass over the night city" (design/glass-night, 2026-09-30).
+ * A night photograph of a city sits behind everything (layout/Backdrop).
+ * Over it: a dark-glass rail, one large frosted container holding the top
+ * bar and the page, and pale glass cards with navy ink inside that.
  *
- * Measured, all passing:
- *     cream on oxblood rail     12.3:1
- *     ink on amber page         12.4:1
- *     ink on green card         16.2:1
- *     green card vs amber page   1.30:1 separation (plus border + shadow)
- *     signal green as text on a green card 4.75:1
+ * Measured on the card's opaque end (#FFFFFF → #EEF5FF):
+ *     ink-strong #0F1930   16.9:1
+ *     ink        #27324A   12.3:1
+ *     ink-mute   #4E5A73    7.2:1   (was #5A6680 in the design — lifted
+ *                                    so 12px captions clear 4.5 on the
+ *                                    translucent end of the card too)
+ *     accent     #2563EB    5.2:1
+ *     signal text green / amber / red  5.6 / 6.4 / 6.1:1
  *
- * Hard rule: --lamp-* and --signal-* appear ONLY where they mean a real
- * signal or traffic state. Because the surfaces now live in the same
- * three hue families, signal state ALWAYS carries a label and a position
- * as well as a hue — never hue alone.
+ * Hard rule, unchanged: --lamp-* and --signal-* appear ONLY where they mean
+ * a real signal or traffic state, and signal state always carries a label
+ * or a position as well as a hue — never hue alone.
  */
 
 :root {
-  /* AMBER — the ground. Traffic yellow, warmed slightly from #EFB700
-     which read too acid. Ink on it is 9.20:1. */
-  --surface-page: #f4b31d;
+  /* The page under the photo — only seen while the photo loads. */
+  --surface-page: #07101f;
 
-  /* GREEN — the cards. Reverted to the pale mint after the saturated
-     #7ECB5A was rejected. The chips stayed as dark pills (ui/SignalChip)
-     because they read more clearly than coloured text either way. */
-  --surface-plate: #d0ebbe;
-  --surface-inset: #badfa4;
-  --surface-hover: #aed89a;
-  --rule-soft: #bcdfa8;
-  --rule: #9fc98a;
-  --rule-strong: #7fae68;
+  /* The glass cards. --surface-plate is the solid fallback / popover
+     fill; the glass itself is painted by .glass-card in index.css. */
+  --surface-plate: #ffffff;
+  --surface-inset: #f1f5fb;
+  --surface-hover: #e7eef8;
+  --rule-soft: rgb(18 30 56 / 0.07);
+  --rule: rgb(18 30 56 / 0.13);
+  --rule-strong: rgb(18 30 56 / 0.26);
 
-  /* Ink — warm near-black, never a cold grey */
-  --ink-strong: #241a10;
-  --ink: #3e3325;
-  --ink-mute: #4e4130;
-  --ink-faint: #4e4130;
-  --ink-on-dark: #fff8e7;
+  /* Card glass: two stops, top brighter. */
+  --glass-a: rgb(255 255 255 / 0.9);
+  --glass-b: rgb(238 245 255 / 0.8);
+  --glass-edge: rgb(255 255 255 / 0.85);
 
-  /* RED — the rail, status bar and footer. A deep member of the real
-     signal-red family (#E60000); the literal value only clears cream
-     text at 4.54:1, this clears it at 7.63:1. */
-  --chrome: #a50000;
-  --chrome-ink: #fff8e7;
-  --chrome-mute: #f2b9b4;
-  --chrome-rule: #c42020;
+  /* Ink — navy, never grey-on-grey. */
+  --ink-strong: #0f1930;
+  --ink: #27324a;
+  --ink-mute: #4e5a73;
+  --ink-faint: #4e5a73;
+  --ink-on-dark: #ffffff;
 
-  /* Accent: GREEN — every single-series chart (heatmap ramp, congestion
-     trend, peak periods, histogram, scatter) reads green. 4.94:1 on the
-     card, so it works as fill, stroke and text alike. */
-  --accent: #276708;
-  --accent-ink: #276708;
-  --accent-soft: #e2f2d6;
+  /* The dark glass — rail, controls sitting on the frosted container,
+     the tools floating over the twin. */
+  --chrome: rgb(6 12 28 / 0.78);
+  --chrome-ink: #ffffff;
+  --chrome-mute: #d3dbe8;
+  --chrome-rule: rgb(255 255 255 / 0.16);
+  --control-a: rgb(24 32 52 / 0.78);
+  --control-b: rgb(10 14 26 / 0.82);
+  --control-edge: rgb(255 255 255 / 0.2);
 
-  /* Chart series — only where several things must be told apart at once
-     (phase share, decision modes). Green leads; all verified >=3:1 as
-     fills on the card. */
-  --series-1: #276708;
-  --series-2: #7a5600;
-  --series-3: #a00000;
-  --series-4: #6b5a3e;
+  /* The brand warm: the active nav item, Start, the Plan/3D toggle,
+     the selected scenario. Never a signal meaning. */
+  --brand: #ff8a12;
+  --brand-hi: #ffb443;
+  --brand-edge: rgb(255 176 80 / 0.9);
+  --brand-glow: rgb(255 138 31 / 0.6);
+  --tagline: #f7c04a;
 
-  /* The junction plate keeps a real dark carriageway so signal colours
-     on it stay unmistakable against the pale card behind. The ground is
-     the 3D model's own grass (Junction3D GROUND), so the two views read
-     as one place; text on it is the marking white (4.75:1 on it). */
-  --plate-ground: #268426;
-  --plate-ink: #f4fbf0;
-  --plate-road: #3e3428;
-  --plate-kerb: #7fae68;
-  --plate-lane: #6d7f5f;
-  --plate-marking: #f4fbf0;
-  --plate-vehicle: #f4fbf0;
+  /* Accent: every single-series chart (heatmap ramp, congestion trend,
+     peak periods, histogram, scatter) reads in this blue. */
+  --accent: #2563eb;
+  --accent-ink: #1d4ed8;
+  --accent-soft: #e3ecff;
+
+  /* Chart series — only where several things must be told apart at
+     once (phase share, decision modes). */
+  --series-1: #2563eb;
+  --series-2: #d97706;
+  --series-3: #e5484d;
+  --series-4: #12a150;
+
+  /* Prediction vs actual: yellow predicted, blue actual (the design's
+     own legend). */
+  --predicted: #f5b800;
+  --actual: #2f6bff;
+
+  /* The junction plate at night: a dark carriageway so signal colours
+     on it stay unmistakable. Ground is deep park green, roads are
+     asphalt under sodium light. */
+  --plate-ground: #16281c;
+  --plate-ink: #f4f7fb;
+  --plate-road: #2a2e35;
+  --plate-kerb: #56645a;
+  --plate-lane: #7d8794;
+  --plate-marking: #eef2f7;
+  --plate-vehicle: #f4f7fb;
   --plate-fill-alpha: 0.34;
 
-  /* Signal — GRAPHIC weight (text, chips, stop bars). Darker members of
-     the real signal hues: the literal codes below are unreadable as text
-     on a pale card (#E60000 4.42, #EFB700 1.69, #4CBB17 2.29 — all under
-     4.5), so text uses these instead — deepened again when the cards
-     went properly green: 6.54 / 5.16 / 5.38:1 on #D0EBBE. */
-  --signal-red: #a00000;
-  --signal-amber: #7a5600;
-  --signal-green: #276708;
+  /* Signal — TEXT weight (chips, labels) on the pale cards. */
+  --signal-red: #b42318;
+  --signal-amber: #8a5200;
+  --signal-green: #067647;
 
-  /* Lit lamps — the real traffic-signal colours, exactly as specified.
-     Amber is RAL 2009 Traffic Orange. Verified 3.55 / 4.25 / 6.85:1
-     inside the dark lamp housing. These
-     stay the most saturated thing on screen. */
+  /* Lit lamps — the real traffic-signal colours, exactly as specified
+     (Amber is RAL 2009 Traffic Orange). These stay the most saturated
+     thing on screen. */
   --lamp-red: #ff0505;
   --lamp-amber: #efb700;
   --lamp-green: #4cbb17;
-  --lamp-housing: #241a10;
-  --lamp-unlit: #4a3f31;
+  --lamp-housing: #0a0e16;
+  --lamp-unlit: #3a3f4a;
 
-  /* The top and bottom bars: one blended red -> amber -> green sweep in
-     three equal parts. The values are the signal hues lifted 30% toward
-     white, because at full saturation dark text on the red third is only
-     3.55:1; lifted, all three thirds clear 4.5 (4.69 / 11.12 / 8.97).
-     Everything on these bars is ink-strong — on a saturated ground even
-     a mid ink fails, so hierarchy there comes from size, not ink level. */
-  --bar-red: #ee4c4c;
-  --bar-amber: #f4cd4c;
-  --bar-green: #82cf5d;
-  --bar-grad: linear-gradient(
-    90deg,
-    var(--bar-red) 0%,
-    var(--bar-red) 16.66%,
-    var(--bar-amber) 50%,
-    var(--bar-green) 83.33%,
-    var(--bar-green) 100%
-  );
-  --bar-ink: #241a10;
-  --bar-rule: rgb(36 26 16 / 0.3);
+  /* Status dots/fills on the cards (lane table, switches) — the design's
+     brighter set, used only as fills with a label beside them. */
+  --dot-red: #ef3b4e;
+  --dot-amber: #f5b800;
+  --dot-green: #12b76a;
 
-  /* Emergency — a light wash so it still punches against the red rail */
-  --alert: #b00000;
-  --alert-wash: #fde8e4;
+  /* The top bar sits on the frosted container: white text over glass. */
+  --bar-ink: #ffffff;
+  --bar-mute: rgb(255 255 255 / 0.88);
+  --bar-rule: rgb(255 255 255 / 0.22);
+
+  /* Emergency */
+  --alert: #d92d20;
+  --alert-wash: #fde8e6;
 
   /* Three type roles:
-       display  Orbitron — wordmark and panel titles only
-       ui       Barlow  — everything readable
-       num      JetBrains Mono — every live number, tabular */
-  --font-display: 'Orbitron', 'Barlow', ui-sans-serif, sans-serif;
-  --font-ui: 'Barlow', ui-sans-serif, system-ui, sans-serif;
-  --font-num: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+       display  Orbitron      — the wordmark only
+       ui       Poppins       — everything readable, panel titles included
+       num      Overpass Mono — every live number, tabular */
+  --font-display: 'Orbitron', 'Poppins', ui-sans-serif, sans-serif;
+  --font-ui: 'Poppins', 'Barlow', ui-sans-serif, system-ui, sans-serif;
+  --font-num: 'Overpass Mono', ui-monospace, SFMono-Regular, monospace;
 
-  /* Shape — rounded, lifted by contrast and a whisper of shadow. */
-  --r-panel: 10px;
-  --r-control: 6px;
+  /* Shape */
+  --r-panel: 20px;
+  --r-control: 10px;
   --r-chip: 999px;
-  --shadow-panel: 0 1px 2px rgb(36 26 16 / 0.10), 0 4px 14px -6px rgb(36 26 16 / 0.18);
+  --shadow-panel:
+    inset 0 1px 0 #fff, inset 0 0 22px rgb(255 255 255 / 0.35), 0 0 0 3px rgb(255 255 255 / 0.12),
+    0 0 26px -6px rgb(255 220 170 / 0.35), 0 16px 36px -20px rgb(3 8 24 / 0.7);
+  --shadow-control: inset 0 1px 0 rgb(255 255 255 / 0.12), 0 10px 22px -12px rgb(0 0 0 / 0.8);
+  --shadow-pop: 0 24px 60px -24px rgb(4 10 28 / 0.55);
 
   /* Space — 4px baseline */
   --s-1: 4px;
@@ -149,17 +151,13 @@
   --s-8: 32px;
 
   /* Motion — ONE rhythm for the whole product; the framer-motion side of
-     it is src/ui/motion.ts, and the two must stay in step. Durations are
-     chosen by how far a thing travels, not copied from each other:
+     it is src/ui/motion.ts, and the two must stay in step.
 
        tick   state flips: lamps, chips, signal fills        120ms
        fast   an answer to the pointer: hover, expand         180ms
        value  a number or a bar easing to a new reading       300ms (ceiling)
        enter  a panel arriving on page mount                  420ms
-       phase  the signal-change choreography, once per switch 900ms
-
-     Exits run at ~65% of their enter — leaving should feel quicker than
-     arriving. --stagger is the step between neighbours in a sequence. */
+       phase  the signal-change choreography, once per switch 900ms */
   --dur-tick: 120ms;
   --dur-fast: 180ms;
   --dur-value: 300ms;
@@ -168,17 +166,5 @@
   --stagger: 70ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-mid: cubic-bezier(0.65, 0, 0.35, 1);
-  /* Overshoots by ~4%: for things the user just pressed, where a little
-     physics reads as responsiveness. Never for data. */
   --ease-spring: cubic-bezier(0.22, 1.18, 0.36, 1);
-
-  /* Ground texture — a drafting grid on the amber, 40px minor / 200px
-     major, at an opacity that is felt rather than seen. The product IS a
-     signal plan; graph paper under it is the right substrate, and a
-     completely flat colour field is what made the page read as unfinished.
-     Static: nothing in the periphery of a live display may move. */
-  --grid-minor: rgb(36 26 16 / 0.07);
-  --grid-major: rgb(36 26 16 / 0.12);
-  --grid-minor-size: 40px;
-  --grid-major-size: 200px;
 }

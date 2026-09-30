@@ -77,7 +77,7 @@ export function RunControls() {
             disabled={disabled}
             label={state.stopping ? 'Stopping' : 'Start'}
             title={`Start the evaluation — Trinetra vs VAC on ${page.scenarioLabel}${ending}`}
-            icon={<Play size={13} aria-hidden />}
+            icon={<Play size={16} fill="currentColor" aria-hidden />}
           />
         </div>
       )
@@ -93,7 +93,7 @@ export function RunControls() {
           disabled={disabled}
           label={state.stopping ? 'Stopping' : 'Start'}
           title={`Start a simulation of ${page.scenarioLabel} (headless — watch it on Overview)${ending}`}
-          icon={<Play size={13} aria-hidden />}
+          icon={<Play size={16} fill="currentColor" aria-hidden />}
         />
         <Button
           onClick={() => {
@@ -103,7 +103,7 @@ export function RunControls() {
           disabled={disabled}
           label=""
           title={`Start a simulation and open the SUMO window as well${ending}`}
-          icon={<Monitor size={13} aria-hidden />}
+          icon={<Monitor size={16} aria-hidden />}
         />
       </div>
     )
@@ -132,7 +132,7 @@ export function RunControls() {
               disabled={busy}
               label={state.paused ? 'Play' : 'Pause'}
               title={state.paused ? 'Resume the simulation' : 'Pause the simulation'}
-              icon={state.paused ? <Play size={13} aria-hidden /> : <Pause size={13} aria-hidden />}
+              icon={state.paused ? <Play size={13} aria-hidden /> : <Pause size={16} aria-hidden />}
               primary={state.paused}
             />
           </motion.div>
@@ -148,7 +148,7 @@ export function RunControls() {
             ? 'End this run — SUMO closes cleanly and you can start another'
             : 'End this run. This dashboard lives inside it, so it cannot be restarted from here'
         }
-        icon={<Square size={13} aria-hidden />}
+        icon={<Square size={16} aria-hidden />}
       />
 
       {/* Continue THIS run in a SUMO window. Not a restart: the run saves
@@ -159,7 +159,7 @@ export function RunControls() {
           disabled={busy || stopping || handing}
           label={handing ? 'Opening' : ''}
           title="Open the SUMO window and carry this run into it — same vehicles, same signal, about two seconds to swap"
-          icon={<Monitor size={13} aria-hidden />}
+          icon={<Monitor size={16} aria-hidden />}
         />
       )}
 
@@ -188,7 +188,7 @@ function SpeedControl({ speed, disabled }: { speed: number | null; disabled?: bo
         disabled={disabled}
         label={speedLabel(speed)}
         title={`Simulated seconds per real second — click for ${speedLabel(next)}, or hover to slide`}
-        icon={<Gauge size={13} aria-hidden />}
+        icon={<Gauge size={16} aria-hidden />}
         mono
       />
 
@@ -199,7 +199,7 @@ function SpeedControl({ speed, disabled }: { speed: number | null; disabled?: bo
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: DUR.tick, ease: EASE_OUT }}
-            className="absolute right-0 top-full z-20 mt-1.5 flex items-center gap-2 rounded-control border border-rule bg-plate px-3 py-2 shadow-[var(--shadow-panel)]"
+            className="absolute right-0 top-full z-20 mt-2 flex items-center gap-2 rounded-[12px] border border-rule bg-plate px-3 py-2.5 shadow-[var(--shadow-pop)]"
           >
             <span className="num text-[11px] text-ink-mute">0.25×</span>
             <input
@@ -211,8 +211,8 @@ function SpeedControl({ speed, disabled }: { speed: number | null; disabled?: bo
               disabled={disabled}
               aria-label="Simulation speed"
               onChange={(e) => void runControl.setSpeed(SPEEDS[Number(e.target.value)])}
-              className="h-1.5 w-[132px] cursor-pointer appearance-none rounded-full bg-inset accent-[var(--ink-strong)]"
-              style={{ accentColor: 'var(--ink-strong)' }}
+              className="h-1.5 w-[132px] cursor-pointer appearance-none rounded-full bg-inset accent-[var(--brand)]"
+              style={{ accentColor: 'var(--brand)' }}
             />
             <span className="num text-[11px] text-ink-mute">max</span>
             <span className="num w-[34px] text-right text-[12px] font-semibold text-ink-strong">
@@ -252,11 +252,10 @@ function Button({
       aria-label={label || title}
       title={title}
       className={clsx(
-        'flex items-center gap-1.5 rounded-control border px-2.5 py-1 text-[12.5px] font-semibold transition-colors',
+        'flex h-11 items-center justify-center gap-2 rounded-full text-[13.5px] font-medium',
         disabled && 'cursor-not-allowed opacity-50',
-        primary
-          ? 'border-[var(--bar-ink)] bg-[var(--bar-ink)] text-[var(--ink-on-dark)]'
-          : 'border-[var(--bar-rule)] text-[var(--bar-ink)] hover:bg-[rgb(36_26_16/0.12)]',
+        primary ? 'brand-button pl-[22px] pr-[26px] text-[14.5px]' : 'glass-control',
+        !primary && (label ? 'px-4' : 'w-[46px]'),
       )}
     >
       {icon}

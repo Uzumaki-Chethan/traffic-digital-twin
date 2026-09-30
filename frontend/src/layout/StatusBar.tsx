@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { Link } from 'react-router-dom'
-import { SlidersHorizontal } from 'lucide-react'
+import { ChevronDown, SlidersHorizontal } from 'lucide-react'
 import { useSim } from '@/data/store'
 import { isEvaluation, isLive } from '@/data/types'
 import { useLiveClock } from '@/data/useLiveClock'
@@ -12,10 +12,9 @@ import { useSettings } from '@/data/settings'
 import { RunControls } from './RunControls'
 
 /**
- * Persistent status bar, drawn as one blended red -> amber -> green sweep
- * in three equal parts (see --bar-grad). Everything on it is set in
- * ink-strong: on a saturated ground even a mid ink drops below 4.5:1, so
- * hierarchy here comes from size and weight rather than ink level.
+ * Persistent top bar, sitting directly on the frosted container: white
+ * title over the glass, then the scenario pill (gold rim), the run
+ * controls, the simulated clock and the link pill — all dark-glass pills.
  *
  * Routine engine modes live in the Active-phase panel where they can be
  * explained; only the two genuine alerts surface here, alongside the
@@ -53,30 +52,30 @@ export function StatusBar() {
   const side = live ?? (evaluating && isEvaluation(latest) ? latest.ai : null)
   const mode = modeMeta(side?.decision.mode)
 
+  // The pill's lamp: red when nothing is flowing (idle, link lost), amber
+  // while it's held or doubtful (paused, connecting, stale), green live.
+  const dot = ended || link === 'closed' ? 'red' : linkLost || paused ? 'amber' : 'green'
+
   return (
-    <header
-      className="bar-flow flex h-14 shrink-0 items-center justify-between px-4 text-[var(--bar-ink)]"
-      style={{ borderBottom: '1px solid var(--bar-rule)' }}
-    >
-      <div className="flex items-center gap-3">
-        <div>
-          <div className="display text-[15px]">Adaptive signal control</div>
-          <div className="text-[12px]">
-            Single 4-way junction
-          </div>
+    <header className="flex h-[88px] shrink-0 items-center justify-between gap-4 pl-6 pr-5 text-[var(--bar-ink)]">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="min-w-0">
+          <h1
+            className="truncate text-[26px] font-medium leading-[1.15] text-white"
+            style={{ textShadow: '0 2px 14px rgb(0 0 0 / 0.55)' }}
+          >
+            Adaptive signal control
+          </h1>
+          <p className="mt-1.5 truncate text-[13.5px] text-[var(--bar-mute)]" style={{ textShadow: '0 1px 8px rgb(0 0 0 / 0.6)' }}>
+            Single 4-way junction <span className="mx-1.5">•</span> Digital twin <span className="mx-1.5">•</span> AI-powered traffic intelligence
+          </p>
         </div>
         {side && mode.loud && (
-          <>
-            <span className="h-5 w-px" style={{ background: 'var(--bar-rule)' }} />
-            <span className="rounded-chip bg-[var(--signal-red)] px-2.5 py-0.5 text-[12.5px] font-semibold text-white">
-              {mode.label}
-            </span>
-          </>
+          <span className="loud-chip shrink-0 rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold text-white">{mode.label}</span>
         )}
       </div>
 
-      <div className="flex items-center gap-4">
-
+      <div className="flex shrink-0 items-center gap-2.5">
         {/* The page's scenario — what is running here, or what Start would
             run — and the way to change it: Settings opens choosing for THIS
             page, so a click from Performance picks the evaluation's scenario. */}
@@ -85,31 +84,32 @@ export function StatusBar() {
           onClick={() => {
             if (!page.path.startsWith('/settings')) setTarget(page.kind === 'evaluation' ? 'performance' : 'overview')
           }}
-          className="flex items-center gap-1.5 rounded-control border border-[var(--bar-rule)] px-2.5 py-1 text-[12.5px] font-medium text-[var(--bar-ink)] transition-colors hover:bg-[rgb(36_26_16/0.12)]"
+          className="scenario-pill flex h-11 items-center gap-2.5 rounded-full pl-4 pr-[18px] text-[13.5px] text-white"
           title={
             page.running
               ? `${page.name} is running ${page.scenarioLabel} — change the scenario on Simulation Settings for the next run`
               : `${page.name} will run ${page.scenarioLabel} — change it on Simulation Settings`
           }
         >
-          <SlidersHorizontal size={13} aria-hidden />
-          <span className="opacity-80">Scenario:</span>
-          <span className="font-semibold">{page.scenarioLabel}</span>
+          <SlidersHorizontal size={16} aria-hidden />
+          <span style={{ color: '#F5B632' }}>Scenario:</span>
+          <span className="whitespace-nowrap font-medium">{page.scenarioLabel}</span>
+          <ChevronDown size={14} strokeWidth={2.2} aria-hidden className="ml-1" />
         </Link>
 
         <RunControls />
 
-        <div className="text-right">
+        <div className="min-w-[132px] text-right" style={{ textShadow: '0 1px 8px rgb(0 0 0 / 0.6)' }}>
           {live === null && !evaluating ? (
-            <div className="text-[13px]">{ended ? 'No simulation running' : 'Waiting for simulation'}</div>
+            <div className="text-[13.5px] text-white">{ended ? 'No simulation running' : 'Waiting for simulation'}</div>
           ) : paused ? (
-            <div className="text-[14px] font-semibold">Simulation paused</div>
+            <div className="text-[13.5px] font-medium text-white">Simulation paused</div>
           ) : ended ? (
-            <div className="text-[14px] font-semibold">Run ended</div>
+            <div className="text-[13.5px] font-medium text-white">Run ended</div>
           ) : (
             <>
-              <div className="num text-[16px] font-semibold leading-none">{simTime == null ? '--:--:--' : clock(simTime)}</div>
-              <div className="mt-0.5 text-[12px]">
+              <div className="num text-[17px] font-semibold leading-none text-white">{simTime == null ? '--:--:--' : clock(simTime)}</div>
+              <div className="mt-1 text-[11.5px] text-[var(--bar-mute)]">
                 simulated time
                 {rate != null && (
                   <>
@@ -122,20 +122,9 @@ export function StatusBar() {
           )}
         </div>
 
-        <span className="h-5 w-px" style={{ background: 'var(--bar-rule)' }} />
-
-        <div className="flex items-center gap-1.5 text-[12.5px] font-medium">
-          <span
-            className={clsx(
-              'h-2.5 w-2.5 rounded-full ring-1 ring-[var(--bar-rule)]',
-              link === 'open' && !linkLost && !paused && !ended
-                ? 'bg-lamp-green'
-                : paused || ended
-                  ? 'bg-lamp-amber'
-                  : 'bg-[var(--bar-ink)]',
-            )}
-          />
-          <span>
+        <div className="glass-control flex h-[42px] items-center gap-2.5 rounded-full pl-3.5 pr-4 text-[13.5px] font-medium">
+          <span className={clsx('status-dot', `status-dot-${dot}`, dot === 'green' && 'status-dot-beat')} />
+          <span className="whitespace-nowrap">
             {link === 'connecting'
               ? 'Connecting'
               : link === 'closed'

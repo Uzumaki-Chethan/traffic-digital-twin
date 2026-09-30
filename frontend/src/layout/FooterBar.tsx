@@ -17,9 +17,8 @@ const PAGE_NOTES: { path: string; name: string; note: string }[] = [
 
 /** Thin footer: what page this is on the left; on the right, where the
  * data comes from — the backend host and the link to it — since the
- * status bar already carries the simulation's clock and rate. Same
- * red -> amber -> green sweep as the status bar so the two frame the
- * page symmetrically. */
+ * status bar already carries the simulation's clock and rate. A
+ * dark glass strip at the foot of the frosted container. */
 export function FooterBar() {
   const link = useSim((s) => s.link)
   const run = useRunStore((s) => s.state)
@@ -35,13 +34,13 @@ export function FooterBar() {
   const page = PAGE_NOTES.find((p) => (p.path === '/' ? pathname === '/' : pathname.startsWith(p.path)))
   return (
     <footer
-      className="bar-flow flex h-8 shrink-0 items-center justify-between gap-4 px-4 text-[12px] font-medium text-[var(--bar-ink)]"
-      style={{ borderTop: '1px solid var(--bar-rule)' }}
+      className="flex h-8 shrink-0 items-center justify-between gap-4 px-[18px] text-[11.5px] text-white/75"
+      style={{ background: 'rgb(6 10 20 / 0.35)', borderTop: '1px solid rgb(255 255 255 / 0.12)' }}
     >
       <span className="min-w-0 truncate">
         {page ? (
           <>
-            <span className="display text-[11.5px] tracking-[0.06em]">{page.name}</span>
+            <span className="display text-[11px] tracking-[0.06em] text-white">{page.name.toUpperCase()}</span>
             <span className="opacity-70"> · </span>
             {page.note}
           </>
