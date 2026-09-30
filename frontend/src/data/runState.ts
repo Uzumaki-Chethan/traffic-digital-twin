@@ -80,18 +80,45 @@ function noteRun(state: RunState): void {
   knownStart = start
 }
 
+/** A poll that hasn't answered in this long is abandoned, not waited on. */
+const POLL_TIMEOUT_MS = 3000
+/** Consecutive failed polls before the controls are withdrawn (~6 s). */
+const FAILS_BEFORE_CLEAR = 3
+let inFlight = false
+let failures = 0
+
+/**
+ * Ask the console what it's doing. Hardened (Section 37.11) after the top
+ * bar was seen to lose every button until a page refresh: a poll could
+ * hang with no timeout, polls could pile up behind it, and ONE failure
+ * wiped the known state. Now each poll times out, never overlaps another,
+ * and the last good state stands until several polls in a row have failed.
+ */
 async function refresh(signal?: AbortSignal): Promise<void> {
+  if (inFlight) return
+  inFlight = true
+  const timeout = new AbortController()
+  const timer = window.setTimeout(() => timeout.abort(), POLL_TIMEOUT_MS)
+  const onOuterAbort = () => timeout.abort()
+  signal?.addEventListener('abort', onOuterAbort)
   try {
-    const res = await fetch('/api/control/run-state', { signal })
+    const res = await fetch('/api/control/run-state', { signal: timeout.signal, cache: 'no-store' })
     if (!res.ok) throw new Error(String(res.status))
     const state = (await res.json()) as RunState
+    failures = 0
     noteRun(state)
     useRunStore.setState({ state })
   } catch {
     if (signal?.aborted) return
     // Server down or no control layer mounted: report nothing rather
-    // than showing controls that cannot work.
-    useRunStore.setState({ state: null })
+    // than showing controls that cannot work — but only once it has
+    // failed several times running, not on one slow or dropped reply.
+    failures++
+    if (failures >= FAILS_BEFORE_CLEAR) useRunStore.setState({ state: null })
+  } finally {
+    window.clearTimeout(timer)
+    signal?.removeEventListener('abort', onOuterAbort)
+    inFlight = false
   }
 }
 
@@ -203,10 +230,19 @@ export function useRunStatePoll(): void {
     // Deferred by a tick so the first poll cannot set state during mount.
     const first = window.setTimeout(() => void refresh(ctrl.signal), 0)
     const id = window.setInterval(() => void refresh(), POLL_MS)
+    // Coming back to the tab (timers are throttled in the background):
+    // ask at once rather than showing a stale bar until the next tick.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refresh()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
     return () => {
       ctrl.abort()
       clearTimeout(first)
       clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
     }
   }, [])
 }

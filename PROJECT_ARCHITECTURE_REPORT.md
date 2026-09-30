@@ -3996,3 +3996,5 @@ Also in this round, at the owner's request:
 - Starting a run took about 2 s longer than necessary: `prune_runs` plus its VACUUM ran before SUMO launched. It now runs at the end of a run, after SUMO closes (`simulation_runner`).
 - The plan's compass is an HTML pill above the fullscreen button, and the East label clamps above the control column. The 3D compass has room for its N.
 - The tab icon is the signal head alone (owner).
+
+**37.11 Run-state polling hardened.** The top bar was seen with no run buttons at all ("Simulation paused", nothing to press) until a page refresh. The backend's run-state is always consistent, so the client was at fault. A poll had no timeout, polls could pile up, and one failed poll set the state to null, which hides every control and drops the bar to its "paused" heuristic. Now each poll aborts after 3 s, polls never overlap, the last good state holds until 3 consecutive failures, and returning to the tab re-polls at once.
