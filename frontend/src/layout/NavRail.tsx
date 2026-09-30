@@ -5,7 +5,6 @@ import clsx from 'clsx'
 import { Activity, BarChart3, ChartColumnIncreasing, ChevronsLeft, ListTree, SlidersHorizontal } from 'lucide-react'
 import { DUR, EASE_OUT, EASE_SPRING } from '@/ui/motion'
 import { Brand } from './Brand'
-import frost from '@/assets/city-night-frost.jpg'
 
 const NAV = [
   { to: '/', label: 'Overview', icon: Activity, end: true },
@@ -48,6 +47,7 @@ export function NavRail() {
 
   return (
     <aside
+      data-frost
       className={clsx(
         'rail relative z-[4] flex shrink-0 flex-col overflow-hidden rounded-[26px] transition-[width] duration-[380ms]',
         collapsed ? 'w-20' : 'w-[262px]',
@@ -55,11 +55,9 @@ export function NavRail() {
       style={{
         transitionTimingFunction: 'var(--ease-mid)',
         border: '1px solid rgb(255 255 255 / 0.14)',
-        // Baked frost, like the main container (see Shell).
-        backgroundImage: `linear-gradient(180deg, rgb(6 12 28 / 0.78), rgb(6 12 28 / 0.6) 45%, rgb(6 12 28 / 0.3) 70%, rgb(6 12 28 / 0.55)), url(${frost})`,
-        backgroundSize: 'auto, cover',
-        backgroundPosition: 'center, center',
-        backgroundAttachment: 'scroll, fixed',
+        // The frost is a static layer in Backdrop cut to this box (data-frost);
+        // only the dark tint is painted here (Section 37.12).
+        backgroundImage: 'linear-gradient(180deg, rgb(6 12 28 / 0.78), rgb(6 12 28 / 0.6) 45%, rgb(6 12 28 / 0.3) 70%, rgb(6 12 28 / 0.55))',
         boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.12), 0 30px 60px -30px rgb(0 0 0 / 0.85)',
       }}
     >

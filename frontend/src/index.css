@@ -526,3 +526,14 @@ button.rail-card:hover {
 .run-go:hover:not(:disabled), .run-hold:hover:not(:disabled), .run-halt:hover:not(:disabled) {
   filter: brightness(1.08);
 }
+
+/* The frost cut-outs (layout/Backdrop): one static, full-viewport copy of the
+   pre-blurred photo per frosted box, clipped to it, on its own layer. */
+.frost-cut {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  will-change: transform;
+  transform: translateZ(0);
+}
