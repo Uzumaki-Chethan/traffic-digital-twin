@@ -82,12 +82,28 @@ export function usePanZoom(
   useEffect(() => {
     const el = target.current
     if (!el || typeof ResizeObserver === 'undefined') return
+    // The first measurement lands at once; after that a resize is applied
+    // only once it settles (~100 ms), so an animated resize — the rail
+    // collapsing — doesn't re-render the plate on every frame. Meanwhile
+    // the SVG just scales with its box.
+    let first = true
+    let timer: number | undefined
     const ro = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect
-      if (width > 0 && height > 0) setStagePx({ w: width, h: height })
+      if (!(width > 0 && height > 0)) return
+      if (first) {
+        first = false
+        setStagePx({ w: width, h: height })
+        return
+      }
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => setStagePx({ w: width, h: height }), 100)
     })
     ro.observe(el)
-    return () => ro.disconnect()
+    return () => {
+      window.clearTimeout(timer)
+      ro.disconnect()
+    }
   }, [target])
 
   const aspect = stagePx.h > 0 ? stagePx.w / stagePx.h : PLATE_ASPECT

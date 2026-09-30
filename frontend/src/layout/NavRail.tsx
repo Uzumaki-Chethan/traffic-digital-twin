@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import clsx from 'clsx'
-import { Activity, BarChart3, ChartColumnIncreasing, ChevronsLeft, ChevronsRight, ListTree, SlidersHorizontal } from 'lucide-react'
+import { Activity, BarChart3, ChartColumnIncreasing, ChevronsLeft, ListTree, SlidersHorizontal } from 'lucide-react'
 import { DUR, EASE_OUT, EASE_SPRING } from '@/ui/motion'
 import { Brand } from './Brand'
 import frost from '@/assets/city-night-frost.jpg'
@@ -49,11 +49,11 @@ export function NavRail() {
   return (
     <aside
       className={clsx(
-        'relative z-[4] flex shrink-0 flex-col overflow-hidden rounded-[26px] transition-[width] duration-300',
+        'rail relative z-[4] flex shrink-0 flex-col overflow-hidden rounded-[26px] transition-[width] duration-[380ms]',
         collapsed ? 'w-20' : 'w-[262px]',
       )}
       style={{
-        transitionTimingFunction: 'var(--ease-out)',
+        transitionTimingFunction: 'var(--ease-mid)',
         border: '1px solid rgb(255 255 255 / 0.14)',
         // Baked frost, like the main container (see Shell).
         backgroundImage: `linear-gradient(180deg, rgb(6 12 28 / 0.78), rgb(6 12 28 / 0.6) 45%, rgb(6 12 28 / 0.3) 70%, rgb(6 12 28 / 0.55)), url(${frost})`,
@@ -74,8 +74,10 @@ export function NavRail() {
             title={collapsed ? label : undefined}
             className={({ isActive }) =>
               clsx(
-                'group relative flex h-[52px] items-center rounded-[15px] text-[14px] transition-colors',
-                collapsed ? 'justify-center px-0' : 'gap-3 px-3',
+                // One layout in both states: the icon never moves (18 px in,
+                // centred in the collapsed strip); only the label and the
+                // mini signal fade, clipped by the rail as it narrows.
+                'group relative flex h-[52px] items-center gap-3 rounded-[15px] px-[18px] text-[14px] transition-colors',
                 isActive ? 'font-medium text-white' : 'text-[#F1F4FA] hover:text-white',
               )
             }
@@ -105,28 +107,26 @@ export function NavRail() {
                   className="relative z-10 shrink-0 transition-transform duration-200 group-hover:translate-x-0.5"
                   style={isActive ? { color: '#FF5A3C', filter: 'drop-shadow(0 0 6px rgb(255 90 60 / 0.8))' } : undefined}
                 />
-                {!collapsed && (
-                  <>
-                    <span className="relative z-10 whitespace-nowrap">{label}</span>
-                    <MiniSignal active={isActive} />
-                  </>
-                )}
+                <span className={clsx('rail-fade relative z-10 whitespace-nowrap', collapsed && 'rail-hidden')}>{label}</span>
+                <MiniSignal active={isActive} hidden={collapsed} />
               </>
             )}
           </NavLink>
         ))}
       </nav>
 
-      {!collapsed && (
-        <div
-          className="mx-[22px] mb-3.5 shrink-0 text-[17px] font-medium leading-[1.3] [@media(max-height:700px)]:hidden"
-          style={{ color: 'var(--tagline)', textShadow: '0 0 18px rgb(247 192 74 / 0.45), 0 2px 6px rgb(0 0 0 / 0.6)' }}
-        >
-          Smarter Signals
-          <br />
-          Safer Cities
-        </div>
-      )}
+      <div
+        aria-hidden={collapsed}
+        className={clsx(
+          'rail-fade mx-[22px] mb-3.5 shrink-0 whitespace-nowrap text-[17px] font-medium leading-[1.3] [@media(max-height:700px)]:hidden',
+          collapsed && 'rail-hidden',
+        )}
+        style={{ color: 'var(--tagline)', textShadow: '0 0 18px rgb(247 192 74 / 0.45), 0 2px 6px rgb(0 0 0 / 0.6)' }}
+      >
+        Smarter Signals
+        <br />
+        Safer Cities
+      </div>
 
       <div className="flex shrink-0 flex-col gap-3 px-3.5 pb-3.5">
         <motion.button
@@ -136,13 +136,16 @@ export function NavRail() {
           aria-expanded={!collapsed}
           whileTap={reduced ? undefined : { scale: 0.97 }}
           transition={{ duration: DUR.tick, ease: EASE_OUT }}
-          className={clsx(
-            'rail-card flex h-[52px] w-full items-center text-[13.5px] text-[#E6ECF6] transition-colors hover:text-white',
-            collapsed ? 'justify-center' : 'gap-3.5 px-4',
-          )}
+          className="rail-card flex h-[52px] w-full items-center gap-3.5 px-4 text-[13.5px] text-[#E6ECF6] transition-colors hover:text-white"
         >
-          {collapsed ? <ChevronsRight size={18} aria-hidden /> : <ChevronsLeft size={18} aria-hidden />}
-          {!collapsed && <span>Collapse</span>}
+          {/* one arrow that turns round, rather than two icons swapping */}
+          <ChevronsLeft
+            size={18}
+            aria-hidden
+            className="shrink-0 transition-transform duration-[380ms]"
+            style={{ transform: collapsed ? 'rotate(180deg)' : undefined, transitionTimingFunction: 'var(--ease-mid)' }}
+          />
+          <span className={clsx('rail-fade whitespace-nowrap', collapsed && 'rail-hidden')}>Collapse</span>
         </motion.button>
       </div>
     </aside>
@@ -150,11 +153,11 @@ export function NavRail() {
 }
 
 /** The item's own three-lamp signal: green here, amber on hover, red otherwise. */
-function MiniSignal({ active }: { active: boolean }) {
+function MiniSignal({ active, hidden }: { active: boolean; hidden: boolean }) {
   return (
     <span
       aria-hidden
-      className="relative z-10 ml-auto flex shrink-0 gap-1 rounded-full px-1.5 py-1"
+      className={clsx('rail-fade relative z-10 ml-auto flex shrink-0 gap-1 rounded-full px-1.5 py-1', hidden && 'rail-hidden')}
       style={{ background: 'rgb(0 0 0 / 0.6)', border: '1px solid rgb(255 255 255 / 0.12)' }}
     >
       <i

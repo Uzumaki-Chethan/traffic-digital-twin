@@ -104,9 +104,9 @@ export function GlassSelect<T extends string>({
         }}
         style={{ minWidth }}
         className={clsx(
-          'flex h-10 items-center gap-2.5 rounded-full border bg-white pr-3.5 text-left text-[13.5px] font-medium text-ink-strong transition-[border-color,box-shadow] disabled:cursor-not-allowed disabled:opacity-60',
+          'flex h-10 items-center gap-2.5 rounded-full border bg-white/60 pr-3.5 text-left text-[13.5px] font-medium text-ink-strong transition-[border-color,box-shadow] disabled:cursor-not-allowed disabled:opacity-60',
           Icon ? 'pl-2' : 'pl-4',
-          open ? 'border-[var(--brand)] shadow-[0_0_0_3px_rgb(255_138_18/0.18)]' : 'border-[rgb(18_30_56/0.14)] hover:border-[var(--brand-edge)]',
+          open ? 'border-[var(--brand)] shadow-[0_0_0_3px_rgb(255_138_18/0.18)]' : 'border-white/60 hover:border-[var(--brand-edge)] hover:bg-white/75',
         )}
       >
         {Icon && (
@@ -128,8 +128,16 @@ export function GlassSelect<T extends string>({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
             transition={{ duration: DUR.fast, ease: EASE_OUT }}
-            style={{ width: menuWidth }}
-            className="absolute left-0 top-full z-30 mt-2 max-h-[360px] origin-top-left overflow-y-auto rounded-[16px] border border-[rgb(18_30_56/0.1)] bg-white p-1.5 shadow-[var(--shadow-pop)]"
+            style={{
+              width: menuWidth,
+              // The cards' own glass, slightly denser so the options stay
+              // readable over whatever is under the menu; a light blur is
+              // affordable here because the menu is only up while open.
+              backgroundImage: 'linear-gradient(180deg, rgb(236 242 251 / 0.9), rgb(220 230 244 / 0.86))',
+              backdropFilter: 'blur(14px) saturate(140%)',
+              WebkitBackdropFilter: 'blur(14px) saturate(140%)',
+            }}
+            className="absolute left-0 top-full z-30 mt-2 max-h-[360px] origin-top-left overflow-y-auto rounded-[16px] border border-white/60 p-1.5 shadow-[var(--shadow-pop)]"
           >
             {options.map((o, i) => {
               const OIcon = o.icon
@@ -143,14 +151,14 @@ export function GlassSelect<T extends string>({
                   onClick={() => choose(i)}
                   className={clsx(
                     'flex cursor-pointer items-center gap-3 rounded-[12px] px-3 py-2.5 transition-colors',
-                    i === active && 'bg-[rgb(255_138_18/0.09)]',
+                    i === active && 'bg-[rgb(255_138_18/0.12)]',
                   )}
                 >
                   {OIcon && (
                     <span
                       className={clsx(
                         'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-                        selected ? 'bg-[var(--brand)] text-white' : 'bg-[rgb(18_30_56/0.06)] text-ink',
+                        selected ? 'bg-[var(--brand)] text-white' : 'bg-white/60 text-ink',
                       )}
                     >
                       <OIcon size={15} aria-hidden />

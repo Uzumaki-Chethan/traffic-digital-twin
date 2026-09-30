@@ -27,9 +27,13 @@
 
   /* The glass cards. --surface-plate is the solid fallback / popover
      fill; the glass itself is painted by .glass-card in index.css. */
-  --surface-plate: #ffffff;
-  --surface-inset: #f1f5fb;
-  --surface-hover: #e7eef8;
+  /* Translucent tints of the same glass rather than solid whites, so
+     tables, insets and hover rows sit IN the card instead of on it
+     (owner: "every table is a bit different", 2026-09-30). Plate stays
+     nearly opaque — it backs popovers and inputs. */
+  --surface-plate: rgb(250 252 255 / 0.94);
+  --surface-inset: rgb(255 255 255 / 0.32);
+  --surface-hover: rgb(255 255 255 / 0.5);
   --rule-soft: rgb(18 30 56 / 0.07);
   --rule: rgb(18 30 56 / 0.13);
   --rule-strong: rgb(18 30 56 / 0.26);

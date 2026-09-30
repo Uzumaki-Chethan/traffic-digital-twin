@@ -125,7 +125,7 @@ export function PerformancePage() {
       )}
 
       {haveResults && (
-        <div className="flex items-center justify-between rounded-panel border border-rule bg-plate px-3 py-2 text-[13px] text-ink">
+        <div className="glass-card flex items-center justify-between px-4 py-2.5 text-[13px] text-ink">
           <span>
             <span className="display text-[13px] text-ink-strong">{final ? 'Final' : 'So far'}</span>
             <span className="text-ink-mute"> · </span>

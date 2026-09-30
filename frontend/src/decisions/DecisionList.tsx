@@ -107,7 +107,7 @@ export function DecisionList({
               style={{ position: 'absolute', top: i * ROW_PX, height: ROW_PX }}
               className={clsx(
                 'grid w-full grid-cols-[64px_minmax(180px,1.1fr)_52px_112px_2fr] items-center gap-3 border-b border-rule-soft px-3 text-left text-[12px] transition-colors',
-                selected ? 'bg-[var(--accent-soft)]' : switched ? 'bg-plate hover:bg-hover' : 'hover:bg-hover',
+                selected ? 'bg-[rgb(255_138_18/0.14)]' : switched ? 'bg-white/45 hover:bg-hover' : 'hover:bg-hover',
               )}
             >
               <span className="num text-ink-mute">{clock(r.time)}</span>

@@ -468,3 +468,37 @@ button.rail-card:hover {
 @media (prefers-reduced-motion: reduce) {
   .scenario-card { transform: none; }
 }
+
+/* The rail collapsing (layout/NavRail, layout/Brand): one duration and
+   curve for the width, the logo and the fades, so it moves as one piece. */
+.rail-fade {
+  transition: opacity 240ms var(--ease-mid);
+}
+.rail-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.brand-eye {
+  width: 208px;
+  transition: width 380ms var(--ease-mid);
+}
+@media (max-height: 760px) {
+  .brand-eye { width: 160px; }
+}
+.brand-eye-small,
+.brand-eye.brand-eye-small {
+  width: 58px;
+}
+.brand-word {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition: grid-template-rows 380ms var(--ease-mid), opacity 240ms var(--ease-mid);
+}
+.brand-word-hidden {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail, .rail-fade, .brand-eye, .brand-word { transition: none !important; }
+}
