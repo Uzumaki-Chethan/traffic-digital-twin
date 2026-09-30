@@ -162,7 +162,7 @@ export function ScenarioPreview({ id, seed }: { id: string; seed: number }) {
       }
       for (const a of ARMS) if (r() < rate(a) * dt * 2.4) cars.push({ a, u: 0 })
       for (const a of ARMS) {
-        const q = cars.filter((x) => x.a === a).sort((x, y) => y.u - x.u)
+        const q = cars.filter((x) => x.a === a).toSorted((x, y) => y.u - x.u)
         const green = a === 'N' || a === 'S' ? ns : !ns
         const gap = 9 / len(a)
         const sp = S.rain ? 0.2 : 0.3

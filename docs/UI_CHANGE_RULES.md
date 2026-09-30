@@ -181,6 +181,16 @@ change on the page you touched (and any page you moved something to or from).
   Moderate / Heavy / Ramping), the selected mark, and the page marks
   (Overview / Performance) showing which page(s) use each.
 
+### Added by the glass redesign (2026-09-30, Section 37) — now part of the inventory
+
+- Shell: the owner's logo (eye) and TRINETRA wordmark as separate pieces, the
+  "Smarter Signals / Safer Cities" tagline, the traffic-light cursor.
+- Overview: sparkline + 30 s trend on each KPI tile; ring chips, held bar and gauge on
+  Active phase; movement arrows and coloured waits on Lanes; the four per-approach
+  predicted-vs-actual charts; the twin's "Live simulation" badge and its labels / frame /
+  focus tools; buildings, trees and sidewalks on both map views.
+- Settings: a moving preview on every scenario card.
+
 ## 4. How to check a change
 
 1. `cd frontend && npm run lint && npx vitest run && npm run build`.

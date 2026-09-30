@@ -334,6 +334,14 @@ unprompted, but do keep this section current if that changes:
   lifted by the user on 2026-09-21, along with the "no looping motion" rule below; see
   `docs/UI_CHANGE_RULES.md` §2. Real animated work, including a planned highly-animated home
   screen, is coming and wants motion and effects freely.)
+  **Since 2026-09-30 the whole UI wears the "glass over the night city" redesign**
+  (branch `design/glass-night`, PROJECT_ARCHITECTURE_REPORT.md **Section 37**): city
+  photo, glass rail with the owner's real logo (eye + wordmark as two separate images),
+  glass cards, Orbitron headings kept, KPI tiles still our five and still at the bottom,
+  and a daytime city map (buildings/trees from `overview/cityscape.ts`, scenery not data)
+  in both the plan and 3D views, at the same true scale. The owner declined the
+  prototype's theme picker, boot curtain, weather widget, cursor glow and its
+  Throughput/Accuracy/"AI confidence" tiles.
   A 3D miniature of the junction DOES exist now, at the user's explicit request
   (`overview/Junction3D.tsx`) — three.js, true network scale, sumo-gui's own look; that is
   not the rejected neon "3D cyberpunk" direction. Since 2026-09-14 the plan view is ALSO

@@ -7,7 +7,11 @@ snapshot stream and `GET /api/*`, plus the narrow control surface in
 ## Status
 
 Built from a Stitch export whose layout the user approved, then iterated on
-colour and typography over about fifteen rounds (`docs/design/` has the brief).
+colour and typography over about fifteen rounds. **Since 2026-09-30 it wears the
+"glass over the night city" design** (PROJECT_ARCHITECTURE_REPORT.md Section 37):
+city-photo backdrop, dark-glass rail with the owner's logo, a frosted container,
+pale glass cards, Poppins / Overpass Mono with Orbitron headings, and a daytime city
+map (shared `overview/cityscape.ts`) in both the plan and the 3D view.
 
 - **Overview** (`/`) — the junction as the hero, in either a true-scale plan view
   (one SVG unit = one metre; Ctrl + scroll or pinch to zoom about the pointer,
@@ -170,9 +174,8 @@ vendored; no CDN at runtime.
 
 ## Not yet done
 
-- **No visual verification by the author** (no browser tool in the build
-  environment). Geometry, contrast and data wiring are verified against source
-  and against a live backend; how it actually *looks* is not. Look at it.
-- The Trinetra logo file was lost when `frontend/` was emptied (it was never
-  committed). A plain wordmark stands in; re-supply the asset.
+- Visual checks are now done with Playwright against a live console (Section 37);
+  keep doing that for UI changes.
+- The logo is back (`src/assets/trinetra-eye.png`, `trinetra-wordmark.png`, cut
+  from the owner's master image).
 - Replay fixtures and a screenshot script are not built yet.

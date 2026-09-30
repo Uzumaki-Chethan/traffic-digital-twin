@@ -3870,3 +3870,72 @@ independently-drafted 12 (which didn't share circles at all).
   driven by whichever of its constituent lane characters is more "active", same tie-break
   rule as the 3D view above) rather than driving 12 lenses 1:1. Not yet written — next step
   after the bench test passes on a few loose pixels.
+
+## SECTION 37 — "Glass over the night city": the frontend redesign (2026-09-30) (CURRENT STATE)
+
+The owner brought a design from a separate Claude chat (artifact
+`claude.ai/artifact/UzNX5V31hGEL2dRPphyQwU`, plus a handoff folder with a single-file
+prototype, `design-skin.css`, `city-night.jpg` and a target screenshot). It was ported onto
+the existing React app on branch `design/glass-night`: the visual layer changed and the
+data layer didn't. Every choice below was made by the owner item by item. The design was
+compared against the current app and each addition or removal was put to him first.
+
+**37.1 Shell.** `layout/Backdrop` (the city photo with a ±8 px pointer parallax and no
+Ken Burns zoom), a dark-glass rail (`NavRail`), one frosted container holding the top bar,
+page and footer (`Shell`), white-over-glass top bar (`StatusBar`: gold-rimmed scenario pill,
+orange Start, dark-glass controls, the simulated clock with its ×-real-time rate kept, and
+the link pill with every state kept: Live / Paused / Idle / Connecting / Link lost / No data).
+Tokens keep their names (`styles/tokens.css`), so every component followed. Fonts: Poppins
+(UI), Overpass Mono (numbers), and Orbitron for the top-bar title and panel titles (the
+owner asked for it back after the first pass used Poppins there).
+`layout/TrafficCursor`: the pointer is a signal head (red at rest, green moving, amber
+pressed). Its trailing glow was removed at the owner's request, and it's off on touch
+screens and under reduced motion. No boot curtain and no theme picker (the prototype had
+both; the owner declined both).
+
+**37.2 Logo.** The owner's master logo (eye with a signal for an iris, and the TRINETRA
+wordmark) is cut into two transparent PNGs, `assets/trinetra-eye.png` and
+`assets/trinetra-wordmark.png`, with brightness converted to alpha so the glow falls off
+over the glass. They're shown as two separate pieces (`layout/Brand`): eye only when the
+rail is collapsed, eye above the wordmark when it's open. `assets/favicon.png` is the iris
+crop. This closes the "logo asset lost" item that had been open since 2026-09-08.
+
+**37.3 Overview.** The KPI tiles are our five existing metrics only, placed at the bottom
+as before (the owner declined the design's Throughput, Prediction Accuracy and "AI
+Decision Confidence" tiles; the last is a made-up logistic of the score gap and clashes
+with the no-confidence rule). They now have glossy icons, plus sparklines and 30 s trend
+arrows taken from `liveHistory`. Other changes:
+- Active phase: plain-label headline, N–S / E–W ring chips, a held bar with the min-green
+  tick, and a gauge. The decided/showing/match rows keep the raw ids.
+- Lanes: movement arrows, a lit dot plus the state word, and waits coloured by length
+  (under 20 s / 20–40 s / 40 s+).
+- Prediction vs actual: four per-approach charts on top (new `liveHistory.getPredictionSeries()`,
+  matured pairs only), with the lane rows, MAE and reading guide still always visible.
+- The ledger's served row glows yellow and the boundary line is red.
+
+**37.4 The map (owner's reference image, 2026-09-30).** The plan view is now a daytime city
+at the same true scale. Only the dressing changed; the geometry is still `plateGeometry`:
+- sidewalks, zebra crossings, double-yellow centre lines, and a yellow cross-hatched box
+- white label pills and a compass
+- buildings and trees from `overview/cityscape.ts`, a fixed-seed layout kept clear of the
+  roads, junction and sidewalks. It's scenery, not SUMO data.
+
+The 3D view draws the same `cityscape` with instanced meshes (buildings, rooftop units,
+trunks, canopies), plus sidewalks, a daytime sky and double-yellow lines, so the two views
+show one place. Twin controls are always visible: Plan/3D top-left; labels / frame /
+focus-on-stop-lines top-right; zoom and fullscreen bottom-right. On Performance they sit
+bottom-left with an icon-only Match, so they clear the South label.
+
+**37.5 Other pages.** Same content, on glass. The lane ledger's signal chips moved to the
+lit-dot style. The Decisions run strip sits on a glass card (its counts were unreadable on
+the photo). Settings cards gained a small moving preview per scenario
+(`settings/ScenarioPreview`, the prototype's toy loop redrawn in the map's daytime
+palette). It's illustration, not data, and it pauses when off screen.
+
+**Verified** with a live console (`python server.py`) and Playwright at 1584×993: a demo
+run on Overview (both views) and Analytics, a VAC evaluation on Accident for Performance
+(Incident and Dispatch bars, verdicts, summary), Decisions against the run-scoped DB, and
+Settings. `tsc -b`, oxlint (clean), vitest 18/18 and `npm run build` all pass. Every §3
+inventory item of `docs/UI_CHANGE_RULES.md` was checked present. Items not re-exercised
+visually in this pass: the rain overlay and the smoke on a stalled vehicle (their code is
+untouched).

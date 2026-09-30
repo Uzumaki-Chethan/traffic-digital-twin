@@ -162,9 +162,10 @@ export function TwinViewport({
       )}
 
       {/* Zoom row: bottom-right beside the compass; where there is no
-          view toggle (Performance's side-by-side windows) it takes the free
-          top-left corner instead, so it never sits on the South label. */}
-      <div className={clsx('absolute flex items-center gap-2', allow3d ? 'bottom-3 right-3' : 'left-3 top-3')}>
+          view toggle (Performance's side-by-side windows) it moves to the
+          bottom-left with an icon-only Match, narrow enough to clear the
+          South label in a half-width window. */}
+      <div className={clsx('absolute bottom-3 flex items-center gap-2', allow3d ? 'right-3' : 'left-3')}>
         {mode === 'plan' && (
           <>
             <IconButton round onClick={() => pan.zoomBy(1 / 1.6)} label="Zoom out" icon={<Minus size={16} aria-hidden />} disabled={!pan.canZoomOut} />
@@ -178,10 +179,10 @@ export function TwinViewport({
                 onClick={() => pan.setView(matchView.view)}
                 disabled={sameView(pan.view, matchView.view)}
                 title={`Match ${matchView.label}'s view`}
-                className="map-pill flex h-[34px] items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium text-[var(--plate-ink)] disabled:opacity-45"
+                aria-label={`Match ${matchView.label}'s view`}
+                className="map-pill flex h-[34px] w-[34px] items-center justify-center rounded-full text-[var(--plate-ink)] disabled:opacity-45"
               >
-                <Link2 size={14} aria-hidden />
-                Match
+                <Link2 size={15} aria-hidden />
               </button>
             )}
           </>
