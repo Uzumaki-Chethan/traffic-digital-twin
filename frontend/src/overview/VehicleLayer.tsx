@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useReducedMotion } from 'framer-motion'
 import { useSim } from '@/data/store'
+import { useClockRate } from '@/data/useClockRate'
 import { DisplayClock, motionBuffer, type MotionSide, type Pose } from '@/data/motion'
 import { NET } from './plateGeometry'
 import { BEACONS, isStalledVehicleId, shapeOf } from './vehicleTypes'
@@ -24,7 +25,8 @@ import { BEACONS, isStalledVehicleId, shapeOf } from './vehicleTypes'
 export function VehicleLayer({ side, powered }: { side: MotionSide; powered: boolean }) {
   const buffer = motionBuffer(side)
   const reduced = useReducedMotion()
-  const rate = useSim((s) => s.rate)
+  // The steady clock rate (set speed, not the wobbling measurement).
+  const rate = useClockRate()
   const smooth = useSim((s) => s.smooth)
   // Subscribing to the tick time is what re-renders this when a frame
   // lands, so the element set below follows the buffer.

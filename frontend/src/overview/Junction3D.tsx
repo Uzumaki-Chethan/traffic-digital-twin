@@ -6,6 +6,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import type { LaneView, VehicleView } from '@/data/types'
 import { useSim } from '@/data/store'
+import { useClockRate } from '@/data/useClockRate'
 import { DisplayClock, motionBuffer, type MotionSide, type Pose } from '@/data/motion'
 import { lampOf } from '@/utils/signal'
 import { BEACONS, isStalledVehicleId, shapeOf, type VehicleShape } from './vehicleTypes'
@@ -252,7 +253,8 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
   // The compass overlay; turned every frame to keep its arrow on world
   // north however the camera has been orbited.
   const compass = useRef<SVGSVGElement>(null)
-  const rate = useSim((s) => s.rate)
+  // The steady clock rate (set speed, not the wobbling measurement).
+  const rate = useClockRate()
   const smooth = useSim((s) => s.smooth)
   const data = useRef({ lanes, powered, motionSide, rate, smooth, raining })
   useEffect(() => {
