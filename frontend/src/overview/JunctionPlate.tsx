@@ -179,7 +179,9 @@ export function JunctionPlate({
                 ? vb.y + vb.h - inset
                 : arm === 'W'
                   ? CENTRE - beside - 11 * px
-                  : CENTRE + beside + 11 * px
+                  : // East sits by the right edge, where the compass and the
+                    // zoom row live: keep it above them at any zoom.
+                    Math.min(CENTRE + beside + 11 * px, vb.y + vb.h - 118 * px)
           return (
             <g key={arm} transform={`translate(${x} ${y}) scale(${px})`}>
               <rect x={-w / 2} y={-9.5} width={w} height={22} rx={11} fill="rgb(0 0 0 / 0.16)" />
@@ -241,17 +243,6 @@ export function JunctionPlate({
           plate colour already means signal state. */}
       <VehicleLayer side={motionSide} powered={powered} />
 
-      {/* north arrow, pinned to the window's bottom-left — clear of the
-          zoom pills (bottom-right) and of the East label beside its road */}
-      <g transform={`translate(${vb.x} ${vb.y + vb.h}) scale(${px}) translate(33 -78)`}>
-        <circle r="14" cy="1.5" fill="rgb(0 0 0 / 0.16)" />
-        <circle r="14" fill="#fff" stroke="rgb(27 37 54 / 0.25)" strokeWidth="1" />
-        <path d="M 0 -11 L -4 0 L 4 0 Z" fill="#E5484D" />
-        <path d="M 0 11 L -4 0 L 4 0 Z" fill="#2F6BFF" />
-        <text y="-19" textAnchor="middle" fontSize="11" fontWeight="700" fontFamily="var(--font-num)" fill="var(--plate-ink)">
-          N
-        </text>
-      </g>
 
       {/* signal heads, above the traffic, at a constant pixel size */}
       {laneDetail &&

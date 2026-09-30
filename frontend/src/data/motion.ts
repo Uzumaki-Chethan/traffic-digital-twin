@@ -45,9 +45,12 @@ interface Frame {
   byId: Map<string, VehicleView>
 }
 
-/** Display lag behind the newest frame, wall seconds. Two motion frames
- * at 1x; the jitter measured on the wire was ±50 ms. */
-export const LAG_WALL_SECONDS = 0.25
+/** Display lag behind the newest frame, wall seconds. Motion frames come
+ * every 0.2 s at 1x; on a quiet machine the jitter was ±50 ms, but with
+ * SUMO and the model busy on the same laptop a frame can be 150 ms+ late,
+ * and at 0.25 s that emptied the buffer — the cars stopped until the next
+ * frame. 0.35 s rides that out (Section 37.10). */
+export const LAG_WALL_SECONDS = 0.35
 const KEEP_FRAMES = 12
 
 /**

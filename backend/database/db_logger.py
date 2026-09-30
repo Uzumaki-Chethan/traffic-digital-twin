@@ -169,7 +169,7 @@ class DatabaseLogger:
         runs (this run counts as one of them, whether or not it has
         written anything yet). Rows with no run id - from before the
         column existed - are the oldest of all and go first. Returns the
-        number of rows deleted. Called once, at the start of a run; a
+        number of rows deleted. Called once, at the end of a run; a
         failure here is logged and the run goes on.
         """
         if self._conn is None or keep < 1:
@@ -197,7 +197,7 @@ class DatabaseLogger:
                 if deleted:
                     # Deleting rows does not shrink the file; give the
                     # space back so the database stays the size of the
-                    # runs it holds (a second or two, once per run start).
+                    # runs it holds (a second or two, once per run, after it ends).
                     self._conn.execute("VACUUM")
             if deleted:
                 logger.info("Pruned %d rows from runs older than the newest %d.", deleted, keep)

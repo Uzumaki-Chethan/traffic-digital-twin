@@ -139,12 +139,13 @@ def run_simulation(store, control=None, *, gui=None, base_config=Config,
     manager = TraCIManager(config)
     # Every row this run writes carries run_id (the console passes its
     # started_at, so a GUI handover continues the SAME run's rows); runs
-    # older than the newest DB_KEEP_RUNS are pruned on the way in.
+    # older than the newest DB_KEEP_RUNS are pruned on the way OUT (see the
+    # finally below) - pruning plus the VACUUM after it took ~2 s, and on
+    # the way in that was ~2 s added to every Start (Section 37.10).
     scenario = (
         os.path.splitext(os.path.basename(sumocfg))[0] if sumocfg else "default"
     )
     db_logger = DatabaseLogger(config.DB_PATH, run_id=run_id, scenario=scenario)
-    db_logger.prune_runs(config.DB_KEEP_RUNS)
 
     try:
         manager.start()
@@ -481,4 +482,7 @@ def run_simulation(store, control=None, *, gui=None, base_config=Config,
         # or raised an exception above, so the TraCI connection and the
         # underlying SUMO process are never left dangling.
         manager.close()
+        # Housekeeping after SUMO is closed, so it never delays a start
+        # or blocks a tick's writes; failure-tolerant like the logger.
+        db_logger.prune_runs(config.DB_KEEP_RUNS)
         db_logger.close()

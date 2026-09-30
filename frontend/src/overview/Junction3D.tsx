@@ -1344,12 +1344,13 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
       {/* The plan view's compass, for the same reason it has one: once
           the model is orbited nothing else says which arm is which. It
           turns with the camera so the arrow stays on north. */}
-      <div className="pointer-events-none absolute bottom-14 right-3" aria-label="Compass: north">
-        <svg ref={compass} width="44" height="44" viewBox="-22 -22 44 44" style={{ transformOrigin: '50% 50%' }}>
+      <div className="pointer-events-none absolute bottom-[54px] right-1" aria-label="Compass: north">
+        {/* Room round the dial for the N, which turns with the needle. */}
+        <svg ref={compass} width="54" height="54" viewBox="-27 -27 54 54" style={{ transformOrigin: '50% 50%' }}>
           <circle r="17" fill="#fff" stroke="rgb(27 37 54 / 0.25)" strokeWidth="1" />
           <path d="M 0 -13 L -4.5 0 L 4.5 0 Z" fill="#E5484D" />
           <path d="M 0 13 L -4.5 0 L 4.5 0 Z" fill="#2F6BFF" />
-          <text y="-19" textAnchor="middle" fontSize="9" fontWeight="700" fontFamily="var(--font-num)" fill="var(--plate-ink)">
+          <text y="-20" textAnchor="middle" fontSize="9.5" fontWeight="700" fontFamily="var(--font-num)" fill="var(--plate-ink)" stroke="#fff" strokeWidth="2.5" paintOrder="stroke">
             N
           </text>
         </svg>

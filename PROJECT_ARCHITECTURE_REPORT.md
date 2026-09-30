@@ -3990,3 +3990,9 @@ Also in this round, at the owner's request:
 - "Zoom to the stop lines" is a toggle: a second press returns to the previous view, and the button shows pressed while zoomed.
 - Approach labels sit beside their roads (N east of its road, S west, W north, E south), not on them. The compass moved to bottom-left, clear of the East label.
 - Two regressions from 37.6, fixed: a page opened during a pause showed "waiting" because motion frames never filled `latestTick` (a motion frame now stands in until the first tick); and a view opened or switched (Plan ↔ 3D) while paused replayed about 1 s of motion. `MotionBuffer.latestAt` lets `DisplayClock` start on the newest frame when the stream has stalled.
+
+**37.10 Smoothness, start time, compasses, tab icon.**
+- The "moves, stops, moves" stutter had three causes. My own test backends competing for the laptop's CPU (stopped). The sim-rate estimate, which was per frame pair and spiked (×2.9 and ×7 were seen at 1×), raced the vehicle clock into the newest frame so the cars stopped there; it is now a 2 s window. And the display lag of 0.25 s, which a late frame on a busy machine could run dry; it is now 0.35 s.
+- Starting a run took about 2 s longer than necessary: `prune_runs` plus its VACUUM ran before SUMO launched. It now runs at the end of a run, after SUMO closes (`simulation_runner`).
+- The plan's compass is an HTML pill above the fullscreen button, and the East label clamps above the control column. The 3D compass has room for its N.
+- The tab icon is the signal head alone (owner).

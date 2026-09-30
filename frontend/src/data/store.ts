@@ -64,6 +64,27 @@ interface SimState {
 /** Longest simulated span a frame may cover and still be tweened. */
 export const SMOOTH_MAX_SIM_SECONDS = 1.6
 
+/**
+ * The sim rate over a WINDOW of recent frames (sim seconds / wall seconds
+ * across the last ~2 s), not frame-to-frame. Two frames arriving close
+ * together — which a busy machine or the network does all the time — made
+ * the old per-pair estimate spike (x2.9, x7 at 1x); the vehicle clock
+ * runs at this rate, so a spike raced the cars into the newest frame
+ * where they stopped and waited: "moves, stops, moves" (Section 37.10).
+ */
+const RATE_WINDOW_MS = 2000
+let rateSamples: { wall: number; sim: number }[] = []
+function windowRate(wall: number, sim: number): number | null {
+  const last = rateSamples[rateSamples.length - 1]
+  if (last && sim < last.sim) rateSamples = [] // time ran backwards: a new run
+  rateSamples.push({ wall, sim })
+  while (rateSamples.length > 2 && wall - rateSamples[0].wall > RATE_WINDOW_MS) rateSamples.shift()
+  const first = rateSamples[0]
+  const dWall = (wall - first.wall) / 1000
+  if (dWall < 0.5) return null
+  return (sim - first.sim) / dWall
+}
+
 const FRESH = {
   latest: null,
   latestTick: null,
@@ -84,6 +105,7 @@ export const useSim = create<SimState>((set) => ({
   setLink: (link) => set({ link }),
   setHoverLane: (hoverLane) => set({ hoverLane }),
   reset: () => {
+    rateSamples = []
     resetMotion()
     set({ ...FRESH })
   },
@@ -105,9 +127,12 @@ export const useSim = create<SimState>((set) => ({
         const dSim = snapshot.sim_time - tickSim
         // Frames can arrive 30 times a second at "max" speed, so the
         // floor is one display frame, not the old 120 ms.
+        const windowed = windowRate(now, snapshot.sim_time)
         if (tickAt > 0 && dWall > 0.01 && dSim > 0 && dSim < 60) {
-          const r = dSim / dWall
-          rate = rate == null ? r : rate * 0.7 + r * 0.3
+          const r = windowed ?? dSim / dWall
+          // Lightly smoothed on top of the window, so the readout and the
+          // vehicle clock drift rather than step when the speed changes.
+          rate = rate == null ? r : rate * 0.6 + r * 0.4
           // Smoothed, and clamped to a sane animation window.
           tickInterval = Math.max(33, Math.min(2000, tickInterval * 0.6 + dWallMs * 0.4))
           simPerFrame = simPerFrame * 0.5 + dSim * 0.5

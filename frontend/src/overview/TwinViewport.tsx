@@ -179,6 +179,23 @@ export function TwinViewport({
           view toggle (Performance's side-by-side windows) it moves to the
           bottom-left with an icon-only Match, narrow enough to clear the
           South label in a half-width window. */}
+      {/* The plan's compass: a round pill right above the fullscreen button
+          (the 3D view has its own, which turns with the camera). */}
+      {mode === 'plan' && (
+        <div
+          className="map-pill pointer-events-none absolute bottom-[58px] right-3 flex h-[34px] w-[34px] items-center justify-center rounded-full"
+          aria-label="Compass: north is up"
+          role="img"
+        >
+          <svg viewBox="-17 -17 34 34" className="h-[30px] w-[30px]" aria-hidden>
+            <path d="M 0 -11 L -4 0 L 4 0 Z" fill="#E5484D" />
+            <path d="M 0 11 L -4 0 L 4 0 Z" fill="#2F6BFF" />
+            <circle r="1.6" fill="#fff" />
+          </svg>
+          <span className="num absolute -top-3.5 text-[10.5px] font-bold text-[var(--plate-ink)] [text-shadow:0_0_3px_#fff,0_0_3px_#fff]">N</span>
+        </div>
+      )}
+
       <div className={clsx('absolute bottom-3 flex items-center gap-2', allow3d ? 'right-3' : 'left-3')}>
         {mode === 'plan' && (
           <>
