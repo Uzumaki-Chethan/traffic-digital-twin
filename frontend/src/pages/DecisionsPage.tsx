@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { History } from 'lucide-react'
 import clsx from 'clsx'
 import { Panel } from '@/ui/Panel'
 import { Reveal } from '@/ui/Reveal'
+import { GlassSelect } from '@/ui/GlassSelect'
 import { useDecisionLog } from '@/decisions/useDecisionLog'
 import { DecisionList } from '@/decisions/DecisionList'
 import { DecisionDetail } from '@/decisions/DecisionDetail'
@@ -68,25 +69,24 @@ export function DecisionsPage() {
     <div className="flex h-full min-h-0 flex-col gap-3.5">
       <Reveal index={0} className="glass-card px-4 py-3">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <label className="flex items-center gap-2 text-[13px] text-ink">
+          <div className="flex items-center gap-2.5">
             <span className="eyebrow">Run</span>
-            <span className="relative">
-              <select
-                value={log.selectedRun ?? ''}
-                onChange={(e) => log.selectRun(e.target.value)}
-                disabled={log.runs.length === 0}
-                className="appearance-none rounded-control border border-rule bg-plate py-1 pl-2.5 pr-7 text-[13px] font-medium text-ink-strong hover:border-[var(--rule-strong)] disabled:opacity-60"
-              >
-                {log.runs.length === 0 && <option value="">No runs recorded</option>}
-                {log.runs.map((r) => (
-                  <option key={r.run_id} value={r.run_id}>
-                    {runLabel(r)}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={14} aria-hidden className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-ink-mute" />
-            </span>
-          </label>
+            <GlassSelect
+              label="Run"
+              value={log.selectedRun}
+              onChange={(v) => log.selectRun(v)}
+              disabled={log.runs.length === 0}
+              placeholder="No runs recorded"
+              minWidth={330}
+              menuWidth={380}
+              options={log.runs.map((r) => ({
+                value: r.run_id,
+                label: runLabel(r),
+                hint: `${r.decisions.toLocaleString()} decisions · ${r.switches} switches`,
+                icon: History,
+              }))}
+            />
+          </div>
           {run && (
             <span className="num text-[12px] text-ink-mute">
               {log.rows.length.toLocaleString()} decisions · {switches} switches · {clock(run.last_time)} simulated

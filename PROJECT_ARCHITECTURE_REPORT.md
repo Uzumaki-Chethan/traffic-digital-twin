@@ -3980,3 +3980,5 @@ Also in this round, at the owner's request:
   and rickshaw cabs have rounded edges. Every vehicle has headlights and tail-lights,
   hubcaps and a contact shadow, and paint, glass and chrome reflect a RoomEnvironment.
   The environment is applied per material, so the road and buildings keep their lighting.
+
+**37.7 One dropdown.** `ui/GlassSelect` replaces both native selects: Settings' "Choose for" (`settings/TargetPicker` is now a thin wrapper) and the Decisions run picker, where each run shows its date · scenario · length with its decision and switch counts beneath. It has keyboard support, closes on an outside click, and long lists scroll inside the menu.
