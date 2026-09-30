@@ -10,7 +10,7 @@ import { useRunStore } from '@/data/runState'
 const PAGE_NOTES: { path: string; name: string; note: string }[] = [
   { path: '/', name: 'Overview', note: 'the junction live — signal state, lanes, and what the engine decided' },
   { path: '/analytics', name: 'Analytics', note: 'the run in progress, read from the live stream' },
-  { path: '/performance', name: 'Performance', note: 'Trinetra against vehicle-actuated control, in lockstep on one scenario' },
+  { path: '/performance', name: 'Performance', note: 'Trinetra against VAC (vehicle-actuated control), in lockstep on one scenario' },
   { path: '/decisions', name: 'Decisions', note: 'every decision of a run, with its scores and reason — from the database' },
   { path: '/settings', name: 'Simulation Settings', note: 'which scenario each page runs' },
 ]

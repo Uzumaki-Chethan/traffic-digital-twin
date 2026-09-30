@@ -105,7 +105,7 @@ export function PerformancePage() {
         </Reveal>
         <Reveal index={1}>
           <ControllerWindow
-            title="Vehicle-actuated control"
+            title="VAC"
             side={frame?.baseline ?? null}
             powered={powered}
             view={vacView}
