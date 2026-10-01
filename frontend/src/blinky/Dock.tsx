@@ -1,17 +1,32 @@
 import { useEffect, useState, type RefObject } from 'react'
 
-function useMainCorner(): { left: number; bottom: number } {
-  const [c, setC] = useState({ left: 300, bottom: 70 })
+/**
+ * Where the dock sits: in the rail's empty space under the page links,
+ * just above the tagline — over nothing. When the rail is too short for
+ * that, the page frame's bottom-left corner instead.
+ */
+function useDockSpot(): { left: number; bottom: number } {
+  const [c, setC] = useState({ left: 36, bottom: 140 })
   useEffect(() => {
+    const aside = document.querySelector('aside')
+    const nav = aside?.querySelector('nav')
     const main = document.querySelector('main')
-    if (!main) return
+    if (!aside || !nav || !main) return
     const read = () => {
-      const r = main.getBoundingClientRect()
-      setC({ left: r.left + 12, bottom: window.innerHeight - r.bottom + 12 })
+      const a = aside.getBoundingClientRect()
+      const n = nav.getBoundingClientRect()
+      const links = nav.querySelectorAll('a')
+      const lastLink = links.length ? links[links.length - 1].getBoundingClientRect().bottom : n.top
+      if (n.bottom - lastLink > 80) setC({ left: a.left + 18, bottom: window.innerHeight - n.bottom + 8 })
+      else {
+        const m = main.getBoundingClientRect()
+        setC({ left: m.left + 12, bottom: window.innerHeight - m.bottom + 12 })
+      }
     }
     read()
     const ro = new ResizeObserver(read)
-    ro.observe(main)
+    ro.observe(aside)
+    ro.observe(nav)
     window.addEventListener('resize', read)
     return () => {
       ro.disconnect()
@@ -22,7 +37,7 @@ function useMainCorner(): { left: number; bottom: number } {
 }
 
 /**
- * Blinky's corner controls (spec §8), bottom-left of the page frame: a
+ * Blinky's corner controls (spec §8), low in the rail (see useDockSpot): a
  * round badge (where Blinky sits when docked) and four buttons that slide
  * out on hover or keyboard focus — Shh/Wake, Sound, Come here, Explain…
  */
@@ -45,7 +60,7 @@ export function Dock({
   onCome: () => void
   onExplain: () => void
 }) {
-  const at = useMainCorner()
+  const at = useDockSpot()
   return (
     <div data-blinky className="blinky-dock" style={{ left: at.left, bottom: at.bottom }} role="toolbar" aria-label="Blinky">
       <div ref={badgeRef} className="blinky-badge" aria-hidden />

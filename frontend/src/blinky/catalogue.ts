@@ -94,7 +94,7 @@ export const CATALOGUE: Record<string, Explainer> = {
       'Lanes glow green or red with their own signal, and each signal head shows its real light.',
       'Switch to 3D for a model you can spin around. The buttons zoom, frame the junction or go full screen.',
     ],
-    live: (f) => (f.running && f.vehicles != null ? `Right now: ${f.vehicles} vehicles on the map, ${f.greens ?? 0} lanes on green.` : null),
+    live: (f) => (f.running && f.vehicles != null ? `${f.vehicles} vehicles on the map, ${f.greens ?? 0} lanes on green.` : null),
   },
   'twin-tools': { title: 'Map tools', steps: ['Show or hide the road names, frame the whole junction, or zoom right in to the stop lines (press it again to come back).'] },
   'active-phase': {
@@ -104,7 +104,7 @@ export const CATALOGUE: Record<string, Explainer> = {
       'This box shows which phase the AI chose, why (the mode, explained in plain words), and how long it has kept it, against its minimum and maximum green.',
       'The light in the simulator changes only after a 3-second amber, so "Engine decided" and "Light showing" can differ for a moment. That’s normal.',
     ],
-    live: (f) => (f.running && f.phase ? `Right now: ${f.phase} is green, held ${f.held ?? 0} s${f.min != null && f.max != null ? ` (it must run ${f.min}–${f.max} s)` : ''}.` : null),
+    live: (f) => (f.running && f.phase ? `${f.phase} is green, held ${f.held ?? 0} s${f.min != null && f.max != null ? ` (it must run ${f.min}–${f.max} s)` : ''}.` : null),
   },
   lanes: { title: 'Lanes', steps: ['All twelve lanes (left, straight and right for each of the four roads), with their signal, how many vehicles are on them, and their average wait.', 'Hover a lane to find it on the map. Longer waits turn orange, then red.'] },
   prediction: {

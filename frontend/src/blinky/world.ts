@@ -60,3 +60,18 @@ export function nearestPlatform(ps: Platform[], p: Vec): Platform | null {
   }
   return best
 }
+
+/**
+ * Standing spots inside a card's title row: the empty stretch between the
+ * title and its right-hand meta, feet 6 px above the row's bottom. The row
+ * (54 px) is taller than Blinky, so it covers nothing — the only place to
+ * stand when cards are packed 14 px apart (Section 38). `blocks` are the
+ * row's own contents. Ids are `<boxId>~h#<n>`.
+ */
+export function headerPlatforms(id: string, header: Rect, blocks: Box[], view: Rect): Platform[] {
+  const y = header.bottom - 6
+  if (y - BLINKY_CLEARANCE < view.top + 8 || y > view.bottom - 12) return []
+  let segs: [number, number][] = [[Math.max(header.left + 18, view.left), Math.min(header.right - 18, view.right)]]
+  for (const b of blocks) segs = segs.flatMap((s) => subtract(s, [b.left - 12, b.right + 12]))
+  return segs.filter(([a, c]) => c - a >= MIN_SEGMENT).map(([a, c], i) => ({ id: `${id}~h#${i}`, kind: 'card' as const, x1: a, x2: c, y }))
+}

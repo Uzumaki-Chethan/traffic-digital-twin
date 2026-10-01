@@ -1,4 +1,4 @@
-import { platformsFrom, type Box } from './world'
+import { headerPlatforms, platformsFrom, type Box } from './world'
 import type { Platform, Rect } from './types'
 
 let seq = 0
@@ -37,9 +37,22 @@ export function readWorld(): WorldRead {
     boxes.push({ id, left: r.left, top: r.top, right: r.right, bottom: r.bottom })
   })
   const platforms = main ? platformsFrom(boxes, main) : []
+  // …plus the empty middle of each card's title row (Panel's <header>).
+  if (main) {
+    for (const [id, el] of byId) {
+      const h = el.querySelector(':scope > div > header, :scope > header')
+      if (!h) continue
+      const r = h.getBoundingClientRect()
+      const blocks = [...h.children].map((c) => {
+        const b = c.getBoundingClientRect()
+        return { id: '', left: b.left, top: b.top, right: b.right, bottom: b.bottom }
+      })
+      platforms.push(...headerPlatforms(id, { left: r.left, top: r.top, right: r.right, bottom: r.bottom }, blocks, main))
+    }
+  }
   const elementOf = new Map<string, Element>()
   for (const p of platforms) {
-    const el = byId.get(p.id.split('#')[0])
+    const el = byId.get(p.id.split('#')[0].replace(/~h$/, ''))
     if (el) elementOf.set(p.id, el)
   }
   const twin = document.querySelector('main [data-explain="twin"]')

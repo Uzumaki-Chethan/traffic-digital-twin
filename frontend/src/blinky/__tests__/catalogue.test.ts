@@ -40,6 +40,11 @@ describe('explanation catalogue', () => {
     }
   })
 
+  it('live lines do not repeat the card label "Right now:"', () => {
+    const f = { running: true, vehicles: 12, greens: 3, phase: 'N–S straight + left', held: 7, min: 10, max: 45 }
+    for (const e of Object.values(CATALOGUE)) expect(e.live?.(f) ?? '').not.toMatch(/^Right now/i)
+  })
+
   it('live lines are silent when nothing runs', () => {
     for (const e of Object.values(CATALOGUE)) expect(e.live?.(EMPTY_FACTS) ?? null).toBeNull()
   })

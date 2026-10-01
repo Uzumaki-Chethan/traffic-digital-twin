@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BLINKY_CLEARANCE, nearestPlatform, platformUnder, platformsFrom } from '../world'
+import { BLINKY_CLEARANCE, headerPlatforms, nearestPlatform, platformUnder, platformsFrom } from '../world'
 
 const view = { left: 300, top: 100, right: 1300, bottom: 900 }
 const box = (id: string, left: number, top: number, right: number, bottom: number) => ({ id, left, top, right, bottom })
@@ -32,5 +32,17 @@ describe('platformUnder / nearestPlatform', () => {
   it('nearestPlatform always answers when there is any', () => {
     expect(nearestPlatform(ps, { x: 100, y: 590 })?.id).toBe('lo')
     expect(nearestPlatform([], { x: 0, y: 0 })).toBeNull()
+  })
+})
+
+describe('headerPlatforms', () => {
+  const header = { left: 400, top: 300, right: 1000, bottom: 354 }
+  it('stands in the empty middle of a title row, between the title and its meta', () => {
+    const ps = headerPlatforms('a', header, [box('t', 418, 310, 600, 340), box('m', 900, 315, 982, 335)], view)
+    expect(ps).toEqual([{ id: 'a~h#0', kind: 'card', x1: 612, x2: 888, y: 348 }])
+  })
+  it('nothing when the row is full, or when the row is too high in the frame', () => {
+    expect(headerPlatforms('a', header, [box('t', 418, 310, 982, 340)], view)).toEqual([])
+    expect(headerPlatforms('a', { ...header, top: 90, bottom: 144 }, [], view)).toEqual([])
   })
 })

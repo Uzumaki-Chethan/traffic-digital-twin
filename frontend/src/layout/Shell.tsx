@@ -6,6 +6,7 @@ import { Backdrop } from './Backdrop'
 import { TrafficCursor } from './TrafficCursor'
 import { useLocation } from 'react-router-dom'
 import { ErrorBoundary } from '@/ui/ErrorBoundary'
+import { BlinkyRoot } from '@/blinky/BlinkyRoot'
 
 /**
  * Glass over the night city: the photo (Backdrop) fixed behind everything;
@@ -61,6 +62,11 @@ export function Shell({ children }: { children: ReactNode }) {
           <FooterBar />
         </div>
       </div>
+      {/* Blinky, the mascot (Section 38). Its own boundary: anything it
+          throws makes it vanish, never the console. */}
+      <ErrorBoundary renderFallback={() => null}>
+        <BlinkyRoot />
+      </ErrorBoundary>
       <TrafficCursor />
     </>
   )
