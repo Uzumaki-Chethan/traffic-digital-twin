@@ -197,6 +197,15 @@ prank whose target is in an exclusion zone or currently hovered by you.
    number is untouched).
 8. **Hide and seek:** teleports away, then peeks out from behind the rail's logo after a
    few seconds.
+9. **Joyride** *(owner, 2026-10-01: in scope)*: while a run is up, Blinky hops onto a real
+   moving vehicle on the map (a car, a motorbike, an auto-rickshaw, whatever is there)
+   and rides it for a few seconds. It stands on the roof or sits astride the bike, waves,
+   and is scaled to the map's zoom.
+   - In the plan view it is the 2D overlay, positioned from the vehicle's pose in the same
+     motion buffer the plate draws from (`data/motion.ts`), so it moves exactly with it.
+   - In the 3D view it is a tiny 3D Blinky parented to the vehicle's group in the scene.
+   - It hops off before the vehicle leaves the network, or if it waits at a red for long
+     ("this one's stuck!"). It never rides an emergency or stalled vehicle.
 
 ## 7. The antenna guide (drag-to-explain)
 
@@ -461,5 +470,5 @@ backend changes.
 
 ## 11. Out of scope (for now)
 
-Riding the cars on the map, voice or text-to-speech, and Blinky on a separately-briefed
-home screen. These are good follow-ups once the core is loved.
+- Blinky on the home screen: after the home screen itself is designed (owner, 2026-10-01).
+- Voice or text-to-speech.
