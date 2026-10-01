@@ -20,7 +20,15 @@ export function Reveal({ children, index = 0, className }: { children: ReactNode
   if (reduced) return className ? <div className={className}>{children}</div> : <>{children}</>
   const { initial, animate, transition } = arrive(index)
   return (
-    <motion.div className={className} initial={initial} animate={animate} transition={transition}>
+    // --trace-i staggers the page-arrival border light (index.css) to
+    // follow the same order the panels arrive in.
+    <motion.div
+      className={className}
+      initial={initial}
+      animate={animate}
+      transition={transition}
+      style={{ '--trace-i': index } as React.CSSProperties}
+    >
       {children}
     </motion.div>
   )

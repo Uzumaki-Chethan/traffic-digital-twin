@@ -141,8 +141,8 @@ export function StartButton({
       whileTap={disabled ? undefined : { scale: 0.96 }}
       className={
         primary
-          ? 'flex items-center gap-2 rounded-control border border-ink-strong bg-ink-strong px-3 py-1.5 text-left text-[13px] font-semibold text-[var(--ink-on-dark)] disabled:opacity-50'
-          : 'flex items-center gap-2 rounded-control border border-rule px-3 py-1.5 text-left text-[13px] font-medium text-ink hover:bg-hover disabled:opacity-50'
+          ? 'run-go flex items-center gap-2 rounded-[12px] px-3.5 py-1.5 text-left text-[13px] font-semibold disabled:opacity-50'
+          : 'flex items-center gap-2 rounded-[12px] border border-white/60 bg-white/50 px-3.5 py-1.5 text-left text-[13px] font-medium text-ink hover:bg-white/70 disabled:opacity-50'
       }
     >
       {icon}

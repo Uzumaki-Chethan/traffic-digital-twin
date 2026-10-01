@@ -30,7 +30,7 @@ export function Brand({ collapsed }: { collapsed: boolean }) {
       />
       <span className={clsx('brand-word', collapsed && 'brand-word-hidden')}>
         <span className="overflow-hidden">
-          <img src={wordmark} alt="Trinetra" draggable={false} className="mx-auto mt-1 block h-auto w-[176px] max-w-none select-none [@media(max-height:760px)]:w-[150px]" />
+          <img src={wordmark} alt="Trinetra" draggable={false} className="mx-auto mt-1 block h-auto w-[200px] max-w-none select-none [@media(max-height:760px)]:w-[168px]" />
         </span>
       </span>
     </Link>
