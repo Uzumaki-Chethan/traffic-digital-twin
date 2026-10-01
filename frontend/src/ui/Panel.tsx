@@ -39,7 +39,10 @@ export function Panel({
   titleExtra?: ReactNode
 }) {
   return (
-    <section className={clsx('glass-card flex min-h-0 flex-col overflow-hidden', className)}>
+    // The card itself doesn't clip (its border light sits outside the
+    // edge); the inner layer clips the content to the rounded corners.
+    <section className={clsx('glass-card flex min-h-0 flex-col', className)}>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[inherit]">
       <header className="flex min-h-[54px] shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-[18px] py-2">
         <h2 className="panel-title">
           <Glyph s={glyph} />
@@ -51,6 +54,7 @@ export function Panel({
         {meta && <div className="num ml-auto min-w-0 text-right text-[12px] text-ink-mute">{meta}</div>}
       </header>
       <div className={clsx('min-h-0 flex-1', bodyClassName ?? 'px-[18px] pb-[18px]')}>{children}</div>
+      </div>
     </section>
   )
 }

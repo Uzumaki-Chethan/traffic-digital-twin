@@ -77,7 +77,7 @@ export function ScenarioCard({
       onPointerMove={onMove}
       onPointerLeave={onLeave}
       className={clsx(
-        'scenario-card glass-card group relative flex w-full flex-col overflow-hidden text-left',
+        'scenario-card glass-card group relative flex w-full flex-col text-left',
         disabled && 'cursor-not-allowed opacity-60',
       )}
     >
@@ -86,6 +86,9 @@ export function ScenarioCard({
           one full turn and stops (index.css .scenario-ring). It replaces the
           old orange border, which clashed with the page-arrival light. */}
       <span aria-hidden className="scenario-ring" />
+      {/* Content clips to the rounded corners here, so the ring and the
+          arrival light can sit outside the card's edge. */}
+      <span className="flex flex-1 flex-col overflow-hidden rounded-[inherit]">
       <ScenarioPreview id={scenario.id} seed={index} />
       <span className="flex flex-1 flex-col gap-1.5 px-3.5 pb-3 pt-2.5">
       <span className="flex items-start justify-between gap-2">
@@ -123,8 +126,9 @@ export function ScenarioCard({
         </motion.span>
       )}
       </span>
+      </span>
       {/* the glare that follows the pointer */}
-      <span aria-hidden className="scenario-glare pointer-events-none absolute inset-0 z-[2]" />
+      <span aria-hidden className="scenario-glare pointer-events-none absolute inset-0 z-[2] rounded-[inherit]" />
     </button>
     </motion.div>
   )

@@ -548,15 +548,19 @@ button.rail-card:hover {
   initial-value: 0deg;
   inherits: false;
 }
+/* The light sits OUTSIDE the card (owner, 2026-10-01: "make it outside, I'll
+   see how it looks"): 6 px beyond the edge, its corners the card's radius
+   plus that gap (--card-r is the card's own radius). */
 .glass-card {
   position: relative;
+  --card-r: var(--r-panel);
 }
 .glass-card::after {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: -6px;
   z-index: 3;
-  border-radius: inherit;
+  border-radius: calc(var(--card-r) + 6px);
   padding: 3px;
   pointer-events: none;
   background: conic-gradient(
@@ -629,9 +633,9 @@ button.rail-card:hover {
 }
 .scenario-ring {
   position: absolute;
-  inset: 0;
+  inset: -6px;
   z-index: 3;
-  border-radius: inherit;
+  border-radius: calc(var(--card-r) + 6px);
   padding: 3px;
   pointer-events: none;
   background: conic-gradient(

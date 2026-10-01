@@ -131,7 +131,7 @@ function Tile({
   // label wraps rather than truncating), then value · unit · trend, then
   // the caption, and the sparkline as a strip along the bottom.
   return (
-    <div className="glass-card flex min-w-0 flex-col gap-1.5 overflow-hidden rounded-[18px] px-3.5 pb-2.5 pt-3.5">
+    <div className="glass-card flex min-w-0 flex-col gap-1.5 rounded-[18px] px-3.5 pb-2.5 pt-3.5 [--card-r:18px]">
       <div className="flex items-center gap-3">
         <span
           aria-hidden

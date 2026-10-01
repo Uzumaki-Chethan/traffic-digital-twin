@@ -35,7 +35,7 @@ export function Shell({ children }: { children: ReactNode }) {
           }}
         >
           <StatusBar />
-          <main className="min-h-0 flex-1 overflow-y-auto px-[18px] pb-[18px] pt-0.5 [scrollbar-gutter:stable]">{children}</main>
+          <main className="min-h-0 flex-1 overflow-y-auto px-[18px] pb-[18px] pt-2 [scrollbar-gutter:stable]">{children}</main>
           <FooterBar />
         </div>
       </div>
