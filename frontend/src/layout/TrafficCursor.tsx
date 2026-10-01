@@ -35,12 +35,22 @@ export function TrafficCursor() {
     let tilt = 0
     let tv = 0
     let raf = 0
+    // Hidden until the pointer first moves over the page — on a reload the
+    // browser doesn't report where the mouse already is, and an unplaced
+    // head would sit in the top-left corner beside the system cursor.
+    let seen = false
+    el.classList.add('waiting')
 
     const onMove = (e: PointerEvent) => {
       if (e.pointerType === 'touch') return
       x = e.clientX
       y = e.clientY
       last = performance.now()
+      if (!seen) {
+        // First movement over the page: place it, then show it.
+        seen = true
+        el.classList.remove('waiting')
+      }
       wake()
       const t = e.target as Element | null
       el.classList.toggle('ui', !!t?.closest?.(CLICKABLE))

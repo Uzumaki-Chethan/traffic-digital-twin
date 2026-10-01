@@ -669,3 +669,6 @@ button.rail-card:hover {
 @media (prefers-reduced-motion: reduce) {
   .scenario-card:hover .scenario-ring { animation: none; }
 }
+.tc-head.waiting {
+  opacity: 0 !important;
+}
