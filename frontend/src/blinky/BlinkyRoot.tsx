@@ -13,7 +13,7 @@ import { KeyboardPicker } from './KeyboardPicker'
 import { TargetHighlight } from './TargetHighlight'
 import { Dock } from './Dock'
 import { targetLabel, type Target } from './targets'
-import type { Explainer } from './catalogue'
+import { liveFactsFor, type Explainer } from './catalogue'
 import type { Vec } from './types'
 
 interface Open {
@@ -61,6 +61,11 @@ export function BlinkyRoot() {
     return { director: new Director(ui), clearBubble: () => window.clearTimeout(timer) }
   })
 
+  // One stable ref for the 3D canvas: a fresh object each render re-ran its
+  // GL effect and rebuilt the renderer on every re-render (review #1).
+  const poseRef = useRef(director.pose)
+  const [dead, setDead] = useState(false)
+
   useEffect(() => {
     routeRef.current = pathname
   }, [pathname])
@@ -85,7 +90,19 @@ export function BlinkyRoot() {
     }
     window.addEventListener('pointermove', onMove, { passive: true })
     const frame = () => {
+      try {
+        step()
+      } catch (err) {
+        // A throw here would repeat every frame and never reach the
+        // ErrorBoundary: stop Blinky instead, leave the console alone.
+        console.error('[Blinky] stopped:', err)
+        director.interrupt()
+        setDead(true)
+        return
+      }
       raf = requestAnimationFrame(frame)
+    }
+    const step = () => {
       const ms = performance.now()
       if (ms - lastRead > 300 || routeRef.current !== lastRoute) {
         world = readWorld()
@@ -145,12 +162,14 @@ export function BlinkyRoot() {
 
   const getBall = useCallback(() => director.getBall(), [director])
   // Read only when called (the explainer's 1 s refresh), never during render.
-  const getFacts = () => live.current.facts
+  const getFacts = () => liveFactsFor(live.current.facts, live.current.run.running)
+
+  if (dead) return null
 
   return (
     <>
       <div data-blinky ref={wrapRef} className="blinky-layer" style={{ width: 1.8 * size, height: 1.8 * size }}>
-        <Blinky3D poseRef={{ current: director.pose }} size={size} />
+        <Blinky3D poseRef={poseRef} size={size} />
         <Bubble text={bubble?.text ?? null} id={bubble?.id ?? 0} align={bubble?.align ?? 'center'} size={size} />
         <div
           className="blinky-hit"

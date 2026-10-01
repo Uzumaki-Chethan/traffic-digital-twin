@@ -13,16 +13,27 @@ export function targetLabel(id: string): string {
 
 const blinkyOwned = (el: Element) => el.closest('[data-blinky]') !== null
 
-/** The explainable thing under a screen point, skipping Blinky's own layers. */
+interface Hit<E> {
+  closest(selector: string): E | null
+  getAttribute(name: string): string | null
+}
+
+/**
+ * What a release over these elements (topmost first) explains. Released over
+ * Blinky itself or its dock: nothing — not the card behind it. (Blinky's
+ * decorative layers take no pointer events, so they never appear here.)
+ */
+export function pickTarget<E extends Hit<E>>(els: E[]): { id: string; el: E } | null {
+  const first = els[0]
+  if (!first || first.closest('[data-blinky]')) return null
+  const t = first.closest('[data-explain]')
+  const id = t?.getAttribute('data-explain')
+  return t && id ? { id, el: t } : null
+}
+
+/** The explainable thing under a screen point. */
 export function targetAt(x: number, y: number): Target | null {
-  for (const el of document.elementsFromPoint(x, y)) {
-    if (blinkyOwned(el)) continue
-    const t = el.closest('[data-explain]')
-    const id = t?.getAttribute('data-explain')
-    if (t && id) return { id, el: t }
-    return null
-  }
-  return null
+  return pickTarget(document.elementsFromPoint(x, y))
 }
 
 /** Visible-ish targets in reading order, rows within 12 px counted as one row. */

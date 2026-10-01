@@ -2,7 +2,7 @@ import { Brain, mulberry32, pick, pointOn, topPlatform, type Rng } from './brain
 import { makePath, type Frame, type Path } from './locomotion'
 import { nearestPlatform, platformUnder } from './world'
 import { presentLayout } from './explainLayout'
-import { explainerFor, type Explainer } from './catalogue'
+import { explainerFor, liveFactsFor, type Explainer } from './catalogue'
 import { FACTS, GREETINGS, JOKES, liveLine } from './lines'
 import { chirp, type Chirp } from './sound'
 import { planPrank } from './pranks'
@@ -175,6 +175,11 @@ export class Director {
     return this.ctx?.live.run.running === true
   }
 
+  /** The brain state to return to after a hold/explain/ride: docked stays docked. */
+  private restState(): 'docked' | 'perched' | 'roaming' {
+    return this.docked ? 'docked' : this.running() ? 'perched' : 'roaming'
+  }
+
   private chirp(k: Chirp): void {
     chirp(k, this.ctx?.sound === true)
   }
@@ -277,8 +282,10 @@ export class Director {
     if (!el || !el.isConnected) return
     const r = el.getBoundingClientRect()
     // Feet on the platform's line: the card's top edge, or its title row.
+    // The offset recorded with the platform, from the same read as its y —
+    // not p.y minus a fresh rect, which bakes in any scroll since the read.
     const p = this.ctx.world.platforms.find((q) => q.id === platformId)
-    const dy = p ? p.y - r.top : 0
+    const dy = this.ctx.world.offsetOf.get(platformId) ?? (p ? p.y - r.top : 0)
     this.anchor = { el, dx: this.pos.x - r.left, dy }
     this.platformId = platformId
     this.pos = { x: this.pos.x, y: r.top + dy }
@@ -545,7 +552,7 @@ export class Director {
     }
     const k = this.deck.shift()
     if (k === 'live') {
-      const l = this.ctx ? liveLine(this.ctx.live.facts) : null
+      const l = this.ctx ? liveLine(liveFactsFor(this.ctx.live.facts, this.ctx.live.run.running)) : null
       if (!l) {
         if (depth < 4) this.react(depth + 1)
         return
@@ -572,7 +579,7 @@ export class Director {
 
   dropAntenna(t: Target | null, now: number): void {
     this.antenna = false
-    this.brain.set(this.running() ? 'perched' : 'roaming')
+    this.brain.set(this.restState())
     if (t && this.present(t, now)) return
     this.queue.push({ t: 'say', text: 'Boing! Nothing to explain there.', mood: 'curious', ms: 1800, sound: 'boing' }, { t: 'pose', anim: 'shrug', mood: 'curious', ms: 1200, prop: null })
   }
@@ -582,11 +589,17 @@ export class Director {
     const explainer = explainerFor(t.id)
     if (!explainer) return false
     this.interrupt()
-    this.docked = false
     this.brain.set('presenting')
     const page = t.id.startsWith('page:')
     const r = page ? null : t.el.getBoundingClientRect()
     const l = presentLayout(r && { left: r.left, top: r.top, right: r.right, bottom: r.bottom }, { w: window.innerWidth, h: window.innerHeight })
+    // Shushed or reduced motion: explain from the dock (spec §2) — no flight.
+    if (this.docked || this.ctx?.reducedMotion) {
+      this.presenting = { faceX: l.card.left > this.pos.x ? 1 : -1, component: !page }
+      this.ui.openExplain({ explainer, at: l.card, target: page ? null : t })
+      this.chirp('tada')
+      return true
+    }
     this.setSize(l.size)
     this.presenting = { faceX: l.card.left > l.blinky.x ? 1 : -1, component: !page }
     this.startMove('fly', l.blinky, null, now)
@@ -601,7 +614,8 @@ export class Director {
     this.presenting = null
     this.path = null
     this.setSize(REST_SIZE)
-    this.brain.set(this.running() ? 'perched' : 'roaming')
+    this.brain.set(this.restState())
+    if (this.docked) return
     const h = this.homeStep()
     if (h) this.queue.push(h)
     this.queue.push({ t: 'pose', anim: 'wave', mood: 'happy', ms: 800, prop: null })

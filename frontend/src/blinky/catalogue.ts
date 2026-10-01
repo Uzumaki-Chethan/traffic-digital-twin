@@ -12,6 +12,14 @@ export interface LiveFacts {
 
 export const EMPTY_FACTS: LiveFacts = { running: false, vehicles: null, greens: null, phase: null, held: null, min: null, max: null }
 
+/**
+ * The facts to speak from: nothing unless a run is up NOW. The last tick of
+ * a finished run stays in the store until the next starts — never "right now".
+ */
+export function liveFactsFor(f: LiveFacts, running: boolean): LiveFacts {
+  return running ? { ...f, running: true } : EMPTY_FACTS
+}
+
 export interface Explainer {
   title: string
   steps: string[]

@@ -20,6 +20,8 @@ export interface WorldRead {
   main: Rect | null
   /** The Digital twin card's platform, when it has one. */
   twinPerch: Platform | null
+  /** Platform id -> its height below its card's top, measured in the same read. */
+  offsetOf: Map<string, number>
 }
 
 /** Read the live page into platforms. Cheap; called a few times a second. */
@@ -51,11 +53,16 @@ export function readWorld(): WorldRead {
     }
   }
   const elementOf = new Map<string, Element>()
+  const offsetOf = new Map<string, number>()
+  const topOf = new Map(boxes.map((b) => [b.id, b.top]))
   for (const p of platforms) {
-    const el = byId.get(p.id.split('#')[0].replace(/~h$/, ''))
+    const cardId = p.id.split('#')[0].replace(/~h$/, '')
+    const el = byId.get(cardId)
     if (el) elementOf.set(p.id, el)
+    const top = topOf.get(cardId)
+    if (top !== undefined) offsetOf.set(p.id, p.y - top)
   }
   const twin = document.querySelector('main [data-explain="twin"]')
   const twinPerch = twin ? (platforms.find((p) => elementOf.get(p.id) === twin) ?? null) : null
-  return { platforms, elementOf, main, twinPerch }
+  return { platforms, elementOf, main, twinPerch, offsetOf }
 }

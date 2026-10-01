@@ -1,4 +1,4 @@
-import type { Anim, Gait, PrankId, Prop, Vec } from './types'
+import type { Anim, Gait, PrankId, Prop, Rect, Vec } from './types'
 import { pick, type Rng } from './brain'
 
 export interface PrankPlan {
@@ -16,6 +16,14 @@ export interface PrankPlan {
   swap?: { atMs: number; prop: Prop; say?: string }
   start?: () => void
   end?: () => void
+}
+
+/** Half the width of Blinky's tap target at rest size (0.35 × 44 px). */
+export const REST_HIT_HALF = 15.4
+
+/** Where the traffic cop stands: beside the run buttons (never under them), on the card below. */
+export function copSpot(buttons: Rect, cardTop: number): Vec {
+  return { x: buttons.left - REST_HIT_HALF - 20, y: cardTop }
 }
 
 const inView = (r: DOMRect) => r.width > 0 && r.top > 80 && r.bottom < window.innerHeight - 40
@@ -81,12 +89,12 @@ export function planPrank(id: PrankId, rng: Rng): PrankPlan | null {
     case 'cop': {
       const btn = document.querySelector('header .run-go, header .run-hold, header .run-halt')
       if (!btn) return null
-      const r = btn.getBoundingClientRect()
-      const x = r.left + r.width / 2
-      const top = cardTopBelow(r.bottom, x)
+      // The whole run-button group, so the cop stands clear of all of them.
+      const r = (btn.parentElement ?? btn).getBoundingClientRect()
+      const top = cardTopBelow(r.bottom, r.left - 40)
       if (top === null) return null
       return {
-        gait: 'fly', to: { x, y: top }, anim: 'present', prop: 'sign-stop', ms: 3600, say: 'Stop!',
+        gait: 'fly', to: copSpot(r, top), anim: 'present', prop: 'sign-stop', ms: 3600, say: 'Stop!',
         swap: { atMs: 1800, prop: 'sign-go', say: '…Go!' },
       }
     }

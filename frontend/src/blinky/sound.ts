@@ -18,6 +18,9 @@ export function chirp(kind: Chirp, enabled: boolean): void {
   if (!enabled) return
   try {
     ctx ??= new AudioContext()
+    // Made before any user gesture (Sound remembered across a reload) it
+    // starts suspended; resume it — this succeeds once the page has a gesture.
+    if (ctx.state === 'suspended') void ctx.resume()
     let t = ctx.currentTime
     for (const [f0, f1, d, type] of SEQ[kind]) {
       const o = ctx.createOscillator()

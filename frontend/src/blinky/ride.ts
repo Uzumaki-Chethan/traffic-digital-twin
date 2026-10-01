@@ -66,7 +66,7 @@ function end(r: Ride, stuck: boolean): { done: true; stuck: boolean } {
  */
 export function stepRide(r: Ride, now: number): { done: false; pos: Vec | null } | { done: true; stuck: boolean } {
   if (now > r.until) return end(r, false)
-  if (r.mode === '3d') return rideBus.vehicleId === r.id ? { done: false, pos: null } : end(r, false)
+  if (r.mode === '3d') return rideBus.view === '3d' && rideBus.vehicleId === r.id ? { done: false, pos: null } : end(r, false)
   const el = r.el
   if (!el || !el.isConnected) return end(r, false)
   const b = el.getBoundingClientRect()

@@ -37,17 +37,23 @@ export function AntennaGuide({ getBall, onHover, onDrop }: { getBall: () => Vec;
         cbs.current.onHover(t)
       }
     }
-    const up = (e: PointerEvent) => {
+    // Snap back with nothing chosen: a release over nothing, a cancelled
+    // pointer, or Esc — never a drag left hanging (review #8).
+    const cancel = () => {
       if (snapFrom) return
-      const t = targetAt(e.clientX, e.clientY)
-      if (t) {
-        cbs.current.onDrop(t)
-        return
-      }
       hoverRef.current = null
       setHover(null)
       cbs.current.onHover(null)
       snapFrom = { at: performance.now(), from: end ?? cbs.current.getBall() }
+    }
+    const up = (e: PointerEvent) => {
+      if (snapFrom) return
+      const t = targetAt(e.clientX, e.clientY)
+      if (t) cbs.current.onDrop(t)
+      else cancel()
+    }
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') cancel()
     }
     const frame = () => {
       const now = performance.now()
@@ -79,11 +85,15 @@ export function AntennaGuide({ getBall, onHover, onDrop }: { getBall: () => Vec;
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', cancel)
+    window.addEventListener('keydown', key)
     raf = requestAnimationFrame(frame)
     return () => {
       cancelAnimationFrame(raf)
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', cancel)
+      window.removeEventListener('keydown', key)
     }
   }, [])
 

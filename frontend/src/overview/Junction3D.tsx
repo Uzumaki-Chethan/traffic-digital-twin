@@ -1097,6 +1097,9 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
     riderPose.facing = 0
     riderPose.scale = 0.9
     let riderLast = performance.now()
+    // Frames the chosen vehicle has been missing: it may be newer than this
+    // view's display clock (250 ms behind), so give it a moment first.
+    let riderMiss = 0
     const fleet = new THREE.Group()
     scene.add(fleet)
 
@@ -1341,7 +1344,8 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
         compass.current.style.transform = `rotate(${deg.toFixed(1)}deg)`
       }
       {
-        const want = rideBus.vehicleId
+        // Only the Overview twin carries a rider (not Performance's windows).
+        const want = data.current.motionSide === 'demo' ? rideBus.vehicleId : null
         if (rider && (rider.on !== want || !cars.has(rider.on))) {
           rider.parent.remove(rider.rig.group)
           rider.rig.dispose()
@@ -1355,8 +1359,12 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
             rig.group.position.y = shapeOf(car.type).height + 0.05
             car.group.add(rig.group)
             rider = { rig, on: want, parent: car.group }
-          } else rideBus.vehicleId = null
+          } else if (++riderMiss > 45) {
+            riderMiss = 0
+            rideBus.vehicleId = null
+          }
         }
+        if (rider) riderMiss = 0
         if (rider) {
           const nowR = performance.now()
           const dtR = Math.min(0.1, (nowR - riderLast) / 1000)
@@ -1377,6 +1385,8 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
       if (rider) {
         rider.parent.remove(rider.rig.group)
         rider.rig.dispose()
+        // The view is going: end the ride, so Blinky doesn't stay hidden.
+        if (rideBus.vehicleId === rider.on) rideBus.vehicleId = null
         rider = null
       }
       ro.disconnect()

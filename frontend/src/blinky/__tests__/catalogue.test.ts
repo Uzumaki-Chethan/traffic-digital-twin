@@ -49,3 +49,12 @@ describe('explanation catalogue', () => {
     for (const e of Object.values(CATALOGUE)) expect(e.live?.(EMPTY_FACTS) ?? null).toBeNull()
   })
 })
+
+describe('liveFactsFor', () => {
+  it('a finished run says nothing "right now", even though its last tick is still in the store', async () => {
+    const { liveFactsFor } = await import('../catalogue')
+    const f = { running: true, vehicles: 12, greens: 3, phase: 'N–S straight + left', held: 7, min: 10, max: 45 }
+    expect(liveFactsFor(f, false)).toEqual(EMPTY_FACTS)
+    expect(liveFactsFor(f, true).vehicles).toBe(12)
+  })
+})
