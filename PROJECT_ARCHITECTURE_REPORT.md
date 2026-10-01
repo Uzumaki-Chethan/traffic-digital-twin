@@ -4019,3 +4019,5 @@ Also in this round, at the owner's request:
 Verified by forcing a context loss (WEBGL_lose_context): overlay, then boundary, then Try again gave a working canvas, with no uncaught error. If it recurs, the boundary shows the real error.
 
 **37.19 Rail fit.** The owner's "orange border touching the signal" (37.15) was the RAIL: on the longest label, Simulation Settings, the mini signal was squeezed against the selected pill's border. The rail is now 270 px wide, items are `pl-[18px] pr-3` with a 10 px gap, and the mini signal is a touch smaller. It now sits exactly 12 px inside the edge on all five items (measured).
+
+**37.20 Phase changes stand out on Decisions.** A row where the phase changed now has a soft green wash, a solid 4 px green bar down its left edge, green time and arrow, and the new phase in dark green. The from → to arrow carries it as well, so colour isn't the only cue, and a tooltip names the change. The selected row keeps its orange tint and the green bar. The phase column is wider (`minmax(250px,1.5fr)`, from the reason column) so "N–S straight + left → E–W straight + left" fits whole at laptop width.

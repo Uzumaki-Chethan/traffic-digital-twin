@@ -104,19 +104,33 @@ export function DecisionList({
               role="option"
               aria-selected={selected}
               onClick={() => onSelect(r.id)}
-              style={{ position: 'absolute', top: i * ROW_PX, height: ROW_PX }}
+              title={switched ? `Phase change: ${phaseLabel(prevPhase)} → ${phaseLabel(r.phase)}` : undefined}
+              // A phase change stands out from the holds around it: a soft
+              // green wash (a fresh green light) and a solid green bar down
+              // its left edge — plus the from → to arrow, so it never rests
+              // on colour alone. Selection keeps its orange, bar included.
+              style={{
+                position: 'absolute',
+                top: i * ROW_PX,
+                height: ROW_PX,
+                boxShadow: switched ? 'inset 4px 0 0 #12B76A' : undefined,
+              }}
               className={clsx(
-                'grid w-full grid-cols-[64px_minmax(180px,1.1fr)_52px_112px_2fr] items-center gap-3 border-b border-rule-soft px-3 text-left text-[12px] transition-colors',
-                selected ? 'bg-[rgb(255_138_18/0.14)]' : switched ? 'bg-white/45 hover:bg-hover' : 'hover:bg-hover',
+                'grid w-full grid-cols-[64px_minmax(250px,1.5fr)_44px_112px_1.6fr] items-center gap-3 border-b border-rule-soft px-3 text-left text-[12px] transition-colors',
+                selected
+                  ? 'bg-[rgb(255_138_18/0.16)]'
+                  : switched
+                    ? 'bg-[rgb(18_183_106/0.17)] hover:bg-[rgb(18_183_106/0.26)]'
+                    : 'hover:bg-hover',
               )}
             >
-              <span className="num text-ink-mute">{clock(r.time)}</span>
+              <span className={clsx('num', switched ? 'font-semibold text-[#065f3a]' : 'text-ink-mute')}>{clock(r.time)}</span>
               <span className="flex min-w-0 items-center gap-1 text-ink">
                 {switched ? (
                   <>
                     <span className="truncate text-ink-mute">{phaseLabel(prevPhase)}</span>
-                    <ArrowRight size={11} aria-hidden className="shrink-0 text-ink-mute" />
-                    <span className="truncate font-semibold text-ink-strong">{phaseLabel(r.phase)}</span>
+                    <ArrowRight size={12} strokeWidth={2.5} aria-hidden className="shrink-0 text-[#067647]" />
+                    <span className="truncate font-semibold text-[#065f3a]">{phaseLabel(r.phase)}</span>
                   </>
                 ) : (
                   <span className="truncate">{phaseLabel(r.phase)}</span>
