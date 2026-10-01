@@ -4,6 +4,7 @@ import clsx from 'clsx'
 import type { LaneView, VehicleView } from '@/data/types'
 import type { MotionSide } from '@/data/motion'
 import { JunctionPlate } from './JunctionPlate'
+import { ErrorBoundary } from '@/ui/ErrorBoundary'
 import { HOME_VIEW, usePanZoom, wheelIsZoom, type View, type ViewState } from './usePanZoom'
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
@@ -132,11 +133,30 @@ export function TwinViewport({
             showLabels={labels}
           />
         ) : (
-          <Suspense
-            fallback={<div className="flex h-full items-center justify-center text-[13px] text-ink">Loading 3D model…</div>}
+          // A failure in the 3D view stays in this box — the page, the run and
+          // the plan view carry on (Section 37.18).
+          <ErrorBoundary
+            renderFallback={(error, reset) => (
+              <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-[13px] text-ink">
+                <div className="font-medium text-ink-strong">The 3D view hit a problem.</div>
+                <div className="num max-w-[60ch] break-words text-[11.5px] text-ink-mute">{error.message}</div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={reset} className="fx-btn fx-soft rounded-full border border-white/60 bg-white/70 px-4 py-1.5 font-medium text-ink-strong">
+                    Try again
+                  </button>
+                  <button type="button" onClick={() => setMode('plan')} className="fx-btn fx-soft rounded-full border border-white/60 bg-white/70 px-4 py-1.5 font-medium text-ink-strong">
+                    Back to plan
+                  </button>
+                </div>
+              </div>
+            )}
           >
-            <Junction3D lanes={lanes} vehicles={vehicles} powered={powered} motionSide={motionSide} raining={raining} />
-          </Suspense>
+            <Suspense
+              fallback={<div className="flex h-full items-center justify-center text-[13px] text-ink">Loading 3D model…</div>}
+            >
+              <Junction3D lanes={lanes} vehicles={vehicles} powered={powered} motionSide={motionSide} raining={raining} />
+            </Suspense>
+          </ErrorBoundary>
         )}
       </div>
 

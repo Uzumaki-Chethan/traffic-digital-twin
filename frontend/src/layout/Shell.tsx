@@ -4,6 +4,8 @@ import { StatusBar } from './StatusBar'
 import { FooterBar } from './FooterBar'
 import { Backdrop } from './Backdrop'
 import { TrafficCursor } from './TrafficCursor'
+import { useLocation } from 'react-router-dom'
+import { ErrorBoundary } from '@/ui/ErrorBoundary'
 
 /**
  * Glass over the night city: the photo (Backdrop) fixed behind everything;
@@ -18,6 +20,7 @@ import { TrafficCursor } from './TrafficCursor'
  * the container on every panel update (Section 37.12).
  */
 export function Shell({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation()
   return (
     <>
       <Backdrop />
@@ -35,7 +38,26 @@ export function Shell({ children }: { children: ReactNode }) {
           }}
         >
           <StatusBar />
-          <main className="min-h-0 flex-1 overflow-y-auto px-[18px] pb-[18px] pt-2 [scrollbar-gutter:stable]">{children}</main>
+          <main className="min-h-0 flex-1 overflow-y-auto px-[18px] pb-[18px] pt-2 [scrollbar-gutter:stable]">
+            {/* No error on a page can blank the whole console any more: it
+                is shown here, the frame and the top bar keep working, and
+                moving to another page clears it. */}
+            <ErrorBoundary
+              resetKey={pathname}
+              renderFallback={(error, reset) => (
+                <div className="glass-card mx-auto mt-10 max-w-[560px] px-6 py-5 text-[13.5px] text-ink">
+                  <div className="text-[15px] font-semibold text-ink-strong">This page hit a problem.</div>
+                  <div className="num mt-2 break-words text-[12px] text-ink-mute">{error.message}</div>
+                  <div className="mt-3 text-[12.5px]">The simulation keeps running. Try again, or pick another page.</div>
+                  <button type="button" onClick={reset} className="run-go mt-4 rounded-full px-5 py-2 text-[13.5px] font-medium">
+                    Try again
+                  </button>
+                </div>
+              )}
+            >
+              {children}
+            </ErrorBoundary>
+          </main>
           <FooterBar />
         </div>
       </div>

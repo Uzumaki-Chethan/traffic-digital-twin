@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { BUILDINGS, CITY_EXTENT, GROUND_DAY, SIDEWALK_DAY, SIDEWALK_OUT, TREES, canopyTone, roofTone } from './cityscape'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
@@ -250,6 +250,15 @@ function combinedLeftAheadShape(): THREE.Shape {
 
 export function Junction3D({ lanes, powered, motionSide = 'demo', raining = false }: Props) {
   const mount = useRef<HTMLDivElement>(null)
+  // An error inside the animation loop happens outside React, where no
+  // error boundary can see it. Caught there, stored here, and re-thrown
+  // during render — so TwinViewport's boundary shows it instead of the
+  // view silently dying (Section 37.18).
+  const [fatal, setFatal] = useState<Error | null>(null)
+  // The GPU can drop a WebGL context (driver reset, too many contexts);
+  // three.js then draws nothing. Say so and offer a restart.
+  const [contextLost, setContextLost] = useState(false)
+  if (fatal) throw fatal
   // The compass overlay; turned every frame to keep its arrow on world
   // north however the camera has been orbited.
   const compass = useRef<SVGSVGElement>(null)
@@ -288,6 +297,11 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
     const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
     pmrem.dispose()
     el.appendChild(renderer.domElement)
+    const onLost = (e: Event) => {
+      e.preventDefault()
+      setContextLost(true)
+    }
+    renderer.domElement.addEventListener('webglcontextlost', onLost)
     renderer.domElement.style.touchAction = 'none'
     renderer.domElement.style.cursor = 'grab'
 
@@ -1137,6 +1151,14 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
     }
 
     const tick = () => {
+      try {
+        frame()
+      } catch (err) {
+        cancelAnimationFrame(raf)
+        setFatal(err instanceof Error ? err : new Error(String(err)))
+      }
+    }
+    const frame = () => {
       const now = performance.now()
       const { lanes: ls, powered: on, motionSide: side } = data.current
 
@@ -1332,7 +1354,13 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
         }
       })
       envTex.dispose()
+      renderer.domElement.removeEventListener('webglcontextlost', onLost)
       renderer.dispose()
+      // Hand the GL context back to the browser NOW. dispose() alone leaves
+      // it alive until garbage collection, so every Plan <-> 3D switch kept
+      // one more context, and Chrome caps a page at ~16 before it starts
+      // killing them (Section 37.18).
+      renderer.forceContextLoss()
       if (renderer.domElement.parentNode === el) el.removeChild(renderer.domElement)
     }
   }, [])
@@ -1340,6 +1368,20 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
   return (
     <div className="relative h-full w-full">
       <div ref={mount} className="h-full w-full" aria-label="Interactive 3D model of the junction" role="img" />
+      {contextLost && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[rgb(207_226_241/0.92)] text-center text-[13px] text-ink">
+          <div className="max-w-[44ch]">
+            The graphics card dropped the 3D view (a WebGL context loss). The simulation is unaffected.
+          </div>
+          <button
+            type="button"
+            onClick={() => setFatal(new Error('3D context lost — restarting the view'))}
+            className="fx-btn fx-soft rounded-full border border-white/60 bg-white/70 px-4 py-1.5 font-medium text-ink-strong"
+          >
+            Restart the 3D view
+          </button>
+        </div>
+      )}
       <div className="map-pill pointer-events-none absolute bottom-3 left-3 rounded-full px-3 py-1.5 text-[12px] text-[var(--plate-ink)]">
         drag to orbit · Ctrl + scroll to zoom · right-drag to pan
       </div>
