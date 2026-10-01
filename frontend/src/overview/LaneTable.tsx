@@ -37,7 +37,7 @@ export function LaneTable({ lanes, powered }: { lanes: LaneView[]; powered: bool
   const queued = lanes.filter((l) => l.vehicles > 0).length
 
   return (
-    <Panel
+    <Panel explain="lanes"
       title="Lanes"
       meta={powered ? `${total} on approaches · ${queued}/12 lanes occupied` : `${LANE_IDS.length} inbound`}
       bodyClassName="flex flex-col px-3.5 pb-[18px]"

@@ -33,7 +33,7 @@ export function LaneLedger({
   const byId = Object.fromEntries(lanes.map((l) => [l.lane_id, l]))
 
   return (
-    <Panel title="Lane ledger" meta={powered ? 'now + this run' : 'this run'}>
+    <Panel explain="an-ledger" title="Lane ledger" meta={powered ? 'now + this run' : 'this run'}>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-[12.5px]">
           <thead>

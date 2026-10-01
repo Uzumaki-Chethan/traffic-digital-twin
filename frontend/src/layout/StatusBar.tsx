@@ -84,7 +84,7 @@ export function StatusBar() {
           onClick={() => {
             if (!page.path.startsWith('/settings')) setTarget(page.kind === 'evaluation' ? 'performance' : 'overview')
           }}
-          className="scenario-pill flex h-11 items-center gap-2.5 rounded-full pl-4 pr-[18px] text-[13.5px] text-white"
+          data-explain="scenario-pill" className="scenario-pill flex h-11 items-center gap-2.5 rounded-full pl-4 pr-[18px] text-[13.5px] text-white"
           title={
             page.running
               ? `${page.name} is running ${page.scenarioLabel} — change the scenario on Simulation Settings for the next run`
@@ -98,7 +98,7 @@ export function StatusBar() {
 
         <RunControls />
 
-        <div className="min-w-[132px] text-right" style={{ textShadow: '0 1px 8px rgb(0 0 0 / 0.6)' }}>
+        <div data-explain="clock" className="min-w-[132px] text-right" style={{ textShadow: '0 1px 8px rgb(0 0 0 / 0.6)' }}>
           {live === null && !evaluating ? (
             <div className="text-[13.5px] text-white">{ended ? 'No simulation running' : 'Waiting for simulation'}</div>
           ) : paused ? (
@@ -121,7 +121,7 @@ export function StatusBar() {
           )}
         </div>
 
-        <div className="glass-control flex h-[42px] items-center gap-2.5 rounded-full pl-3.5 pr-4 text-[13.5px] font-medium">
+        <div data-explain="link-pill" className="glass-control flex h-[42px] items-center gap-2.5 rounded-full pl-3.5 pr-4 text-[13.5px] font-medium">
           <span className={clsx('status-dot', `status-dot-${dot}`, dot === 'green' && 'status-dot-beat')} />
           <span className="whitespace-nowrap">
             {link === 'connecting'

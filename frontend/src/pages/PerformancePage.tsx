@@ -91,7 +91,7 @@ export function PerformancePage() {
       )}
       <div className="grid grid-cols-2 gap-3.5">
         <Reveal index={0}>
-          <ControllerWindow
+          <ControllerWindow explain="pf-ai"
             title="Trinetra"
             side={frame?.ai ?? null}
             powered={powered}
@@ -104,7 +104,7 @@ export function PerformancePage() {
           />
         </Reveal>
         <Reveal index={1}>
-          <ControllerWindow
+          <ControllerWindow explain="pf-vac"
             title="VAC"
             side={frame?.baseline ?? null}
             powered={powered}
@@ -125,7 +125,7 @@ export function PerformancePage() {
       )}
 
       {haveResults && (
-        <div className="glass-card flex items-center justify-between px-4 py-2.5 text-[13px] text-ink">
+        <div data-explain="pf-summary" className="glass-card flex items-center justify-between px-4 py-2.5 text-[13px] text-ink">
           <span>
             <span className="display text-[13px] text-ink-strong">{final ? 'Final' : 'So far'}</span>
             <span className="text-ink-mute"> · </span>

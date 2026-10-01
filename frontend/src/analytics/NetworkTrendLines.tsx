@@ -37,7 +37,7 @@ export function NetworkTrendLines({ rows }: { rows: NetworkSample[] }) {
 
   if (data.length < 2) {
     return (
-      <Panel title="Network over time">
+      <Panel explain="an-network" title="Network over time">
         <div className="py-6 text-center text-[13px] text-ink-mute">Waiting for a second tick.</div>
       </Panel>
     )
@@ -48,7 +48,7 @@ export function NetworkTrendLines({ rows }: { rows: NetworkSample[] }) {
   const tSpan = Math.max(1e-6, t1 - t0)
 
   return (
-    <Panel title="Network over time" meta={`${data.length.toLocaleString()} points · ${Math.round(tSpan)}s`}>
+    <Panel explain="an-network" title="Network over time" meta={`${data.length.toLocaleString()} points · ${Math.round(tSpan)}s`}>
       {SERIES.map((s) => {
         const vals = data.map((r) => r[s.key])
         const max = Math.max(...vals, 0)

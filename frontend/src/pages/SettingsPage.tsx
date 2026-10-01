@@ -57,7 +57,7 @@ export function SettingsPage() {
   return (
     <div className="flex flex-col gap-3.5">
       <Reveal index={0}>
-        <Panel
+        <Panel explain="st-cards"
           title="Scenario"
           meta={
             locked
@@ -67,7 +67,7 @@ export function SettingsPage() {
           bodyClassName="px-3 pb-3"
         >
           <div className="mb-3.5 flex flex-wrap items-center gap-x-5 gap-y-2">
-            <div className="flex items-center gap-2.5">
+            <div data-explain="st-for" className="flex items-center gap-2.5">
               <span className="eyebrow">Choose for</span>
               <TargetPicker value={target} onChange={setTarget} />
             </div>

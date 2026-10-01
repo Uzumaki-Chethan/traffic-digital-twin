@@ -20,6 +20,7 @@ export function ControllerWindow({
   note,
   motionSide,
   raining = false,
+  explain,
 }: {
   title: string
   side: SideView | null
@@ -36,10 +37,13 @@ export function ControllerWindow({
   view: ViewState
   /** The other window's framing, offered as a one-press "Match". */
   matchView: { label: string; view: View }
+  /** Blinky's antenna target id. */
+  explain?: string
 }) {
   const lanes = side?.lanes ?? []
   return (
     <Panel
+      explain={explain}
       title={title}
       meta={
         side && powered ? (

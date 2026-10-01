@@ -37,7 +37,7 @@ export function LanePressureHeatmap({ buckets, width }: { buckets: LaneBucket[];
 
   if (buckets.length === 0) {
     return (
-      <Panel title="Lane pressure over time">
+      <Panel explain="an-heatmap" title="Lane pressure over time">
         <div className="py-6 text-center text-[13px] text-ink-mute">Waiting for the first tick.</div>
       </Panel>
     )
@@ -46,7 +46,7 @@ export function LanePressureHeatmap({ buckets, width }: { buckets: LaneBucket[];
   const span = width
 
   return (
-    <Panel
+    <Panel explain="an-heatmap"
       title="Lane pressure over time"
       meta={`${LANE_IDS.length} lanes · ${starts.length} × ${span}s buckets`}
     >

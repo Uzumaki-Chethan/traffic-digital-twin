@@ -93,7 +93,7 @@ export function AnalyticsPage() {
   return (
     <div className="flex flex-col gap-3.5">
       <Reveal index={0}>
-        <div className="glass-card flex items-center justify-between px-4 py-2.5">
+        <div data-explain="an-run" className="glass-card flex items-center justify-between px-4 py-2.5">
           <div className="text-[13px] text-ink">
             <span className="display text-[13px] text-ink-strong">This run</span>
             <span className="text-ink-mute"> · </span>
@@ -168,7 +168,7 @@ export function AnalyticsPage() {
           </Reveal>
         </div>
         <div className="col-span-4 flex flex-col gap-3.5">
-          <Panel title="This run so far">
+          <Panel explain="an-summary" title="This run so far">
             <div className="flex items-baseline justify-between py-1">
               <span className="text-[13px] text-ink">Mean wait, whole network</span>
               <span className="num text-[20px] text-ink-strong">

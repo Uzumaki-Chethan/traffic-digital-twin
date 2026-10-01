@@ -68,7 +68,7 @@ export function RunControls() {
     if (page.kind === 'evaluation') {
       return (
         <div className="flex items-center gap-1.5">
-          <Button
+          <Button explain="run-start"
             tone="go"
             onClick={() => {
               goHome()
@@ -84,7 +84,7 @@ export function RunControls() {
     }
     return (
       <div className="flex items-center gap-1.5">
-        <Button
+        <Button explain="run-start"
           tone="go"
           onClick={() => {
             goHome()
@@ -95,7 +95,7 @@ export function RunControls() {
           title={`Start a simulation of ${page.scenarioLabel} (headless — watch it on Overview)${ending}`}
           icon={<Play size={16} fill="currentColor" aria-hidden />}
         />
-        <Button
+        <Button explain="run-window"
           onClick={() => {
             goHome()
             void (other ? runControl.replaceWithDemo(true, page.scenario) : runControl.start(true, page.scenario))
@@ -127,7 +127,7 @@ export function RunControls() {
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ duration: DUR.tick, ease: EASE_OUT }}
           >
-            <Button
+            <Button explain="run-pause"
               onClick={() => void (state.paused ? runControl.resume() : runControl.pause())}
               disabled={busy}
               label={state.paused ? 'Play' : 'Pause'}
@@ -139,7 +139,7 @@ export function RunControls() {
         )}
       </AnimatePresence>
 
-      <Button
+      <Button explain="run-stop"
         tone="halt"
         onClick={() => void (state.managed ? runControl.stop() : runControl.halt())}
         disabled={busy || stopping}
@@ -155,7 +155,7 @@ export function RunControls() {
       {/* Continue THIS run in a SUMO window. Not a restart: the run saves
           its state and resumes from it, so the same vehicles carry over. */}
       {state.managed && state.running && !state.gui && state.kind !== 'evaluation' && (
-        <Button
+        <Button explain="run-window"
           onClick={() => void runControl.openGui()}
           disabled={busy || stopping || handing}
           label={handing ? 'Opening' : ''}
@@ -184,7 +184,7 @@ function SpeedControl({ speed, disabled }: { speed: number | null; disabled?: bo
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
     >
-      <Button
+      <Button explain="run-speed"
         onClick={() => void runControl.setSpeed(next)}
         disabled={disabled}
         label={speedLabel(speed)}
@@ -234,6 +234,7 @@ function Button({
   icon,
   tone,
   mono,
+  explain,
 }: {
   onClick: () => void
   disabled?: boolean
@@ -245,9 +246,12 @@ function Button({
   tone?: 'go' | 'hold' | 'halt'
   /** Numeric labels only — words belong in the UI face, not the mono one. */
   mono?: boolean
+  /** Blinky's antenna target id. */
+  explain?: string
 }) {
   return (
     <motion.button
+      data-explain={explain}
       type="button"
       onClick={onClick}
       disabled={disabled}

@@ -22,14 +22,14 @@ export function PhaseShare({ rows }: { rows: DecisionSample[] }) {
 
   if (total === 0) {
     return (
-      <Panel title="Phase share">
+      <Panel explain="an-phase-share" title="Phase share">
         <div className="py-6 text-center text-[13px] text-ink-mute">Waiting for the first decision.</div>
       </Panel>
     )
   }
 
   return (
-    <Panel title="Phase share" meta={`${total.toLocaleString()} decisions`}>
+    <Panel explain="an-phase-share" title="Phase share" meta={`${total.toLocaleString()} decisions`}>
       <div className="flex h-7 w-full overflow-hidden rounded-control">
         {PHASE_NAMES.map((p, i) => {
           const pct = (counts[p] / total) * 100

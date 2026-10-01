@@ -16,7 +16,7 @@ import { clock } from '@/utils/format'
 export function DecisionDetail({ row, previous }: { row: DecisionLogRow | null; previous: DecisionLogRow | null }) {
   if (!row) {
     return (
-      <Panel title="Decision" bodyClassName="px-3.5 pb-3.5 pt-1">
+      <Panel explain="dc-detail" title="Decision" bodyClassName="px-3.5 pb-3.5 pt-1">
         <div className="py-6 text-center text-[12.5px] text-ink-mute">Select a decision to open it.</div>
       </Panel>
     )
@@ -54,7 +54,7 @@ export function DecisionDetail({ row, previous }: { row: DecisionLogRow | null; 
 
   return (
     <div className="flex flex-col gap-2">
-      <Panel
+      <Panel explain="dc-detail"
         title={`Decision at ${clock(row.time)}`}
         meta={<span className="num">held {row.duration.toFixed(0)} s</span>}
         bodyClassName="px-3.5 pb-3.5 pt-1"
@@ -104,7 +104,7 @@ export function DecisionDetail({ row, previous }: { row: DecisionLogRow | null; 
       {decision ? (
         <ScoreLedger decision={decision} powered />
       ) : (
-        <Panel title="Why this phase" bodyClassName="px-3.5 pb-3 pt-1">
+        <Panel explain="why-phase" title="Why this phase" bodyClassName="px-3.5 pb-3 pt-1">
           <div className="py-3 text-center text-[12.5px] text-ink-mute">
             Phase scores were not recorded for this decision (a run from before 17 Sep 2026).
           </div>

@@ -29,7 +29,7 @@ export function ScoreLedger({ decision, powered }: { decision: DecisionView; pow
   const mode = modeMeta(decision.mode)
 
   return (
-    <Panel
+    <Panel explain="why-phase"
       title="Why this phase"
       meta={
         powered ? (

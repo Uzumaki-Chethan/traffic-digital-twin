@@ -168,7 +168,7 @@ export function TwinViewport({
       )}
 
       {mode === 'plan' && (
-        <div className="absolute right-3 top-3 flex flex-col gap-0.5 rounded-[14px] p-1 map-pill">
+        <div data-explain="twin-tools" className="absolute right-3 top-3 flex flex-col gap-0.5 rounded-[14px] p-1 map-pill">
           <IconButton
             onClick={() => setLabels((v) => !v)}
             label={labels ? 'Hide the approach names' : 'Show the approach names'}

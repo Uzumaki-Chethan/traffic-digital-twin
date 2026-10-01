@@ -49,7 +49,7 @@ export function RecentSwitches({ history, powered }: { history: PhaseHistoryEntr
   }
 
   return (
-    <Panel
+    <Panel explain="recent-switches"
       title="Recent switches"
       meta={powered && switches.length > 0 ? 'last 60 s' : undefined}
       className="w-full"
