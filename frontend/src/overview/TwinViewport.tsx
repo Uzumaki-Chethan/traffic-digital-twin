@@ -4,6 +4,7 @@ import clsx from 'clsx'
 import type { LaneView, VehicleView } from '@/data/types'
 import type { MotionSide } from '@/data/motion'
 import { JunctionPlate } from './JunctionPlate'
+import { rideBus } from '@/blinky/rideBus'
 import { ErrorBoundary } from '@/ui/ErrorBoundary'
 import { HOME_VIEW, usePanZoom, wheelIsZoom, type View, type ViewState } from './usePanZoom'
 
@@ -66,6 +67,15 @@ export function TwinViewport({
   // The view before "zoom to the stop lines", so a second press returns.
   const beforeFocus = useRef<View | null>(null)
   const [mode, setMode] = useState<'plan' | '3d'>('plan')
+  // Blinky's joyride needs to know whether the demo twin shows the plan or
+  // 3D (blinky/ride.ts). The Performance windows aren't rideable.
+  useEffect(() => {
+    if (motionSide !== 'demo') return
+    rideBus.view = mode
+    return () => {
+      rideBus.view = null
+    }
+  }, [mode, motionSide])
   // Ctrl + scroll to zoom, drag to pan, in metres. Narrows the SVG
   // viewBox, so the drawing stays sharp at any magnification.
   const pan = usePanZoom(stage, sharedView, { wheelZoomsPlain: isFull })

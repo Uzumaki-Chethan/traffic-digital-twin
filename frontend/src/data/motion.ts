@@ -176,6 +176,12 @@ export class MotionBuffer {
     return this.frames.length ? this.frames[0].t : null
   }
 
+  /** Vehicle ids in the newest frame (Blinky's 3D joyride picks from these). */
+  latestIds(): string[] {
+    const f = this.frames[this.frames.length - 1]
+    return f ? [...f.byId.keys()] : []
+  }
+
   /** The type a vehicle was last seen with, for building its element. */
   typeOf(id: string): string | undefined {
     for (let k = this.frames.length - 1; k >= 0; k--) {

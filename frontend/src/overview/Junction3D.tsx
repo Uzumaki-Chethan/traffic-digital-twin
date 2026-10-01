@@ -4,6 +4,8 @@ import { BUILDINGS, CITY_EXTENT, GROUND_DAY, SIDEWALK_DAY, SIDEWALK_OUT, TREES, 
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+import { buildBlinky, restPose } from '@/blinky/model'
+import { rideBus } from '@/blinky/rideBus'
 import type { LaneView, VehicleView } from '@/data/types'
 import { useSim } from '@/data/store'
 import { useClockRate } from '@/data/useClockRate'
@@ -1088,6 +1090,13 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
     }
 
     const cars = new Map<string, Car>()
+    // Blinky's 3D joyride (blinky/ride.ts): a tiny rig on the chosen
+    // vehicle's roof while rideBus.vehicleId names it.
+    let rider: { rig: ReturnType<typeof buildBlinky>; on: string; parent: THREE.Group } | null = null
+    const riderPose = restPose()
+    riderPose.facing = 0
+    riderPose.scale = 0.9
+    let riderLast = performance.now()
     const fleet = new THREE.Group()
     scene.add(fleet)
 
@@ -1331,6 +1340,33 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
         const deg = (controls.getAzimuthalAngle() * 180) / Math.PI
         compass.current.style.transform = `rotate(${deg.toFixed(1)}deg)`
       }
+      {
+        const want = rideBus.vehicleId
+        if (rider && (rider.on !== want || !cars.has(rider.on))) {
+          rider.parent.remove(rider.rig.group)
+          rider.rig.dispose()
+          if (rideBus.vehicleId === rider.on) rideBus.vehicleId = null
+          rider = null
+        }
+        if (want && !rider) {
+          const car = cars.get(want)
+          if (car) {
+            const rig = buildBlinky(envTex)
+            rig.group.position.y = shapeOf(car.type).height + 0.05
+            car.group.add(rig.group)
+            rider = { rig, on: want, parent: car.group }
+          } else rideBus.vehicleId = null
+        }
+        if (rider) {
+          const nowR = performance.now()
+          const dtR = Math.min(0.1, (nowR - riderLast) / 1000)
+          riderLast = nowR
+          riderPose.t = nowR / 1000
+          riderPose.anim = 'ride'
+          riderPose.animT += dtR
+          rider.rig.update(riderPose, dtR)
+        }
+      }
       renderer.render(scene, camera)
       raf = requestAnimationFrame(tick)
     }
@@ -1338,6 +1374,11 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
 
     return () => {
       cancelAnimationFrame(raf)
+      if (rider) {
+        rider.parent.remove(rider.rig.group)
+        rider.rig.dispose()
+        rider = null
+      }
       ro.disconnect()
       controls.removeEventListener('start', stopAuto)
       controls.removeEventListener('end', release)
