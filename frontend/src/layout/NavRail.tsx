@@ -50,7 +50,7 @@ export function NavRail() {
       data-frost
       className={clsx(
         'rail relative z-[4] flex shrink-0 flex-col overflow-hidden rounded-[26px] transition-[width] duration-[380ms]',
-        collapsed ? 'w-20' : 'w-[262px]',
+        collapsed ? 'w-20' : 'w-[270px]',
       )}
       style={{
         transitionTimingFunction: 'var(--ease-mid)',
@@ -75,7 +75,7 @@ export function NavRail() {
                 // One layout in both states: the icon never moves (18 px in,
                 // centred in the collapsed strip); only the label and the
                 // mini signal fade, clipped by the rail as it narrows.
-                'group relative flex h-[52px] items-center gap-3 rounded-[15px] px-[18px] text-[14px] transition-colors',
+                'group relative flex h-[52px] items-center gap-2.5 rounded-[15px] pl-[18px] pr-3 text-[14px] transition-colors',
                 isActive ? 'font-medium text-white' : 'text-[#F1F4FA] hover:text-white',
               )
             }
@@ -155,7 +155,9 @@ function MiniSignal({ active, hidden }: { active: boolean; hidden: boolean }) {
   return (
     <span
       aria-hidden
-      className={clsx('rail-fade relative z-10 ml-auto flex shrink-0 gap-1 rounded-full px-1.5 py-1', hidden && 'rail-hidden')}
+      // ml-auto plus a min gap: on the longest label (Simulation Settings)
+      // it used to be squeezed against the selected pill's orange border.
+      className={clsx('rail-fade relative z-10 ml-auto flex shrink-0 gap-[3px] rounded-full px-[5px] py-[5px]', hidden && 'rail-hidden')}
       style={{ background: 'rgb(0 0 0 / 0.6)', border: '1px solid rgb(255 255 255 / 0.12)' }}
     >
       <i

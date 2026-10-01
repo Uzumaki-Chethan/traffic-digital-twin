@@ -4017,3 +4017,5 @@ Also in this round, at the owner's request:
 - It handles `webglcontextlost` with a "Restart the 3D view" overlay.
 - It calls `renderer.forceContextLoss()` on unmount. Until now each Plan ↔ 3D switch left a live GL context until GC, against Chrome's ~16-per-page cap.
 Verified by forcing a context loss (WEBGL_lose_context): overlay, then boundary, then Try again gave a working canvas, with no uncaught error. If it recurs, the boundary shows the real error.
+
+**37.19 Rail fit.** The owner's "orange border touching the signal" (37.15) was the RAIL: on the longest label, Simulation Settings, the mini signal was squeezed against the selected pill's border. The rail is now 270 px wide, items are `pl-[18px] pr-3` with a 10 px gap, and the mini signal is a touch smaller. It now sits exactly 12 px inside the edge on all five items (measured).
