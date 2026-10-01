@@ -142,7 +142,7 @@ export function StartButton({
       className={
         primary
           ? 'run-go flex items-center gap-2 rounded-[12px] px-3.5 py-1.5 text-left text-[13px] font-semibold disabled:opacity-50'
-          : 'flex items-center gap-2 rounded-[12px] border border-white/60 bg-white/50 px-3.5 py-1.5 text-left text-[13px] font-medium text-ink hover:bg-white/70 disabled:opacity-50'
+          : 'fx-btn fx-soft flex items-center gap-2 rounded-[12px] border border-white/60 bg-white/50 px-3.5 py-1.5 text-left text-[13px] font-medium text-ink hover:bg-white/70 disabled:opacity-50'
       }
     >
       {icon}

@@ -188,7 +188,7 @@ function Chip({ active, loud, onClick, children }: { active: boolean; loud?: boo
       onClick={onClick}
       aria-pressed={active}
       className={clsx(
-        'rounded-full border px-2.5 py-0.5 text-[12px] font-medium transition-colors',
+        'fx-btn fx-soft rounded-full border px-2.5 py-0.5 text-[12px] font-medium',
         active
           ? 'border-[var(--ink-strong)] bg-ink-strong text-ink-on-dark'
           : loud

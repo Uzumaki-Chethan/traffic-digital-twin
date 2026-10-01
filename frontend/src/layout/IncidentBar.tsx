@@ -57,7 +57,7 @@ export function IncidentBar() {
         disabled={busy || run.paused}
         title={run.paused ? 'Resume the run to stall a vehicle' : page.kind === 'evaluation' ? 'Enters both simulations at the same moment' : 'Stalls it on that lane now'}
         className={clsx(
-          'rounded-control border px-2.5 py-1 text-[12.5px] font-semibold transition-colors',
+          'fx-btn fx-dark rounded-control border px-2.5 py-1 text-[12.5px] font-semibold',
           busy || run.paused
             ? 'cursor-not-allowed border-rule text-ink-mute'
             : 'border-[var(--ink-strong)] bg-ink-strong text-ink-on-dark hover:opacity-90',

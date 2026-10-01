@@ -104,7 +104,7 @@ export function GlassSelect<T extends string>({
         }}
         style={{ minWidth }}
         className={clsx(
-          'flex h-10 items-center gap-2.5 rounded-full border bg-white/60 pr-3.5 text-left text-[13.5px] font-medium text-ink-strong transition-[border-color,box-shadow] disabled:cursor-not-allowed disabled:opacity-60',
+          'fx-btn fx-soft flex h-10 items-center gap-2.5 rounded-full border bg-white/60 pr-3.5 text-left text-[13.5px] font-medium text-ink-strong transition-[border-color,box-shadow] disabled:cursor-not-allowed disabled:opacity-60',
           Icon ? 'pl-2' : 'pl-4',
           open ? 'border-[var(--brand)] shadow-[0_0_0_3px_rgb(255_138_18/0.18)]' : 'border-white/60 hover:border-[var(--brand-edge)] hover:bg-white/75',
         )}

@@ -676,3 +676,88 @@ button.rail-card:hover {
 .tc-head.waiting {
   opacity: 0 !important;
 }
+
+/* ---- Hover on everything clickable (owner, 2026-10-01) -------------------
+   One language, tinted per button: it lifts a little, its glow brightens in
+   its own colour, and one streak of light passes across it (a single pass
+   per hover, never a loop). Pressing sinks it back. `translate` / `scale`
+   are used rather than `transform`, so they compose with framer-motion's
+   tap animations instead of fighting them. */
+:is(.run-go, .run-hold, .run-halt, button.glass-control, .scenario-pill, button.map-pill, button.rail-card, .fx-btn) {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transition:
+    translate 0.2s var(--ease-spring),
+    scale 0.08s var(--ease-out),
+    box-shadow 0.2s var(--ease-out),
+    filter 0.2s var(--ease-out),
+    border-color 0.2s var(--ease-out),
+    background 0.2s var(--ease-out),
+    background-color 0.2s var(--ease-out);
+}
+:is(.run-go, .run-hold, .run-halt, button.glass-control, .scenario-pill, button.map-pill, button.rail-card, .fx-btn)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / 0.38) 50%, transparent 70%);
+  translate: -130% 0;
+}
+:is(.run-go, .run-hold, .run-halt, button.glass-control, .scenario-pill, button.map-pill, button.rail-card, .fx-btn):hover:not(:disabled)::after {
+  translate: 130% 0;
+  transition: translate 0.65s var(--ease-out);
+}
+:is(.run-go, .run-hold, .run-halt, button.glass-control, .scenario-pill, button.map-pill, button.rail-card, .fx-btn):hover:not(:disabled) {
+  translate: 0 -2px;
+}
+:is(.run-go, .run-hold, .run-halt, button.glass-control, .scenario-pill, button.map-pill, button.rail-card, .fx-btn):active:not(:disabled) {
+  translate: 0 0;
+  scale: 0.96;
+}
+
+/* each in its own colour */
+.run-go:hover:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgb(220 255 236 / 0.8), 0 0 0 1px rgb(110 231 183 / 0.8), 0 0 26px 2px rgb(16 185 129 / 0.75), 0 12px 28px -8px rgb(16 185 129 / 0.9);
+}
+.run-hold:hover:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgb(255 236 190 / 0.9), 0 0 0 1px rgb(255 190 100 / 0.85), 0 0 26px 2px rgb(255 140 20 / 0.7), 0 12px 28px -8px rgb(255 140 20 / 0.9);
+}
+.run-halt:hover:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgb(255 214 214 / 0.8), 0 0 0 1px rgb(255 130 130 / 0.8), 0 0 26px 2px rgb(225 29 72 / 0.7), 0 12px 28px -8px rgb(225 29 72 / 0.9);
+}
+button.glass-control:hover:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2), 0 0 0 1px rgb(255 255 255 / 0.18), 0 0 20px -4px rgb(170 200 255 / 0.55), 0 12px 24px -12px rgb(0 0 0 / 0.85);
+}
+.scenario-pill:hover {
+  translate: 0 -2px;
+  box-shadow: inset 0 0 0 1.5px #ffc24d, 0 0 28px 0 rgb(245 170 40 / 0.75);
+}
+button.map-pill:hover:not(:disabled) {
+  box-shadow: 0 0 0 1px rgb(255 138 18 / 0.45), 0 8px 18px -6px rgb(0 0 0 / 0.4);
+}
+button.rail-card:hover {
+  border-color: rgb(255 255 255 / 0.36);
+  box-shadow: inset 0 0 18px -6px rgb(255 255 255 / 0.4), 0 0 18px -6px rgb(255 190 90 / 0.5);
+}
+.fx-dark:hover:not(:disabled) {
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.2), 0 0 16px -2px rgb(37 99 235 / 0.6), 0 8px 16px -8px rgb(15 25 48 / 0.8);
+}
+.fx-soft:hover:not(:disabled) {
+  box-shadow: 0 0 0 1px rgb(255 138 18 / 0.4), 0 0 16px -4px rgb(255 160 60 / 0.6), 0 8px 18px -10px rgb(15 25 48 / 0.6);
+}
+/* the light streak on pale buttons reads darker, so it's visible */
+.fx-soft::after,
+button.map-pill::after {
+  background: linear-gradient(105deg, transparent 30%, rgb(255 180 90 / 0.35) 50%, transparent 70%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.run-go, .run-hold, .run-halt, button.glass-control, .scenario-pill, button.map-pill, button.rail-card, .fx-btn):hover {
+    translate: none;
+  }
+  :is(.run-go, .run-hold, .run-halt, button.glass-control, .scenario-pill, button.map-pill, button.rail-card, .fx-btn)::after {
+    display: none;
+  }
+}
