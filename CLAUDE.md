@@ -342,6 +342,12 @@ unprompted, but do keep this section current if that changes:
   in both the plan and 3D views, at the same true scale. The owner declined the
   prototype's theme picker, boot curtain, weather widget, cursor glow and its
   Throughput/Accuracy/"AI confidence" tiles.
+  **Blinky (2026-10-01, Section 38):** a 3D signal-bot mascot (`frontend/src/blinky/`),
+  mounted once in `Shell` inside its own `ErrorBoundary`, strictly read-only. Its antenna
+  explains any page/panel: **every new panel needs a `data-explain` id (Panel's `explain`
+  prop) with an entry in `blinky/catalogue.ts`, or `catalogue.test.ts` fails.** Its
+  three.js canvas is its own; the only hook into `Junction3D` is the 3D joyride rider
+  (`blinky/rideBus.ts`). Home-screen Blinky waits for the home screen's design.
   A 3D miniature of the junction DOES exist now, at the user's explicit request
   (`overview/Junction3D.tsx`) — three.js, true network scale, sumo-gui's own look; that is
   not the rejected neon "3D cyberpunk" direction. Since 2026-09-14 the plan view is ALSO

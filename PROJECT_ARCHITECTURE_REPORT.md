@@ -4021,3 +4021,77 @@ Verified by forcing a context loss (WEBGL_lose_context): overlay, then boundary,
 **37.19 Rail fit.** The owner's "orange border touching the signal" (37.15) was the RAIL: on the longest label, Simulation Settings, the mini signal was squeezed against the selected pill's border. The rail is now 270 px wide, items are `pl-[18px] pr-3` with a 10 px gap, and the mini signal is a touch smaller. It now sits exactly 12 px inside the edge on all five items (measured).
 
 **37.20 Phase changes stand out on Decisions.** A row where the phase changed now has a soft green wash, a solid 4 px green bar down its left edge, green time and arrow, and the new phase in dark green. The from → to arrow carries it as well, so colour isn't the only cue, and a tooltip names the change. The selected row keeps its orange tint and the green bar. The phase column is wider (`minmax(250px,1.5fr)`, from the reason column) so "N–S straight + left → E–W straight + left" fits whole at laptop width.
+
+## SECTION 38 — Blinky, the signal-bot mascot (CURRENT STATE)
+
+*2026-10-01 · branch `design/glass-night` · spec `docs/superpowers/specs/2026-10-01-blinky-design.md` · plan `docs/superpowers/plans/2026-10-01-blinky.md`*
+
+**What it is.** A small 3D traffic-signal robot that lives on the console. It stands on
+card tops and walks, hops, flies and teleports between them. It reacts to the live run:
+it cheers on a phase switch, salutes an emergency, holds an umbrella in rain and
+dances at max speed. Tapping it shows a greeting, a fact, a joke or the live state. It
+plays harmless pranks that undo themselves, and during a run it rides real vehicles in
+both the plan and 3D views.
+
+**The owner's idea: the antenna guide.** Drag Blinky's antenna ball onto a rail link or
+any component, and Blinky flies forward with a plain-language explainer for a first-time
+viewer. This replaces tooltips. Every explainable element carries `data-explain="<id>"`
+(`Panel` has an `explain` prop), and `blinky/catalogue.ts` holds the text. A unit test
+fails if the source uses an id that has no entry, so a new panel cannot ship unexplained.
+The dock's "Explain…" button gives the same thing from the keyboard.
+
+**How it's built** (`frontend/src/blinky/`):
+- **Pure, tested logic:** `brain.ts` (state machine, seeded), `world.ts` (standing spots:
+  card top edges with 46 px clear above, and the empty middle of each card's 54 px title
+  row between the title and its meta), `locomotion.ts` (paths), `explainLayout.ts`,
+  `catalogue.ts`, `lines.ts`, `targets.ts`.
+- **Body:** `director.ts`, plain TypeScript. It runs a queue of steps, anchors Blinky to
+  its card so it scrolls with it, runs pranks with their undo, rides vehicles, and handles
+  taps, drags and the antenna.
+- **Loop and UI:** `BlinkyRoot.tsx` runs one rAF loop and writes a single wrapper
+  transform per frame. React state is only for the bubble, the explainer, the drag cable,
+  the picker and the dock.
+- **Rendering:** `model.ts` builds the three.js rig, drawn by `Blinky3D.tsx` in its own
+  small transparent canvas. `BlinkySvg.tsx` takes over if WebGL fails or the context is
+  lost.
+- **Joyride:** `ride.ts` with `rideBus.ts`. The plan view reads the vehicles'
+  `data-vid`/`data-ride` attributes in `VehicleLayer`. In 3D, `Junction3D` parents a mini
+  rig to the ridden car. `TwinViewport` publishes which view the demo twin shows.
+
+**Guarantees.**
+- **Read-only:** no run control, no POSTs, no store writes.
+- **Isolated:** mounted once in `Shell` inside its own `ErrorBoundary`, which renders
+  nothing on error.
+- **Never in the way:** its only pointer targets are its body and its antenna ball.
+- **Quiet by default:** sound is off until the user turns it on.
+- **Shh persists:** the "Shh" setting survives a reload (`localStorage` key
+  `trinetra.blinky`).
+- **Reduced motion:** with `prefers-reduced-motion`, Blinky stays docked and asleep, and
+  the antenna still works.
+
+**Found in the browser, fixed before shipping (ledgered rulings):**
+- Cards sit 14 px apart and the top row hugs the frame, so top edges alone gave Blinky
+  nowhere to stand on Overview. It now also stands inside a card's title row
+  (`headerPlatforms`, tested) — the row is taller than Blinky, so it covers nothing — and
+  is anchored with a vertical offset, so it scrolls with the card exactly (measured).
+- The dock sits in the rail's empty space under the page links (it covered a card corner
+  in the frame's bottom-left, where the spec first put it); the frame corner is the
+  fallback on a short screen.
+- A live line read "Right now: Right now: …"; fixed, with a test.
+- A dev-only `window.blinkyDebug` handle exists for verification (not in production).
+- Frame cost could not be measured on the build machine: its test browser composites the
+  console at ~1 fps with or without Blinky (a blank page runs at 60). Judge it on the demo
+  laptop.
+
+**Deferred by the owner:** Blinky on the home screen, built after the home screen is
+designed.
+
+**Names that differ from the spec's sketch:**
+
+| Spec name | Shipped as |
+|---|---|
+| `Antenna.tsx` | `AntennaGuide.tsx` + `TargetHighlight.tsx` |
+| `Explainer.tsx` | `ExplainerCard.tsx` |
+| `useBlinkyWorld.ts` | `useLiveState.ts` + `worldDom.ts` |
+
+`director.ts` is new: it is the body, kept out of React.

@@ -43,6 +43,8 @@ way before the change.
   not exist, drop the panel idea or ask for the field — never a placeholder
   that could be mistaken for real.
 - **Never show prediction confidence anywhere.** (Owner's standing rule.)
+- Blinky's live lines use real fields only, never invent a number, and never show prediction
+  confidence.
 - No internal jargon on screen: lanes are "North · Left", phases are
   "N–S straight + left", modes are "Minimum green", never `N_in_0`,
   `NS_straight_left`, `min_green_hold`. Explain it or cut it. (The one known
@@ -193,6 +195,15 @@ change on the page you touched (and any page you moved something to or from).
   predicted-vs-actual charts; the twin's "Live simulation" badge and its labels / frame /
   focus tools; buildings, trees and sidewalks on both map views.
 - Settings: a moving preview on every scenario card.
+
+### Blinky (2026-10-01, Section 38) — part of the inventory
+
+- the Blinky mascot (3D signal-bot, SVG fallback);
+- the antenna drag-to-explain guide, and an explanation for every `data-explain` id
+  (`blinky/catalogue.ts` — a test fails on a missing one, so a new panel needs its own);
+- the explainer card: title, steps with Back/Next and dots, the live line, "Got it!";
+- the dock: Shh/Wake, Sound, Come here, Explain…;
+- the joyride on real vehicles in the plan and 3D views.
 
 ## 4. How to check a change
 
