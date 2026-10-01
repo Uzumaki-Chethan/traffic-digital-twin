@@ -80,23 +80,14 @@ export function ScenarioCard({
         'scenario-card glass-card group relative flex w-full flex-col overflow-hidden text-left',
         disabled && 'cursor-not-allowed opacity-60',
       )}
-      style={
-        selected
-          ? { borderColor: 'rgb(255 150 40 / 0.9)', boxShadow: '0 0 0 1px rgb(255 150 40 / 0.55), 0 18px 40px -24px rgb(255 140 20 / 0.7)' }
-          : undefined
-      }
     >
+      {/* The signal ring: red, orange, green in equal thirds round the
+          border — always on for the selected card, and on hover it spins
+          one full turn and stops (index.css .scenario-ring). It replaces the
+          old orange border, which clashed with the page-arrival light. */}
+      <span aria-hidden className="scenario-ring" />
       <ScenarioPreview id={scenario.id} seed={index} />
       <span className="flex flex-1 flex-col gap-1.5 px-3.5 pb-3 pt-2.5">
-      {/* Selection bar, drawn from the leading edge. */}
-      <span
-        aria-hidden
-        className="absolute inset-x-0 top-0 z-[1] h-[3px] origin-left bg-[var(--brand)] transition-transform duration-200"
-        style={{
-          transform: `scaleX(${selected ? 1 : 0})`,
-          transitionTimingFunction: 'var(--ease-out)',
-        }}
-      />
       <span className="flex items-start justify-between gap-2">
         <span className="text-[15px] font-medium leading-tight text-ink-strong">{scenario.name}</span>
         {selected ? (

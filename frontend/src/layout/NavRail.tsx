@@ -86,7 +86,7 @@ export function NavRail() {
                 {isActive && (
                   <motion.span
                     layoutId={reduced ? undefined : 'nav-active'}
-                    className="absolute inset-0 rounded-[15px]"
+                    className="nav-active absolute inset-0 overflow-hidden rounded-[15px]"
                     style={{
                       background: 'linear-gradient(90deg, rgb(255 140 30 / 0.46), rgb(255 120 20 / 0.18) 62%, rgb(255 120 20 / 0.08))',
                       border: '1px solid var(--brand-edge)',

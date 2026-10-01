@@ -585,3 +585,87 @@ button.rail-card:hover {
 @media (prefers-reduced-motion: reduce) {
   .glass-card::after { animation: none; display: none; }
 }
+
+/* The rail's selected page, alive (owner, 2026-10-01): a glint of light
+   sweeps across the orange pill every few seconds, like light catching
+   glass, while its glow breathes. Both loop; both stop under reduced
+   motion. Decorative only. */
+.nav-active {
+  animation: nav-breathe 2.8s ease-in-out infinite;
+}
+.nav-active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.32) 50%, transparent 65%);
+  background-size: 260% 100%;
+  background-position: 150% 0;
+  animation: nav-sheen 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes nav-sheen {
+  0% { background-position: 150% 0; }
+  55%, 100% { background-position: -110% 0; }
+}
+@keyframes nav-breathe {
+  0%, 100% { box-shadow: 0 0 24px -2px var(--brand-glow), inset 0 0 20px -6px rgb(255 190 100 / 0.7); }
+  50% { box-shadow: 0 0 34px 0 rgb(255 138 31 / 0.85), inset 0 0 24px -4px rgb(255 200 120 / 0.85); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-active, .nav-active::after { animation: none; }
+}
+
+/* Scenario cards' signal ring (settings/ScenarioCard). Red, orange, green
+   in equal thirds round the whole border, softly blended at the joins.
+   Selected: shown, still. Hover (any enabled card): shown, and it spins
+   one full turn, then stops — re-hovering spins it again. The selected
+   card skips the page-arrival light (glass-card::after) so the two never
+   overlap. */
+@property --ring-ang {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+.scenario-ring {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  padding: 3px;
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--ring-ang),
+    #ff3b47 0%,
+    #ff3b47 27%,
+    #ffb020 39%,
+    #ffb020 61%,
+    #2af28e 73%,
+    #2af28e 95%,
+    #ff3b47 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  filter: drop-shadow(0 0 5px rgb(255 176 32 / 0.6));
+  opacity: 0;
+  transition: opacity 0.25s var(--ease-out);
+}
+.scenario-card[aria-pressed='true'] .scenario-ring {
+  opacity: 1;
+}
+.scenario-card:hover:not(:disabled) .scenario-ring {
+  opacity: 1;
+  animation: ring-spin 1.2s var(--ease-mid) 1 both;
+}
+@keyframes ring-spin {
+  from { --ring-ang: 0deg; }
+  to { --ring-ang: 360deg; }
+}
+.scenario-card[aria-pressed='true']::after {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scenario-card:hover .scenario-ring { animation: none; }
+}
