@@ -13,14 +13,6 @@ city-photo backdrop, dark-glass rail with the owner's logo, a frosted container,
 pale glass cards, Poppins / Overpass Mono with Orbitron headings, and a daytime city
 map (shared `overview/cityscape.ts`) in both the plan and the 3D view.
 
-Every explainable element carries `data-explain="<id>"` (`Panel` has an `explain` prop);
-`blinky/catalogue.ts` holds the words, and `catalogue.test.ts` fails on a missing entry.
-Verified in a browser (Playwright): arrival, scroll anchoring, antenna on a nav link / a
-panel / empty space, all five pages and the rail collapse, Shh across a reload, reduced
-motion, keyboard mode with focus trap, plan-view joyride. Not verified by eye: the 3D
-rider (too small at the camera distance) and frame cost (the build machine's test browser
-runs the console at ~1 fps with or without Blinky).
-
 - **Overview** (`/`) — the junction as the hero, in either a true-scale plan view
   (one SVG unit = one metre; Ctrl + scroll or pinch to zoom about the pointer,
   drag to pan, 1× = the whole 400 m network, 3.5× on opening and under the
