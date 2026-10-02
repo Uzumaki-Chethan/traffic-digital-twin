@@ -4841,3 +4841,19 @@ looks the same apart from those.
 - No shader warnings: an early version's sampling inside a divergent branch produced
   "gradient instruction in a loop" warnings; fixed.
 - As before, smoothness can't be judged in the build machine's test browser.
+
+### 48.1 Logo, top bar, hero, no pointer glow (owner, same day)
+
+- **Logo:** the logo PNGs are already transparent. The `mix-blend-mode: screen` they carried
+  (left over from the night city) washed them out over the morning sky, so it is removed
+  from the hero, top bar and footer. Instead, a tight dark drop-shadow keeps the mark crisp
+  in its true colours.
+- **Top bar:** now a floating dark-glass bar, like the console's rail:
+  - the eye and the wordmark image;
+  - section links in a segmented group, the active one amber;
+  - "Open the console" in the console's brand orange.
+- **Hero:** the one-line explanation sits on a frosted caption, the tagline has a dark
+  halo, and the shade behind the logo is a little firmer.
+- **Pointer glow:** the glow that followed the pointer over the glass cards is removed,
+  CSS and handler both. The signal-head cursor itself is the console-wide one and stays.
+

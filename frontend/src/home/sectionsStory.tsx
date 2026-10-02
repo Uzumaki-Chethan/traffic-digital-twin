@@ -167,7 +167,7 @@ export function Pillars() {
             const Viz = PILLAR_VIZ[p.key]
             return (
               <div key={p.key} className="pillar-slot">
-                <article className={`pillar pillar-${i} spot`}>
+                <article className={`pillar pillar-${i}`}>
                   <Viz />
                   <div className="pillar-row">
                     <span className="pillar-icon">
@@ -226,7 +226,7 @@ export function Pipeline() {
         {PIPELINE.map((s, i) => {
           const Icon = PIPE_ICON[s.key]
           return (
-            <article key={s.key} className="pipe-step spot">
+            <article key={s.key} className="pipe-step">
               <span className="pipe-num">{String(i + 1).padStart(2, '0')}</span>
               <span className="pipe-chip">{s.short}</span>
               <span className="pipe-big" aria-hidden>
@@ -248,7 +248,7 @@ export function Pipeline() {
             </article>
           )
         })}
-        <article className="pipe-step pipe-again spot">
+        <article className="pipe-step pipe-again">
           <span className="pipe-icon">
             <Repeat size={26} aria-hidden />
           </span>
@@ -330,27 +330,27 @@ export function Results() {
           Not a fixed timer: the comparison is a vehicle-actuated controller (VAC), the kind that extends a green while cars keep coming. Both run the exact same traffic at the same time, in lockstep.
         </p>
         <div className="res-stats">
-          <div className="res-stat spot">
+          <div className="res-stat">
             <b>
               <Counter to={HEADLINES.scenariosWon} />
               <small>/13</small>
             </b>
             <span className="cap">scenarios won</span>
           </div>
-          <div className="res-stat spot">
+          <div className="res-stat">
             <b>
               <Counter to={HEADLINES.metrics} />
               <small>/7</small>
             </b>
             <span className="cap">metrics won or tied, in every scenario</span>
           </div>
-          <div className="res-stat spot">
+          <div className="res-stat">
             <b>
               <Counter to={HEADLINES.bestWaitCut} decimals={1} suffix="%" />
             </b>
             <span className="cap">less waiting, at best ({scenarioName('normal_traffic_seed1')})</span>
           </div>
-          <div className="res-stat spot">
+          <div className="res-stat">
             <b>
               <Counter to={PREDICTION.betterThanGuessPct} suffix="%" />
             </b>
@@ -358,7 +358,7 @@ export function Results() {
           </div>
         </div>
 
-        <div className="res-bars spot" data-reveal>
+        <div className="res-bars" data-reveal>
           <div className="res-tabs" role="tablist" aria-label="Metric">
             {METRICS.map((m) => (
               <button key={m.key} type="button" role="tab" aria-selected={metric === m.key} className={metric === m.key ? 'on' : ''} onClick={() => setMetric(m.key)}>

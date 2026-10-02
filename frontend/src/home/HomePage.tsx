@@ -7,6 +7,7 @@ import { ArrowRight } from 'lucide-react'
 import { useRunStore } from '@/data/runState'
 import { TrafficCursor } from '@/layout/TrafficCursor'
 import eye from '@/assets/trinetra-eye.png'
+import wordmark from '@/assets/trinetra-wordmark.png'
 import { MorningCity } from './MorningCity'
 import { Hero, Pillars, Pipeline, Problem, Results } from './sectionsStory'
 import { ConsoleTour, Finale, Resilience, Rig, Scenarios } from './sectionsShow'
@@ -72,21 +73,6 @@ export function HomePage() {
     window.addEventListener('scroll', onProgress, { passive: true })
     onProgress()
 
-    // the glass cards' spotlight follows the pointer
-    let lit: HTMLElement | null = null
-    const onPointer = (e: PointerEvent) => {
-      const card = (e.target as Element | null)?.closest?.<HTMLElement>('.spot') ?? null
-      if (lit && lit !== card) {
-        lit.style.removeProperty('--mx')
-        lit.style.removeProperty('--my')
-      }
-      lit = card
-      if (!card) return
-      const r = card.getBoundingClientRect()
-      card.style.setProperty('--mx', `${e.clientX - r.left}px`)
-      card.style.setProperty('--my', `${e.clientY - r.top}px`)
-    }
-    window.addEventListener('pointermove', onPointer, { passive: true })
 
     // every [data-reveal] rises in as it enters (sections add their own scenes)
     const ctx = gsap.context(() => {
@@ -111,7 +97,6 @@ export function HomePage() {
     return () => {
       window.clearTimeout(refresh)
       window.removeEventListener('scroll', onProgress)
-      window.removeEventListener('pointermove', onPointer)
       ctx.revert()
       chapterTriggers.forEach((t) => t?.kill())
       topTrigger.kill()
@@ -138,9 +123,9 @@ export function HomePage() {
       <div ref={bar} className="home-progress" aria-hidden />
 
       <header className={scrolled ? 'home-top scrolled' : 'home-top'}>
-        <Link to="/" className="flex items-center gap-2.5" aria-label="Trinetra home">
-          <img src={eye} alt="" className="h-9 w-auto drop-shadow-[0_0_12px_rgba(255,120,40,0.45)]" />
-          <span className="home-top-word font-display text-[15px] font-bold tracking-[0.18em] text-white">TRINETRA</span>
+        <Link to="/" className="home-brand" aria-label="Trinetra home">
+          <img src={eye} alt="" />
+          <img src={wordmark} alt="" className="home-top-word" />
         </Link>
         <nav className="home-links" aria-label="Sections">
           {CHAPTERS.filter((c) => c.top).map((c) => (

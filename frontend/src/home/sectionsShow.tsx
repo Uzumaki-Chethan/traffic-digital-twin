@@ -53,7 +53,7 @@ export function Resilience() {
             const Icon = RES_ICON[r.key]
             return (
               <div key={r.key} className="res-slot">
-                <article className={`res-card spot fx-${r.key}`}>
+                <article className={`res-card fx-${r.key}`}>
                   <div className="res-fx" aria-hidden>
                     <Icon size={30} />
                     <span className="fx-layer" />
@@ -115,7 +115,7 @@ export function Scenarios() {
                 const res = resultOf.get(id)
                 return (
                   <div key={id} className="scn-slot">
-                    <Link to="/settings" className="scn-card spot" aria-label={`${s.name} — open Simulation Settings`}>
+                    <Link to="/settings" className="scn-card" aria-label={`${s.name} — open Simulation Settings`}>
                       <div className="scn-preview">
                         <ScenarioPreview id={id} seed={gi * 10 + i + 1} />
                       </div>
