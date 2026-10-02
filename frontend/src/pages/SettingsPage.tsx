@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Panel } from '@/ui/Panel'
+import { Glyph } from '@/ui/Panel'
 import { Reveal } from '@/ui/Reveal'
 import { ScenarioCard, type ScenarioUse } from '@/settings/ScenarioCard'
 import { TargetPicker } from '@/settings/TargetPicker'
@@ -56,43 +56,43 @@ export function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-3.5">
+      {/* A slim strip, like Analytics' "This run": the cards below sit on
+          the frosted page itself, the way every other page's cards do —
+          not nested inside one big panel. */}
       <Reveal index={0}>
-        <Panel explain="st-cards"
-          title="Scenario"
-          meta={
-            locked
-              ? 'Stop the current run to change'
-              : <span>Selected: <span className="text-ink-strong">{scenarioName(selected)}</span></span>
-          }
-          bodyClassName="px-3 pb-3"
-        >
-          <div className="mb-3.5 flex flex-wrap items-center gap-x-5 gap-y-2">
-            <div data-explain="st-for" className="flex items-center gap-2.5">
-              <span className="eyebrow">Choose for</span>
-              <TargetPicker value={target} onChange={setTarget} />
-            </div>
-            <p className="min-w-0 flex-1 text-[13px] leading-[1.55] text-ink">{current.lead}</p>
+        <div className="glass-card flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2.5">
+          <h2 className="panel-title shrink-0">
+            <Glyph s="green" />
+            Scenario
+          </h2>
+          <div data-explain="st-for" className="flex items-center gap-2.5">
+            <span className="eyebrow">Choose for</span>
+            <TargetPicker value={target} onChange={setTarget} />
           </div>
-          <div className="grid grid-cols-2 gap-3.5 xl:grid-cols-3">
-            {DEMO_SCENARIOS.map((s, i) => {
-              const usedBy: ScenarioUse[] = []
-              if (s.id === demoScenario) usedBy.push('overview')
-              if (s.id === evalScenario) usedBy.push('performance')
-              return (
-                <ScenarioCard
-                  key={s.id}
-                  scenario={s}
-                  index={i}
-                  selected={s.id === selected}
-                  disabled={locked}
-                  usedBy={usedBy}
-                  onSelect={() => (forOverview ? setDemo(s.id) : setEval(s.id))}
-                />
-              )
-            })}
+          <p className="min-w-0 flex-1 text-[13px] leading-[1.55] text-ink">{current.lead}</p>
+          <div className="num ml-auto shrink-0 text-right text-[12px] text-ink-mute">
+            {locked ? 'Stop the current run to change' : <span>Selected: <span className="text-ink-strong">{scenarioName(selected)}</span></span>}
           </div>
-        </Panel>
+        </div>
       </Reveal>
+      <div data-explain="st-cards" className="grid grid-cols-2 gap-3.5 xl:grid-cols-3">
+        {DEMO_SCENARIOS.map((s, i) => {
+          const usedBy: ScenarioUse[] = []
+          if (s.id === demoScenario) usedBy.push('overview')
+          if (s.id === evalScenario) usedBy.push('performance')
+          return (
+            <ScenarioCard
+              key={s.id}
+              scenario={s}
+              index={i}
+              selected={s.id === selected}
+              disabled={locked}
+              usedBy={usedBy}
+              onSelect={() => (forOverview ? setDemo(s.id) : setEval(s.id))}
+            />
+          )
+        })}
+      </div>
     </div>
   )
 }
