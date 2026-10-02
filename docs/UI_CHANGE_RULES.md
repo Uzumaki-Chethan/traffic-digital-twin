@@ -201,25 +201,40 @@ change on the page you touched (and any page you moved something to or from).
   the `data-explain` tags on every panel. The owner wrote: "remove all the files regarding
   the robo, everything we are not implementing it". Section 42.
 
-### Home page (2026-10-02, Section 44) — part of the inventory
+### Home page (2026-10-02, Sections 44–45) — part of the inventory
 
 The home page is at `/`, full-screen, outside the console frame. Overview moved to
 `/overview`, and the rail has a Home item first. The page holds:
 - the live night-city background;
-- the eye logo, wordmark, tagline and one-line explanation;
+- navigation:
+  - the top bar's section links (How it works, Results, Scenarios, The console,
+    Physical model; hidden below 1180 px);
+  - the chapter navigator on the right edge (ten chapters; hidden below 900 px);
+- the eye logo, wordmark, tagline and one-line explanation, plus the four fact chips
+  under it (13/13 scenarios won, 15s look-ahead, 1 decision every second, best wait cut);
 - "Open the console" (in the hero, the top bar and the finale) and "See how it works";
 - the live-run badge in the top bar;
-- the problem statement with its little junction scene;
-- the three pillars (Sees / Predicts / Decides);
-- the six-step "how it works" pipeline;
+- the problem statement with its scroll-played junction:
+  - "On a clock", then "With Trinetra";
+  - the waiting-cars counter;
+- the three pillars (Sees / Predicts / Decides), each with its little picture (sweep,
+  forecast line, scored phases);
+- the six-step "how it works" pipeline, with its icons and the closing "And again." card;
 - the results:
   - the four counters (13/13, 7/7 won or tied, best wait cut, 47% better forecasts);
   - the per-scenario bars with their metric tabs and the honest footnote;
+  - each row opens to all seven measures for that scenario;
 - the six "built for the unexpected" cards;
-- all 13 scenarios in four groups, each with its live preview;
-- the five-page console tour with real screenshots;
-- the physical-model section with the animated four-lens head;
-- the "Built with" marquee and the finale.
+- all 13 scenarios in four groups:
+  - each with its live preview;
+  - its own result (less waiting %, measures out of 7);
+  - a link to Simulation Settings;
+- the five-page console tour with real screenshots (inline under each page on phones);
+- the physical-model section:
+  - the animated four-lens head with its four lens labels;
+  - the Console → USB → ESP32 → lamps chain;
+- the "Built with" marquee and the finale;
+- the footer (logo and tagline, links to all five console pages, back to top).
 
 Every number comes from `home/content.ts`, which is transcribed from README.md's results;
 its tests fail if a headline is typed in rather than computed.

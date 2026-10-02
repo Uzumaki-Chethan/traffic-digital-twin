@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
@@ -13,6 +13,20 @@ import { ConsoleTour, Finale, Resilience, Rig, Scenarios } from './sectionsShow'
 import './home.css'
 
 gsap.registerPlugin(ScrollTrigger)
+
+/** The page's chapters, for the side navigator and the top bar. */
+const CHAPTERS: { id: string; label: string; top?: boolean }[] = [
+  { id: 'top', label: 'Trinetra' },
+  { id: 'problem', label: 'The problem' },
+  { id: 'what', label: 'What it is' },
+  { id: 'how', label: 'How it works', top: true },
+  { id: 'results', label: 'Results', top: true },
+  { id: 'unexpected', label: 'The unexpected' },
+  { id: 'scenarios', label: 'Scenarios', top: true },
+  { id: 'console', label: 'The console', top: true },
+  { id: 'rig', label: 'Physical model', top: true },
+  { id: 'start', label: 'Start' },
+]
 
 const reduced = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -31,6 +45,8 @@ export function HomePage() {
   const still = reduced()
   const run = useRunStore((s) => s.state)
   const lenisRef = useRef<Lenis | null>(null)
+  const [chapter, setChapter] = useState(0)
+  const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
     document.title = 'Trinetra — AI traffic signal control'
@@ -56,6 +72,22 @@ export function HomePage() {
     window.addEventListener('scroll', onProgress, { passive: true })
     onProgress()
 
+    // the glass cards' spotlight follows the pointer
+    let lit: HTMLElement | null = null
+    const onPointer = (e: PointerEvent) => {
+      const card = (e.target as Element | null)?.closest?.<HTMLElement>('.spot') ?? null
+      if (lit && lit !== card) {
+        lit.style.removeProperty('--mx')
+        lit.style.removeProperty('--my')
+      }
+      lit = card
+      if (!card) return
+      const r = card.getBoundingClientRect()
+      card.style.setProperty('--mx', `${e.clientX - r.left}px`)
+      card.style.setProperty('--my', `${e.clientY - r.top}px`)
+    }
+    window.addEventListener('pointermove', onPointer, { passive: true })
+
     // every [data-reveal] rises in as it enters (sections add their own scenes)
     const ctx = gsap.context(() => {
       if (still) return
@@ -64,12 +96,25 @@ export function HomePage() {
         onEnter: (els) => gsap.to(els, { opacity: 1, y: 0, filter: 'blur(0px)', duration: 1, ease: 'power3.out', stagger: 0.09, overwrite: true }),
       })
     }, root)
+    // which chapter is on screen (created after the sections' own pins, so
+    // their spacing is already counted)
+    const chapterTriggers = CHAPTERS.map((c, i) => {
+      const el = document.getElementById(c.id)
+      // a pinned section is measured by its spacer, which spans the whole pin
+      const trigger = el?.parentElement?.classList.contains('pin-spacer') ? el.parentElement : el
+      return trigger ? ScrollTrigger.create({ trigger, start: 'top 55%', end: 'bottom 55%', onToggle: (self) => self.isActive && setChapter(i) }) : null
+    })
+    const topTrigger = ScrollTrigger.create({ start: 120, end: 'max', onToggle: (self) => setScrolled(self.isActive) })
+
     // layout settles after fonts/images; let the triggers re-measure
     const refresh = window.setTimeout(() => ScrollTrigger.refresh(), 600)
     return () => {
       window.clearTimeout(refresh)
       window.removeEventListener('scroll', onProgress)
+      window.removeEventListener('pointermove', onPointer)
       ctx.revert()
+      chapterTriggers.forEach((t) => t?.kill())
+      topTrigger.kill()
       if (tick) gsap.ticker.remove(tick)
       lenis?.destroy()
       lenisRef.current = null
@@ -80,8 +125,10 @@ export function HomePage() {
   const scrollTo = (id: string) => {
     const el = document.getElementById(id)
     if (!el) return
-    if (lenisRef.current) lenisRef.current.scrollTo(el, { duration: 1.6 })
-    else window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY })
+    // a pinned section's spacer starts where the section does
+    const target = el.parentElement?.classList.contains('pin-spacer') ? el.parentElement : el
+    if (lenisRef.current) lenisRef.current.scrollTo(target, { duration: 1.6 })
+    else window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY })
   }
 
   return (
@@ -90,11 +137,18 @@ export function HomePage() {
       <div className="home-vignette" aria-hidden />
       <div ref={bar} className="home-progress" aria-hidden />
 
-      <header className="home-top">
+      <header className={scrolled ? 'home-top scrolled' : 'home-top'}>
         <Link to="/" className="flex items-center gap-2.5" aria-label="Trinetra home">
           <img src={eye} alt="" className="h-9 w-auto drop-shadow-[0_0_12px_rgba(255,120,40,0.45)]" />
-          <span className="font-display text-[15px] font-bold tracking-[0.18em] text-white">TRINETRA</span>
+          <span className="home-top-word font-display text-[15px] font-bold tracking-[0.18em] text-white">TRINETRA</span>
         </Link>
+        <nav className="home-links" aria-label="Sections">
+          {CHAPTERS.filter((c) => c.top).map((c) => (
+            <button key={c.id} type="button" className={CHAPTERS[chapter].id === c.id ? 'on' : ''} onClick={() => scrollTo(c.id)}>
+              {c.label}
+            </button>
+          ))}
+        </nav>
         <div className="flex items-center gap-3">
           {run?.running && (
             <Link to={run.kind === 'evaluation' ? '/performance' : '/overview'} className="home-live">
@@ -107,6 +161,15 @@ export function HomePage() {
         </div>
       </header>
 
+      <nav className="home-chapters" aria-label="Chapters">
+        {CHAPTERS.map((c, i) => (
+          <button key={c.id} type="button" className={i === chapter ? 'on' : ''} onClick={() => scrollTo(c.id)} aria-label={c.label} aria-current={i === chapter ? 'true' : undefined}>
+            <span>{c.label}</span>
+            <i />
+          </button>
+        ))}
+      </nav>
+
       <main>
         <Hero onMore={() => scrollTo('problem')} />
         <Problem />
@@ -117,7 +180,7 @@ export function HomePage() {
         <Scenarios />
         <ConsoleTour />
         <Rig />
-        <Finale />
+        <Finale onTop={() => scrollTo('top')} />
       </main>
       <TrafficCursor />
     </div>

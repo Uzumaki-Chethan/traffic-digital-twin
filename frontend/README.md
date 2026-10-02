@@ -19,6 +19,9 @@ console frame:
   scroll and which drops its own quality on a slow machine;
 - smooth scrolling (Lenis) and GSAP ScrollTrigger scenes;
 - all its words and numbers in `content.ts`, tested against README.md's results;
+- the problem section's junction story in `ProblemScene.tsx`, a pure function of scroll
+  progress with its rules under test;
+- the pillar pictures in `PillarViz.tsx`, which are illustrations and show no numbers;
 - real console screenshots in `src/assets/home/`, which should be retaken if the console
   changes a lot.
 

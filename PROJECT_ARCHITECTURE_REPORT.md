@@ -4496,3 +4496,98 @@ and, while a run is up, a live badge linking to it.
 
 **Not judged here:** animation smoothness. The build machine's test browser renders WebGL
 at about 1 fps, so smoothness is for the demo laptop to judge.
+
+## SECTION 45 — The home page, second pass (CURRENT STATE)
+
+*2026-10-02 · branch `main` · `frontend/src/home/` · supersedes the matching parts of
+Section 44*
+
+**Request (owner):** after the first version, "there is a very lot of room for
+enhancement and improvement … take your time and do it". This pass is the result. Every
+item is an improvement, not a removal; nothing in Section 44's inventory was lost.
+
+**Background** (`CityTrails.tsx`):
+- **Towers:**
+  - They use a custom shader instead of a stretched window texture.
+  - Windows are laid out per floor in world metres (3 m bays, 3.5 m floors), so a tall
+    tower has many normal windows rather than a few giant ones.
+  - Windows are lit at random, warm or cool; whole floors sometimes go dark, and a few
+    flicker.
+  - Side faces are darker, and street light washes up the lowest floors.
+  - Tall towers get a lit cornice; outer blocks grow taller with distance, a skyline.
+- **Light trails:** they are now two crossed planes with a tail-to-head fade texture
+  (additive, pointed the way the car travels) instead of solid boxes, so they read as
+  long-exposure streaks.
+- **New scenery:**
+  - a sky dome (navy overhead, an amber city haze at the horizon), stars, amber centre
+    lines;
+  - red rooftop beacons on towers over 90 m (round, a fixed few pixels, blinking);
+  - three rings sweeping out from the junction (the eye watching).
+- **Sparks:** round now.
+- **Slow machines:** the self-protecting quality step also hides the stars.
+
+**Page structure (`HomePage.tsx`):**
+- **Chapter navigator:** fixed on the right, ten chapters; a click scrolls there.
+  Hidden on phones.
+- **Top bar:** section links that follow the scroll. The bar tightens once you scroll.
+- **Measuring pinned sections:** a pinned section is measured by its pin spacer. Both the
+  chapter triggers and `scrollTo` use it, because the section itself never leaves the
+  top while pinned.
+- **Card spotlight:** glass cards (`.spot`) light up around the pointer, with a glowing
+  edge.
+
+**Sections:**
+- **Hero:** four fact chips, all real numbers from `content.ts`.
+- **The problem** (`ProblemScene.tsx`): the old static drawing is now a story the scroll
+  plays, pinned for 220%.
+  - *On a clock:* East–West holds green over an empty road ("green · nobody here") while
+    seven cars queue on each North–South arm.
+  - *The change:* East–West amber, then red.
+  - *With Trinetra:* North–South green and the queues drain.
+  - The strip under it shows the mode and a counter. The count is exactly the cars drawn,
+    nothing measured.
+  - It is a pure function of progress `p`, so it scrubs both ways.
+  - `__tests__/problemScene.test.ts` checks three things: never green both ways, amber
+    before the switch, and the queue built and then cleared.
+- **Pillars** (`PillarViz.tsx`): each card has a picture.
+  - *Sees:* a radar sweep lights the vehicles as it passes.
+  - *Predicts:* the past line draws in, then a dashed forecast with its band and
+    now/+15 s marks.
+  - *Decides:* four phase bars re-scored every 1.8 s, the winner green.
+  - These are illustrations with no numbers on them.
+- **Pipeline:** an icon per step (step 6 is a cycling mini signal), large ghost step
+  numbers, and a closing *And again.* card. It says 3,600 decisions per simulated hour,
+  which is the 1 Hz cadence.
+- **Results:** each scenario row opens to all seven measures, from `RESULTS`; a 0 shows
+  as "tied", and throughput is always tied.
+- **Scenarios:** each card shows its own result (less waiting %, n/7 measures) and links
+  to Simulation Settings.
+  - The preview only brightens on hover. It never scales, because `ScenarioPreview`
+    sizes its canvas from its own on-screen box.
+- **Console tour:**
+  - the frame tilts in;
+  - page dots sit in the frame's bar;
+  - a slow pan runs on the active shot;
+  - on phones, each page's screenshot sits inline under its text.
+- **Physical model:**
+  - the head's four lenses get labels whose lines draw in;
+  - a "Console → USB → ESP32 → 4 heads · 16 lamps" chain, with a packet running along
+    each wire.
+- **Footer:** the logo and tagline, links to all five console pages, and *Back to top*.
+
+**Phones:**
+- the top-bar button never wraps;
+- the wordmark text hides below 480 px (the eye stays);
+- the tagline tightens;
+- the problem's controls moved out of the drawing so they never cover the queue.
+
+**Verified:**
+- tsc, oxlint and the production build are clean.
+- 25 frontend tests (3 new) and 114 backend tests pass.
+- Every changed section was photographed at 1440×900 in animated mode and at 390×844
+  with reduced motion.
+- The navigator reaches all ten chapters.
+- Top-bar and *Back to top* clicks land correctly.
+- A full scroll produces no errors.
+- As before, smoothness can't be judged in the build machine's test browser (about
+  1 fps); the quality step still protects slow machines.

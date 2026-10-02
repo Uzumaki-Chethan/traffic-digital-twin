@@ -2,15 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import { ArrowRight, Ambulance, CloudRain, Scale, ShieldCheck, TrafficCone, Waves } from 'lucide-react'
+import { ArrowRight, ArrowUp, Ambulance, CloudRain, Cpu, Lightbulb, Monitor, Scale, ShieldCheck, TrafficCone, Waves } from 'lucide-react'
 import { ScenarioPreview } from '@/settings/ScenarioPreview'
+import eye from '@/assets/trinetra-eye.png'
 import { EVAL_SCENARIOS } from '@/data/scenarios'
 import shotOverview from '@/assets/home/overview.webp'
 import shotPerformance from '@/assets/home/performance.webp'
 import shotAnalytics from '@/assets/home/analytics.webp'
 import shotDecisions from '@/assets/home/decisions.webp'
 import shotSettings from '@/assets/home/settings.webp'
-import { CONSOLE_PAGES, RESILIENCE, SCENARIO_GROUPS, STACK } from './content'
+import { CONSOLE_PAGES, RESILIENCE, RESULTS, SCENARIO_GROUPS, STACK } from './content'
 
 const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -43,7 +44,7 @@ export function Resilience() {
     })
   })
   return (
-    <section ref={ref} className="home-section">
+    <section ref={ref} className="home-section" id="unexpected">
       <div className="home-wrap">
         <p className="home-eyebrow" data-reveal>
           Built for the unexpected
@@ -55,7 +56,7 @@ export function Resilience() {
           {RESILIENCE.map((r) => {
             const Icon = RES_ICON[r.key]
             return (
-              <article key={r.key} className={`res-card fx-${r.key}`}>
+              <article key={r.key} className={`res-card spot fx-${r.key}`}>
                 <div className="res-fx" aria-hidden>
                   <Icon size={30} />
                   <span className="fx-layer" />
@@ -90,6 +91,7 @@ export function Scenarios() {
     })
   })
   const byId = new Map(EVAL_SCENARIOS.map((s) => [s.id, s]))
+  const resultOf = new Map(RESULTS.map((r) => [r.id, r]))
   return (
     <section ref={ref} className="home-section" id="scenarios">
       <div className="home-wrap">
@@ -100,7 +102,7 @@ export function Scenarios() {
           Every kind of day, <span className="grad">tested.</span>
         </h2>
         <p className="home-lead" data-reveal>
-          Each one is a full traffic simulation you can run from the console — watch the AI on its own, or race it against the vehicle-actuated signal.
+          Each one is a full traffic simulation you can run from the console — watch the AI on its own, or race it against the vehicle-actuated signal. Under each: how Trinetra did against that signal.
         </p>
         {SCENARIO_GROUPS.map((g, gi) => (
           <div key={g.title} className="scn-group">
@@ -115,8 +117,9 @@ export function Scenarios() {
               {g.ids.map((id, i) => {
                 const s = byId.get(id)
                 if (!s) return null
+                const res = resultOf.get(id)
                 return (
-                  <article key={id} className="scn-card">
+                  <Link key={id} to="/settings" className="scn-card spot" aria-label={`${s.name} — open Simulation Settings`}>
                     <div className="scn-preview">
                       <ScenarioPreview id={id} seed={gi * 10 + i + 1} />
                     </div>
@@ -126,8 +129,18 @@ export function Scenarios() {
                         <span className={`scn-tag tag-${s.demand}`}>{DEMAND_LABEL[s.demand]}</span>
                       </div>
                       <p>{s.blurb}</p>
+                      {res && (
+                        <div className="scn-result">
+                          <span>
+                            <b>{res.wait.toFixed(1)}%</b> less waiting
+                          </span>
+                          <span>
+                            <b>{res.wins}/7</b> measures
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  </article>
+                  </Link>
                 )
               })}
             </div>
@@ -159,6 +172,16 @@ export function ConsoleTour() {
     )
     return () => triggers.forEach((t) => t.kill())
   }, [])
+  useScene(ref, () => {
+    gsap.from('.tour-frame', {
+      rotateX: 22,
+      rotateY: -14,
+      scale: 0.88,
+      opacity: 0.4,
+      ease: 'none',
+      scrollTrigger: { trigger: '.tour', start: 'top bottom', end: 'top 30%', scrub: 0.6 },
+    })
+  })
   return (
     <section ref={ref} className="home-section" id="console">
       <div className="home-wrap">
@@ -180,6 +203,7 @@ export function ConsoleTour() {
                     <li key={pt}>{pt}</li>
                   ))}
                 </ul>
+                <img src={SHOTS[p.key]} alt="" className="tour-inline" loading="lazy" />
                 <Link to={p.path} className="tour-link">
                   Open {p.name} <ArrowRight size={14} aria-hidden />
                 </Link>
@@ -193,6 +217,11 @@ export function ConsoleTour() {
                 <i />
                 <i />
                 <span>{CONSOLE_PAGES[active].name}</span>
+                <b className="tour-dots">
+                  {CONSOLE_PAGES.map((p, i) => (
+                    <em key={p.key} className={i === active ? 'on' : ''} />
+                  ))}
+                </b>
               </div>
               <div className="tour-shots">
                 {CONSOLE_PAGES.map((p, i) => (
@@ -225,11 +254,14 @@ const SEQ: [Lamp, Lamp, Lamp, Lamp][] = [
 ]
 const COLOUR: Record<Lamp, string> = { R: '#ff2b20', A: '#ffb300', G: '#38e070', '0': '#1b1f28' }
 
+const LENS_LABELS = ['Red · shared by every movement', 'Amber · shared', 'Left + ahead · one arrow', 'Right turn · its own arrow']
+const LENS_Y = [60, 146, 232, 318]
+
 function SignalHead({ phase }: { phase: number }) {
   const lamps = SEQ[phase % SEQ.length]
   const glow = (l: Lamp) => (l === '0' ? undefined : `drop-shadow(0 0 8px ${COLOUR[l]}) drop-shadow(0 0 18px ${COLOUR[l]})`)
   return (
-    <svg viewBox="0 0 120 380" className="rig-head" role="img" aria-label="A four-lens signal head">
+    <svg viewBox="0 0 400 380" className="rig-head" role="img" aria-label="A four-lens signal head: red, amber, a combined left-and-ahead arrow, and a right arrow">
       <rect x="6" y="6" width="108" height="368" rx="22" fill="#0b0e15" stroke="#2a3346" strokeWidth="3" />
       <circle cx="60" cy="60" r="34" fill={COLOUR[lamps[0]]} style={{ filter: glow(lamps[0]), transition: 'fill .35s' }} />
       <circle cx="60" cy="146" r="34" fill={COLOUR[lamps[1]]} style={{ filter: glow(lamps[1]), transition: 'fill .35s' }} />
@@ -237,7 +269,40 @@ function SignalHead({ phase }: { phase: number }) {
       <polygon points={COMBINED} transform="translate(64 232) scale(58 -58)" fill={COLOUR[lamps[2]]} style={{ filter: glow(lamps[2]), transition: 'fill .35s' }} />
       <circle cx="60" cy="318" r="36" fill="#05070b" />
       <polygon points={RIGHT} transform="translate(58 318) scale(58 -58)" fill={COLOUR[lamps[3]]} style={{ filter: glow(lamps[3]), transition: 'fill .35s' }} />
+      {LENS_LABELS.map((t, i) => (
+        <g key={t} className="rig-call">
+          <path d={`M100 ${LENS_Y[i]} H150 L165 ${LENS_Y[i] - 14} H392`} className="rig-call-line" pathLength={1} />
+          <circle cx={100} cy={LENS_Y[i]} r={3} fill="#ffb020" />
+          <text x={168} y={LENS_Y[i] - 22} className="rig-call-text">
+            {t}
+          </text>
+        </g>
+      ))}
     </svg>
+  )
+}
+
+function RigChain() {
+  return (
+    <div className="rig-chain" aria-label="Console, then a USB cable, then the ESP32 board, then the four signal heads">
+      <span className="rig-node">
+        <Monitor size={18} aria-hidden /> Console
+      </span>
+      <span className="rig-wire" aria-hidden>
+        <i />
+        <em>USB</em>
+      </span>
+      <span className="rig-node">
+        <Cpu size={18} aria-hidden /> ESP32
+      </span>
+      <span className="rig-wire" aria-hidden>
+        <i />
+        <em>LEDs</em>
+      </span>
+      <span className="rig-node">
+        <Lightbulb size={18} aria-hidden /> 4 heads · 16 lamps
+      </span>
+    </div>
   )
 }
 
@@ -251,6 +316,8 @@ export function Rig() {
   }, [])
   useScene(ref, () => {
     gsap.from('.rig-head', { opacity: 0, y: 120, rotateY: 50, duration: 1.4, ease: 'power3.out', scrollTrigger: { trigger: '.rig', start: 'top 75%' } })
+    gsap.from('.rig-call-line', { strokeDashoffset: 1, stagger: 0.18, duration: 1.1, ease: 'power2.inOut', scrollTrigger: { trigger: '.rig', start: 'top 60%' } })
+    gsap.from('.rig-call-text', { opacity: 0, x: -14, stagger: 0.18, duration: 0.8, delay: 0.5, ease: 'power2.out', scrollTrigger: { trigger: '.rig', start: 'top 60%' } })
   })
   return (
     <section ref={ref} className="home-section" id="rig">
@@ -276,8 +343,9 @@ export function Rig() {
               <b>Fail-safe:</b> if the link drops, every head blinks amber — like a real signal in fault mode.
             </li>
           </ul>
+          <RigChain />
         </div>
-        <div className="rig-stage" aria-hidden>
+        <div className="rig-stage">
           <SignalHead phase={phase} />
         </div>
       </div>
@@ -287,13 +355,13 @@ export function Rig() {
 
 // ---------------------------------------------------------------- finale
 
-export function Finale() {
+export function Finale({ onTop }: { onTop: () => void }) {
   const ref = useRef<HTMLElement>(null)
   useScene(ref, () => {
     gsap.from('.finale-title', { opacity: 0, scale: 0.7, filter: 'blur(14px)', duration: 1.4, ease: 'power4.out', scrollTrigger: { trigger: '.finale-title', start: 'top 85%' } })
   })
   return (
-    <section ref={ref} className="home-finale">
+    <section ref={ref} className="home-finale" id="start">
       <div className="stack-marquee" aria-label="Built with">
         <div className="stack-track">
           {[...STACK, ...STACK].map((s, i) => (
@@ -309,8 +377,26 @@ export function Finale() {
         <Link to="/overview" className="home-cta big">
           Open the console <ArrowRight size={20} aria-hidden />
         </Link>
-        <p className="finale-foot">Trinetra · Smarter Signals, Safer Cities</p>
       </div>
+      <footer className="home-wrap home-foot">
+        <div className="foot-brand">
+          <img src={eye} alt="" />
+          <div>
+            <b>TRINETRA</b>
+            <span>Smarter Signals · Safer Cities</span>
+          </div>
+        </div>
+        <nav aria-label="Console pages">
+          {CONSOLE_PAGES.map((p) => (
+            <Link key={p.key} to={p.path}>
+              {p.name}
+            </Link>
+          ))}
+        </nav>
+        <button type="button" className="foot-top" onClick={onTop}>
+          Back to top <ArrowUp size={14} aria-hidden />
+        </button>
+      </footer>
     </section>
   )
 }

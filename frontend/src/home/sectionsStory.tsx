@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import gsap from 'gsap'
-import { ArrowDown, ArrowRight, BrainCircuit, Eye, TrendingUp } from 'lucide-react'
+import { Activity, ArrowDown, ArrowRight, BrainCircuit, Car, ChevronDown, Eye, Repeat, ScanEye, TrendingUp, type LucideIcon } from 'lucide-react'
 import eye from '@/assets/trinetra-eye.png'
 import wordmark from '@/assets/trinetra-wordmark.png'
 import { scenarioName } from '@/data/scenarios'
+import { ProblemScene } from './ProblemScene'
+import { DecidesViz, PredictsViz, SeesViz } from './PillarViz'
 import { HEADLINES, PILLARS, PIPELINE, PREDICTION, RESULTS, type ResultRow } from './content'
 
 const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -32,6 +34,7 @@ export function Hero({ onMore }: { onMore: () => void }) {
       .from('.hero-tag span', { y: 40, opacity: 0, stagger: 0.12, duration: 0.9 }, '-=0.7')
       .from('.hero-line', { y: 30, opacity: 0, filter: 'blur(8px)', duration: 1 }, '-=0.5')
       .from('.hero-actions > *', { y: 24, opacity: 0, stagger: 0.12, duration: 0.8 }, '-=0.6')
+      .from('.hero-facts li', { y: 16, opacity: 0, stagger: 0.08, duration: 0.6 }, '-=0.4')
       .from('.hero-cue', { opacity: 0, duration: 0.8 }, '-=0.3')
     // leaving the hero: it sinks back and fades as the page scrolls on
     gsap.to(el.querySelector('.hero-inner'), {
@@ -61,6 +64,20 @@ export function Hero({ onMore }: { onMore: () => void }) {
             See how it works
           </button>
         </div>
+        <ul className="hero-facts">
+          <li>
+            <b>{HEADLINES.scenariosWon}/13</b> scenarios won
+          </li>
+          <li>
+            <b>{PREDICTION.horizonSeconds}s</b> look-ahead
+          </li>
+          <li>
+            <b>1</b> decision every second
+          </li>
+          <li>
+            <b>{HEADLINES.bestWaitCut.toFixed(0)}%</b> less waiting, at best
+          </li>
+        </ul>
       </div>
       <button type="button" className="hero-cue" onClick={onMore} aria-label="Scroll down">
         <ArrowDown size={20} aria-hidden />
@@ -82,12 +99,16 @@ const PROBLEM_2 = 'They hand a green to an empty road while a queue waits at red
 
 export function Problem() {
   const ref = useRef<HTMLElement>(null)
+  // with reduced motion the scene simply shows the problem itself
+  const [p, setP] = useState(0.45)
   useScene(ref, (el) => {
     const words = el.querySelectorAll('.pw')
-    gsap.timeline({ scrollTrigger: { trigger: el, start: 'top top', end: '+=140%', scrub: 0.6, pin: true } })
-      .to(words, { color: '#ffffff', textShadow: '0 0 24px rgba(255,170,90,0.35)', stagger: 0.12, ease: 'none' })
-      .from('.problem-scene', { opacity: 0, y: 60, scale: 0.9, ease: 'none' }, 0.2)
-      .to('.problem-answer', { opacity: 1, y: 0, ease: 'none' }, '>-0.2')
+    setP(0)
+    gsap
+      .timeline({ scrollTrigger: { trigger: el, start: 'top top', end: '+=220%', scrub: 0.6, pin: true, onUpdate: (self) => setP(self.progress) } })
+      .to(words, { color: '#ffffff', textShadow: '0 0 24px rgba(255,170,90,0.35)', stagger: { amount: 0.4 }, ease: 'none', duration: 0.05 }, 0)
+      .to('.problem-answer', { opacity: 1, y: 0, ease: 'none', duration: 0.12 }, 0.62)
+      .to({}, { duration: 0.26 })
   })
   return (
     <section ref={ref} className="home-problem" id="problem">
@@ -100,21 +121,7 @@ export function Problem() {
             Trinetra gives the green to <b>whoever actually needs it</b> — and can show you why.
           </p>
         </div>
-        <div className="problem-scene" aria-hidden>
-          {/* a red light with a queue, a green light with nobody */}
-          <div className="ps-road ps-h">
-            <div className="ps-queue">
-              {Array.from({ length: 7 }, (_, i) => (
-                <i key={i} style={{ animationDelay: `${i * 0.12}s` }} />
-              ))}
-            </div>
-            <span className="ps-lamp red" />
-          </div>
-          <div className="ps-road ps-v">
-            <span className="ps-lamp green" />
-            <em>empty</em>
-          </div>
-        </div>
+        <ProblemScene p={p} />
       </div>
     </section>
   )
@@ -123,6 +130,7 @@ export function Problem() {
 // ---------------------------------------------------------------- what it is
 
 const PILLAR_ICON = { sees: Eye, predicts: TrendingUp, decides: BrainCircuit } as const
+const PILLAR_VIZ = { sees: SeesViz, predicts: PredictsViz, decides: DecidesViz } as const
 
 export function Pillars() {
   const ref = useRef<HTMLElement>(null)
@@ -139,7 +147,7 @@ export function Pillars() {
     })
   })
   return (
-    <section ref={ref} className="home-section">
+    <section ref={ref} className="home-section" id="what">
       <div className="home-wrap">
         <p className="home-eyebrow" data-reveal>
           What Trinetra is
@@ -153,12 +161,16 @@ export function Pillars() {
         <div className="pillars">
           {PILLARS.map((p, i) => {
             const Icon = PILLAR_ICON[p.key]
+            const Viz = PILLAR_VIZ[p.key]
             return (
-              <article key={p.key} className={`pillar pillar-${i}`}>
-                <span className="pillar-icon">
-                  <Icon size={30} aria-hidden />
-                </span>
-                <h3>{p.title}</h3>
+              <article key={p.key} className={`pillar pillar-${i} spot`}>
+                <Viz />
+                <div className="pillar-row">
+                  <span className="pillar-icon">
+                    <Icon size={24} aria-hidden />
+                  </span>
+                  <h3>{p.title}</h3>
+                </div>
                 <p>{p.body}</p>
               </article>
             )
@@ -170,6 +182,8 @@ export function Pillars() {
 }
 
 // ---------------------------------------------------------------- how it works
+
+const PIPE_ICON: Record<string, LucideIcon | undefined> = { sim: Car, twin: ScanEye, features: Activity, predict: TrendingUp, decide: BrainCircuit }
 
 export function Pipeline() {
   const ref = useRef<HTMLElement>(null)
@@ -205,14 +219,38 @@ export function Pipeline() {
           <div className="pipe-fill" />
           <div className="pipe-pulse" />
         </div>
-        {PIPELINE.map((s, i) => (
-          <article key={s.key} className="pipe-step">
-            <span className="pipe-num">{String(i + 1).padStart(2, '0')}</span>
-            <span className="pipe-chip">{s.short}</span>
-            <h3>{s.title}</h3>
-            <p>{s.body}</p>
-          </article>
-        ))}
+        {PIPELINE.map((s, i) => {
+          const Icon = PIPE_ICON[s.key]
+          return (
+            <article key={s.key} className="pipe-step spot">
+              <span className="pipe-num">{String(i + 1).padStart(2, '0')}</span>
+              <span className="pipe-chip">{s.short}</span>
+              <span className="pipe-big" aria-hidden>
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <span className="pipe-icon">
+                {Icon ? (
+                  <Icon size={26} aria-hidden />
+                ) : (
+                  <span className="pipe-light" aria-hidden>
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                )}
+              </span>
+              <h3>{s.title}</h3>
+              <p>{s.body}</p>
+            </article>
+          )
+        })}
+        <article className="pipe-step pipe-again spot">
+          <span className="pipe-icon">
+            <Repeat size={26} aria-hidden />
+          </span>
+          <h3>And again.</h3>
+          <p>The whole loop runs once every simulated second — 3,600 decisions an hour, and the console shows the reasons behind each one.</p>
+        </article>
       </div>
     </section>
   )
@@ -254,9 +292,21 @@ const METRICS: { key: keyof ResultRow; label: string }[] = [
   { key: 'speed', label: 'Average speed' },
 ]
 
+/** All seven measures, for a row's breakdown (throughput is level by construction). */
+const ALL_MEASURES: { key: keyof ResultRow | null; label: string; better: string }[] = [
+  { key: 'wait', label: 'Waiting time', better: 'less' },
+  { key: 'travel', label: 'Journey time', better: 'shorter' },
+  { key: 'worstTravel', label: 'Worst journey', better: 'shorter' },
+  { key: 'avgQueue', label: 'Average queue', better: 'shorter' },
+  { key: 'maxQueue', label: 'Longest queue', better: 'shorter' },
+  { key: 'speed', label: 'Average speed', better: 'faster' },
+  { key: null, label: 'Vehicles through', better: '' },
+]
+
 export function Results() {
   const ref = useRef<HTMLElement>(null)
   const [metric, setMetric] = useState<keyof ResultRow>('wait')
+  const [open, setOpen] = useState<string | null>(null)
   const rows = RESULTS.toSorted((a, b) => (b[metric] as number) - (a[metric] as number))
   const max = Math.max(...rows.map((r) => r[metric] as number), 1)
   useScene(ref, () => {
@@ -276,27 +326,27 @@ export function Results() {
           Not a fixed timer: the comparison is a vehicle-actuated controller (VAC), the kind that extends a green while cars keep coming. Both run the exact same traffic at the same time, in lockstep.
         </p>
         <div className="res-stats">
-          <div className="res-stat">
+          <div className="res-stat spot">
             <b>
               <Counter to={HEADLINES.scenariosWon} />
               <small>/13</small>
             </b>
             <span className="cap">scenarios won</span>
           </div>
-          <div className="res-stat">
+          <div className="res-stat spot">
             <b>
               <Counter to={HEADLINES.metrics} />
               <small>/7</small>
             </b>
             <span className="cap">metrics won or tied, in every scenario</span>
           </div>
-          <div className="res-stat">
+          <div className="res-stat spot">
             <b>
               <Counter to={HEADLINES.bestWaitCut} decimals={1} suffix="%" />
             </b>
             <span className="cap">less waiting, at best ({scenarioName('normal_traffic_seed1')})</span>
           </div>
-          <div className="res-stat">
+          <div className="res-stat spot">
             <b>
               <Counter to={PREDICTION.betterThanGuessPct} suffix="%" />
             </b>
@@ -304,7 +354,7 @@ export function Results() {
           </div>
         </div>
 
-        <div className="res-bars" data-reveal>
+        <div className="res-bars spot" data-reveal>
           <div className="res-tabs" role="tablist" aria-label="Metric">
             {METRICS.map((m) => (
               <button key={m.key} type="button" role="tab" aria-selected={metric === m.key} className={metric === m.key ? 'on' : ''} onClick={() => setMetric(m.key)}>
@@ -314,17 +364,39 @@ export function Results() {
           </div>
           <ul>
             {rows.map((r) => (
-              <li key={r.id}>
-                <span className="bar-name">{scenarioName(r.id)}</span>
-                <span className="bar-track">
-                  <span className="bar-fill" style={{ width: `${((r[metric] as number) / max) * 100}%` }} />
-                </span>
-                <span className="bar-val">{(r[metric] as number).toFixed(1)}%</span>
+              <li key={r.id} className={open === r.id ? 'open' : ''}>
+                <button type="button" className="bar-row" aria-expanded={open === r.id} onClick={() => setOpen(open === r.id ? null : r.id)}>
+                  <span className="bar-name">{scenarioName(r.id)}</span>
+                  <span className="bar-track">
+                    <span className="bar-fill" style={{ width: `${((r[metric] as number) / max) * 100}%` }} />
+                  </span>
+                  <span className="bar-val">{(r[metric] as number).toFixed(1)}%</span>
+                  <ChevronDown size={15} className="bar-chev" aria-hidden />
+                </button>
+                <div className="bar-more">
+                  <div>
+                    <p className="bar-more-head">
+                      <b>{r.wins}/7</b> measures better than or level with vehicle-actuated control
+                    </p>
+                    <div className="bar-chips">
+                      {ALL_MEASURES.map((m) => {
+                        const v = m.key ? (r[m.key] as number) : 0
+                        const tie = v === 0
+                        return (
+                          <span key={m.label} className={tie ? 'tie' : ''}>
+                            <em>{m.label}</em>
+                            {tie ? 'tied' : `${v.toFixed(1)}% ${m.better}`}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
               </li>
             ))}
           </ul>
           <p className="res-note">
-            Improvement over vehicle-actuated control, seed 1 of every scenario. Throughput (vehicles completed) is tied everywhere by design, and Light and Balanced traffic also tie on the longest queue; every other measure favours Trinetra.
+            Improvement over vehicle-actuated control, seed 1 of every scenario — click a scenario for all seven measures. Throughput (vehicles completed) is tied everywhere by design, and Light and Balanced traffic also tie on the longest queue; every other measure favours Trinetra.
           </p>
         </div>
       </div>
