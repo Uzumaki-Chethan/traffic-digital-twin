@@ -47,7 +47,7 @@ always-on console) both just call it.
 | **Real-time Dashboard** | ✔ **done** |
 | **Emergency vehicle detection** | ✔ **done** |
 | **Database logging (SQLite)** | ✔ **done** |
-| Blinky — 3D signal-bot mascot; drag its antenna onto any page or panel and it explains it (Section 38) | ✔ done |
+| Zen (formerly Blinky) — 3D robot-monk guide; drag one of his floating orbs onto any page or panel and he explains it (Sections 38, 40) | ✔ done |
 | Final optimization + demo polish | ⬜ |
 
 Full engineering context and history: see `PROJECT_ARCHITECTURE_REPORT.md`

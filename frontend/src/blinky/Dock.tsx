@@ -62,7 +62,7 @@ export function Dock({
 }) {
   const at = useDockSpot()
   return (
-    <div data-blinky className="blinky-dock" style={{ left: at.left, bottom: at.bottom }} role="toolbar" aria-label="Blinky">
+    <div data-blinky className="blinky-dock" style={{ left: at.left, bottom: at.bottom }} role="toolbar" aria-label="Zen">
       <div ref={badgeRef} className="blinky-badge" aria-hidden />
       <div className="blinky-tools">
         <button type="button" className="fx-btn fx-dark" aria-pressed={asleep} onClick={onSleep}>

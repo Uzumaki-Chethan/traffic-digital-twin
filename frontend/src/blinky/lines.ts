@@ -1,6 +1,6 @@
 import type { LiveFacts } from './catalogue'
 
-export const GREETINGS = ['Hi! I’m Blinky 👋', 'Hello, human! Blink blink.', 'Hey there, traffic friend!', 'Psst — drag my antenna onto anything!'] as const
+export const GREETINGS = ['Hi! I’m Zen. 🙏', 'Peace, friend. Breathe in… breathe out.', 'Welcome. Let’s calm the traffic together.', 'Psst — drag one of my orbs onto anything!'] as const
 
 export const FACTS = [
   'The first electric traffic light lit up in Cleveland, Ohio, in 1914.',

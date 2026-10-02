@@ -18,8 +18,8 @@ export interface PrankPlan {
   end?: () => void
 }
 
-/** Half the width of Blinky's tap target at rest size (0.35 × 44 px). */
-export const REST_HIT_HALF = 15.4
+/** Half the width of Zen's tap target at rest size (0.3 × 110 px). */
+export const REST_HIT_HALF = 33
 
 /** Where the traffic cop stands: beside the run buttons (never under them), on the card below. */
 export function copSpot(buttons: Rect, cardTop: number): Vec {
@@ -68,7 +68,7 @@ export function planPrank(id: PrankId, rng: Rng): PrankPlan | null {
         start: () => {
           note = document.createElement('div')
           note.className = 'blinky-note'
-          note.textContent = 'Blinky was here ✌'
+          note.textContent = 'Zen was here ✌'
           note.style.left = `${r.right - 132}px`
           note.style.top = `${r.top - 18}px`
           document.body.appendChild(note)

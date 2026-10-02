@@ -4141,3 +4141,89 @@ builds (≈7–11x at 100–130 vehicles on the build laptop).
 
 **Not related:** the browser side (Blinky, the 3D view) never touches the simulation's
 speed; it only affects how smoothly the page draws.
+
+## SECTION 40 — Zen: Blinky redesigned as a robot-monk guide, iteration 1 of N (CURRENT STATE)
+
+*2026-10-02 · branch `design/glass-night` · `frontend/src/blinky/` (folder name kept)*
+
+**Request (owner):**
+- Blinky becomes **Zen**, built "exactly" from the owner's design sheet (two images plus a
+  written spec: a calm robot-monk guide bot), at "ultra" quality, with no performance limits.
+- **Big**, not Blinky-small; overlapping panels is fine.
+- Instead of pulling an antenna, you **take one of Zen's floating orbs** and drop it on any
+  component, and he comes and explains it.
+- Coming in later iterations: a temple **home** in the rail (below Simulation Settings,
+  above Collapse) and more behaviour changes.
+
+**Iteration 1 (this section): Zen's body, the orb guide, the size.** Behaviour is otherwise
+Blinky's (Section 38) — the brain, director, pranks, rides and dock are unchanged.
+
+- **Model** (`model.ts` → `buildZen`): hand-built three.js, the owner's choice over an
+  AI-generated mesh, so everything animates.
+  - **Head:** ivory clear-coat ceramic helmet; deep-black glass face screen; gold-ringed ear
+    pods with amber lenses; side antennas with emissive gold orb tips that bounce.
+  - **Hat:** woven bamboo conical hat with a charcoal band of gold cloud scrolls, a
+    禅 emblem, a black knob, a gold brim, and eight swinging tassels including the 禅
+    charm tag.
+  - **Clothes:**
+    - an ivory inner cloth, and an open charcoal outer robe with gold lotus, cloud and
+      circle motifs and gold trims, whose hems ripple (vertex-animated);
+    - wide sleeves with gold cuffs over white-and-black arms with gold joints;
+    - a golden silk scarf with streaming tails.
+  - **Ornaments:** prayer beads (gold, wood and black) with a gold pendant, and a glowing
+    lotus chest core.
+  - **Glow:** three black-glass orbs with gold swirls circling at chest height, and a
+    golden aura (disc, turning sigil ring, expanding ripples, rising sparks) under him. He
+    floats by default.
+  - **Textures:** all procedural and high-resolution (`zenTextures.ts`), with no image
+    files.
+- **Face** (`zenFace.ts`): eye-only expressions, as the sheet says ("no mouth"). There are
+  nine: happy, excited, curious, thinking, surprised, sleepy (with drifting z's), angry,
+  peaceful and laughing. They are drawn on a canvas mapped across the screen, with blinks
+  and gaze. `expressionFor(anim, mood)` maps each of Blinky's reactions to one (tested).
+- **Rendering** (`Blinky3D.tsx` → `mountZen`):
+  - up to 3× pixel density, a 4× MSAA scene target, and ACES tone mapping;
+  - studio environment reflections, with warm key light and golden rim lights;
+  - a real `UnrealBloomPass`, blooming only genuinely bright light (eyes, orbs, core,
+    tips, aura);
+  - the camera is raised to look slightly down, so the hat's top faces you (from eye
+    level you saw its underside).
+  - **Transparency fix:** the bloom blur writes alpha 1 over the whole canvas, which drew a
+    dark square over the page. The scene is now rendered separately to keep its alpha, and
+    a final pass rebuilds alpha as max(scene alpha, glow brightness), faded at the canvas
+    edges.
+- **Orb guide** (`OrbGuide.tsx`, replacing `AntennaGuide.tsx`):
+  - Each orb has a grab handle that follows its projected screen position.
+  - Dragging hides that orb from the orbit and draws it at the pointer with a golden light
+    trail; the target gets its outline and name tag.
+  - Release, Esc or a cancelled pointer report the choice at once, and the orb flies home
+    in an arc.
+  - A drop on nothing gets a soft temple-bell chime and "Hmm… nothing to explain there."
+- **Size:**
+  - 110 px at rest (was 44); explaining a page 240 px (was 140), a component 170 px
+    (was 80);
+  - riding in the plan view 56–90 px; the 3D rider is scaled 0.62.
+- **Name:** "Zen" everywhere it shows (greetings, the hello line, the dock label, the
+  sticky note). Code identifiers keep "blinky" to avoid churn.
+- **Dev preview:** `frontend/zen.html` (dev server only, not in the build).
+  `?grid=expressions` and `?grid=turnaround` render design-sheet strips, which are how Zen
+  was compared against the sheet. `window.zen.set({ anim, mood, prop, turn })` poses him.
+
+**Verified:**
+- 68 frontend tests (new: `zenFace.test.ts`; `explainLayout.test.ts` updated for the
+  sizes); tsc, oxlint and the build are clean.
+- Visually, in the preview grids: all expressions and the six-angle turnaround.
+- In the console: Zen at rest over a card, and an orb dragged onto Active phase (tag,
+  trail, return flight, explainer, 170 px).
+
+**Known limits (stated to the owner up front):**
+- A stylized real-time model, not the sheet's offline render.
+- Robe and scarf motion is animated geometry, not cloth simulation.
+- Fine gold patterns read best at explaining size.
+- Props from Blinky (siren, parasol, STOP/GO sign, fan, sunglasses drawn on the screen)
+  are restyled; the propeller is gone (orbs spin faster instead).
+
+**Next iterations:**
+- 2: Zen's temple home in the rail (replacing the dock badge).
+- 3: the sheet's poses (meditating, thinking-sit, casting, spinning, pointing) in his
+  behaviour.

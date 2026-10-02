@@ -4,7 +4,7 @@ import { BUILDINGS, CITY_EXTENT, GROUND_DAY, SIDEWALK_DAY, SIDEWALK_OUT, TREES, 
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
-import { buildBlinky, restPose } from '@/blinky/model'
+import { buildZen, restPose } from '@/blinky/model'
 import { rideBus } from '@/blinky/rideBus'
 import type { LaneView, VehicleView } from '@/data/types'
 import { useSim } from '@/data/store'
@@ -1090,12 +1090,13 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
     }
 
     const cars = new Map<string, Car>()
-    // Blinky's 3D joyride (blinky/ride.ts): a tiny rig on the chosen
+    // Zen's 3D joyride (blinky/ride.ts): a tiny rig on the chosen
     // vehicle's roof while rideBus.vehicleId names it.
-    let rider: { rig: ReturnType<typeof buildBlinky>; on: string; parent: THREE.Group } | null = null
+    let rider: { rig: ReturnType<typeof buildZen>; on: string; parent: THREE.Group } | null = null
     const riderPose = restPose()
     riderPose.facing = 0
-    riderPose.scale = 0.9
+    // Zen is ~2.5 m tall at scale 1 — sized down to sit on a car's roof
+    riderPose.scale = 0.62
     let riderLast = performance.now()
     // Frames the chosen vehicle has been missing: it may be newer than this
     // view's display clock (250 ms behind), so give it a moment first.
@@ -1355,7 +1356,7 @@ export function Junction3D({ lanes, powered, motionSide = 'demo', raining = fals
         if (want && !rider) {
           const car = cars.get(want)
           if (car) {
-            const rig = buildBlinky(envTex)
+            const rig = buildZen(envTex)
             rig.group.position.y = shapeOf(car.type).height + 0.05
             car.group.add(rig.group)
             rider = { rig, on: want, parent: car.group }

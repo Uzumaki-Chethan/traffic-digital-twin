@@ -6,7 +6,7 @@ const view = { w: 1400, h: 800 }
 describe('presentLayout', () => {
   it('a page: card centred-ish, Blinky to its left and big', () => {
     const l = presentLayout(null, view)
-    expect(l.size).toBe(140)
+    expect(l.size).toBe(240)
     expect(l.blinky.x).toBeLessThan(l.card.left)
   })
   it('a component with room on the right: card to its right, Blinky between', () => {
@@ -14,7 +14,7 @@ describe('presentLayout', () => {
     expect(l.card.left).toBeGreaterThan(600)
     expect(l.blinky.x).toBeGreaterThan(600)
     expect(l.blinky.x).toBeLessThan(l.card.left)
-    expect(l.size).toBe(80)
+    expect(l.size).toBe(170)
   })
   it('a component near the right edge: card to its left', () => {
     const l = presentLayout({ left: 900, top: 200, right: 1350, bottom: 400 }, view)

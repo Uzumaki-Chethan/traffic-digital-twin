@@ -1,4 +1,4 @@
-export type Chirp = 'hi' | 'giggle' | 'boing' | 'yawn' | 'cheer' | 'tada' | 'pop'
+export type Chirp = 'hi' | 'giggle' | 'boing' | 'yawn' | 'cheer' | 'tada' | 'pop' | 'chime'
 
 /** [fromHz, toHz, seconds, wave] glides, played one after another. */
 const SEQ: Record<Chirp, [number, number, number, OscillatorType][]> = {
@@ -9,6 +9,8 @@ const SEQ: Record<Chirp, [number, number, number, OscillatorType][]> = {
   cheer: [[660, 990, 0.07, 'square'], [990, 1320, 0.1, 'square']],
   tada: [[523, 523, 0.08, 'triangle'], [659, 659, 0.08, 'triangle'], [784, 1046, 0.18, 'triangle']],
   pop: [[500, 1400, 0.06, 'sine']],
+  // a soft temple-bell chime: the orb drifting home
+  chime: [[1568, 1560, 0.35, 'sine'], [2093, 2090, 0.5, 'sine']],
 }
 
 let ctx: AudioContext | null = null

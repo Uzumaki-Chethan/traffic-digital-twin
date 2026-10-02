@@ -14,7 +14,8 @@ import type { WorldRead } from './worldDom'
 import type { LiveState } from './useLiveState'
 import type { Anim, Gait, Intent, Mood, PrankId, Prop, Vec, WorldSnapshot } from './types'
 
-export const REST_SIZE = 44
+/** Zen's height at rest, hat to aura (Section 40: big, not Blinky's 44 px). */
+export const REST_SIZE = 110
 export type Align = 'left' | 'center' | 'right'
 
 export interface Ui {
@@ -387,7 +388,7 @@ export class Director {
       return
     }
     const b = r.el?.getBoundingClientRect()
-    this.setSize(clamp(b ? Math.max(b.width, b.height) * 1.6 : 26, 20, 34))
+    this.setSize(clamp(b ? Math.max(b.width, b.height) * 3 : 70, 56, 90))
     this.sayNow('Beep beep!', 1600)
   }
 
@@ -560,7 +561,7 @@ export class Director {
       this.queue.push({ t: 'say', text: l, mood: 'curious', ms: readTime(l) }, { t: 'pose', anim: 'look', mood: 'curious', ms: 1600, prop: null })
       return
     }
-    const text = k === 'hi' ? 'Hi, I’m Blinky! Drag my antenna onto anything and I’ll explain it.' : k === 'fact' ? pick(this.rng, FACTS) : pick(this.rng, JOKES)
+    const text = k === 'hi' ? 'Hi, I’m Zen. Drag one of my orbs onto anything and I’ll explain it.' : k === 'fact' ? pick(this.rng, FACTS) : pick(this.rng, JOKES)
     this.queue.push({ t: 'say', text, mood: 'happy', ms: readTime(text), sound: k === 'joke' ? 'giggle' : 'hi' }, { t: 'pose', anim: k === 'hi' ? 'wave' : 'blush', mood: 'happy', ms: 1400, prop: null })
   }
 
@@ -568,6 +569,11 @@ export class Director {
 
   getBall(): Vec {
     return { x: this.pos.x, y: this.pos.y - 0.94 * this.size }
+  }
+
+  /** An orb is in the user's hand (hidden from Zen's orbit) / back home. */
+  holdOrb(i: number | null): void {
+    this.pose.orbHeld = i
   }
 
   grabAntenna(): void {
@@ -581,7 +587,7 @@ export class Director {
     this.antenna = false
     this.brain.set(this.restState())
     if (t && this.present(t, now)) return
-    this.queue.push({ t: 'say', text: 'Boing! Nothing to explain there.', mood: 'curious', ms: 1800, sound: 'boing' }, { t: 'pose', anim: 'shrug', mood: 'curious', ms: 1200, prop: null })
+    this.queue.push({ t: 'say', text: 'Hmm… nothing to explain there.', mood: 'curious', ms: 1800, sound: 'chime' }, { t: 'pose', anim: 'shrug', mood: 'curious', ms: 1200, prop: null })
   }
 
   /** Fly to the front and open the explainer. False when the id has no entry. */

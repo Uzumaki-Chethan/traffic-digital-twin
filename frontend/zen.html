@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zen preview</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: radial-gradient(ellipse at 50% 60%, #3a2a14 0%, #120d08 55%, #070504 100%); color: #f6d27c; font: 14px Poppins, sans-serif; }
+      #stage { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+      #label { position: absolute; left: 20px; top: 16px; letter-spacing: 0.2em; text-transform: uppercase; }
+    </style>
+  </head>
+  <body>
+    <div id="label"></div>
+    <div id="stage"></div>
+    <script type="module" src="/src/blinky/preview.ts"></script>
+  </body>
+</html>
