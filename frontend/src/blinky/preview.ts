@@ -1,11 +1,11 @@
 /**
- * Dev-only Zen preview (frontend/zen.html; not part of the console build):
- * Zen big on a dark stage, posed from the URL or from the console —
- *   zen.html?anim=idle&mood=happy&turn=0&size=420
- *   window.zen.set({ anim: 'cheer', turn: Math.PI })
- * Used to compare him against the owner's design sheet (Section 40).
+ * Dev-only Sparky preview (frontend/sparky.html; not part of the console build):
+ * Sparky big on a dark stage, posed from the URL or from the console —
+ *   sparky.html?anim=idle&mood=happy&turn=0&size=420
+ *   window.sparky.set({ anim: 'cheer', turn: Math.PI })
+ * Used to compare him against the owner’s design sheet (Section 41).
  */
-import { mountZen } from './Blinky3D'
+import { mountBot } from './Blinky3D'
 import { restPose } from './model'
 import type { Anim, Mood, Prop } from './types'
 
@@ -22,7 +22,7 @@ const t0 = performance.now()
 const stage = document.getElementById('stage') as HTMLElement
 const label = document.getElementById('label') as HTMLElement
 
-// ?grid=expressions | turnaround — a design-sheet strip of small Zens
+// ?grid=expressions | turnaround — a design-sheet strip of small Sparkys
 const grid = q.get('grid')
 if (grid) {
   const EXPR: [Anim, Mood, string][] = [
@@ -47,7 +47,7 @@ if (grid) {
   document.body.style.display = 'grid'
   document.body.style.gridTemplateColumns = `repeat(${Math.min(4, cells.length)}, ${1.8 * size}px)`
   stage.remove()
-  label.textContent = `Zen · ${grid}`
+  label.textContent = `Sparky · ${grid}`
   for (const c of cells) {
     const cell = document.createElement('div')
     cell.style.cssText = `position:relative;width:${1.8 * size}px;height:${1.8 * size}px`
@@ -60,7 +60,7 @@ if (grid) {
     p.anim = c.anim
     p.mood = c.mood
     p.facing = 0
-    mountZen(cell, {
+    mountBot(cell, {
       cssPx: 1.8 * size,
       pose: () => {
         const now = (performance.now() - t0) / 1000
@@ -69,16 +69,16 @@ if (grid) {
         return p
       },
       turn: () => c.turn,
-      onFail: (err) => console.error('Zen preview failed', err),
+      onFail: (err) => console.error('Sparky preview failed', err),
     })
   }
 }
 
 const show = () => {
-  label.textContent = `Zen · ${pose.anim} · ${pose.mood}${pose.prop ? ' · ' + pose.prop : ''}`
+  label.textContent = `Sparky · ${pose.anim} · ${pose.mood}${pose.prop ? ' · ' + pose.prop : ''}`
 }
 show()
-if (!grid) mountZen(stage, {
+if (!grid) mountBot(stage, {
   cssPx: 1.8 * size,
   pose: () => {
     const now = (performance.now() - t0) / 1000
@@ -87,9 +87,9 @@ if (!grid) mountZen(stage, {
     return pose
   },
   turn: () => turn,
-  onFail: (err) => console.error('Zen preview failed', err),
+  onFail: (err) => console.error('Sparky preview failed', err),
 })
-;(window as unknown as { zen: unknown }).zen = {
+;(window as unknown as { sparky: unknown }).sparky = {
   pose,
   set(p: { anim?: Anim; mood?: Mood; prop?: Prop; turn?: number }) {
     if (p.anim) pose.anim = p.anim

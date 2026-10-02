@@ -5,10 +5,10 @@ import { readWorld } from './worldDom'
 import { useLiveState } from './useLiveState'
 import { loadPrefs, savePrefs, type BlinkyPrefs } from './prefs'
 import { chirp } from './sound'
-import { Blinky3D, emptyOrbSpots } from './Blinky3D'
-import { ORB_COUNT } from './model'
+import { Blinky3D, emptyHandleSpots } from './Blinky3D'
+import { HANDLE_COUNT } from './model'
 import { Bubble } from './Bubble'
-import { OrbGuide } from './OrbGuide'
+import { AntennaGuide } from './AntennaGuide'
 import { ExplainerCard } from './ExplainerCard'
 import { KeyboardPicker } from './KeyboardPicker'
 import { TargetHighlight } from './TargetHighlight'
@@ -25,14 +25,15 @@ interface Open {
 }
 
 const nowS = () => performance.now() / 1000
-/** Size of each orb's grab handle (px). */
-const ORB_HIT = 30
+/** Size of each antenna tip's grab handle (px). */
+const TIP_HIT = 30
+const noop = () => {}
 
 /**
  * Blinky (Section 38): mounted once in Shell, outside the routes. Owns the
  * rAF loop that feeds the Director and writes Blinky's wrapper transform
  * directly; React state only for the occasional UI (bubble, explainer,
- * orb drag, keyboard picker, dock). Strictly read-only towards the run.
+ * antenna drag, keyboard picker, dock). Strictly read-only towards the run.
  */
 export function BlinkyRoot() {
   const { pathname } = useLocation()
@@ -43,10 +44,10 @@ export function BlinkyRoot() {
   const [size, setSize] = useState(REST_SIZE)
   const [bubble, setBubble] = useState<{ text: string; id: number; align: Align } | null>(null)
   const [open, setOpen] = useState<Open | null>(null)
-  // The orb being dragged to explain something (Section 40), and where it was grabbed.
-  const [drag, setDrag] = useState<{ orb: number; start: Vec } | null>(null)
-  const orbsRef = useRef(emptyOrbSpots())
-  const orbEls = useRef<(HTMLDivElement | null)[]>([])
+  // The antenna being pulled to explain something (Section 41).
+  const [drag, setDrag] = useState<number | null>(null)
+  const tipsRef = useRef(emptyHandleSpots())
+  const tipEls = useRef<(HTMLDivElement | null)[]>([])
   const [picking, setPicking] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const badgeRef = useRef<HTMLDivElement>(null)
@@ -135,11 +136,11 @@ export function BlinkyRoot() {
         el.style.transform = `translate3d(${director.pos.x - 0.9 * s}px, ${director.pos.y - 1.4 * s}px, 0)`
         el.style.visibility = director.hidden ? 'hidden' : 'visible'
         el.style.clipPath = director.clip ?? ''
-        // the orbs' grab handles follow the orbs as they circle
-        orbsRef.current.forEach((o, i) => {
-          const h = orbEls.current[i]
+        // the grab handles follow the antenna tips as they bob
+        tipsRef.current.forEach((o, i) => {
+          const h = tipEls.current[i]
           if (!h) return
-          h.style.transform = `translate(${o.x - ORB_HIT / 2}px, ${o.y - ORB_HIT / 2}px)`
+          h.style.transform = `translate(${o.x - TIP_HIT / 2}px, ${o.y - TIP_HIT / 2}px)`
           h.style.visibility = o.visible && !director.hidden ? 'visible' : 'hidden'
         })
       }
@@ -164,15 +165,18 @@ export function BlinkyRoot() {
     director.endPresent()
   }, [director])
 
-  const onDrop = useCallback((t: Target | null) => director.dropAntenna(t, nowS()), [director])
-  const onOrbHome = useCallback(() => {
-    director.holdOrb(null)
-    setDrag(null)
-  }, [director])
-  // Where the held orb's place in Zen's orbit is on screen right now.
-  const orbHome = (i: number) => (): Vec => {
+  const onDrop = useCallback(
+    (t: Target | null) => {
+      director.holdAntenna(null)
+      setDrag(null)
+      director.dropAntenna(t, nowS())
+    },
+    [director],
+  )
+  // Where the pulled antenna's tip is on screen right now (the cable's start).
+  const tipAt = (i: number) => (): Vec => {
     const w = wrapRef.current?.getBoundingClientRect()
-    const o = orbsRef.current[i]
+    const o = tipsRef.current[i]
     return w ? { x: w.left + o.x, y: w.top + o.y } : { x: 0, y: 0 }
   }
   // Read only when called (the explainer's 1 s refresh), never during render.
@@ -183,12 +187,12 @@ export function BlinkyRoot() {
   return (
     <>
       <div data-blinky ref={wrapRef} className="blinky-layer" style={{ width: 1.8 * size, height: 1.8 * size }}>
-        <Blinky3D poseRef={poseRef} size={size} orbsRef={orbsRef} />
+        <Blinky3D poseRef={poseRef} size={size} handlesRef={tipsRef} />
         <Bubble text={bubble?.text ?? null} id={bubble?.id ?? 0} align={bubble?.align ?? 'center'} size={size} />
         <div
           className="blinky-hit"
           role="img"
-          aria-label="Zen, the guide bot"
+          aria-label="Sparky, the energy bot"
           style={{ left: 0.6 * size, top: 0.42 * size, width: 0.6 * size, height: 0.95 * size }}
           onPointerDown={(e) => {
             try {
@@ -203,29 +207,29 @@ export function BlinkyRoot() {
           onPointerCancel={() => director.bodyUp(nowS())}
           onPointerEnter={() => director.hover(nowS())}
         />
-        {Array.from({ length: ORB_COUNT }, (_, i) => (
+        {Array.from({ length: HANDLE_COUNT }, (_, i) => (
           <div
             key={i}
             ref={(el) => {
-              orbEls.current[i] = el
+              tipEls.current[i] = el
             }}
             className="blinky-ball"
             aria-hidden
-            style={{ left: 0, top: 0, width: ORB_HIT, height: ORB_HIT }}
+            style={{ left: 0, top: 0, width: TIP_HIT, height: TIP_HIT }}
             onPointerDown={(e) => {
               e.stopPropagation()
               e.preventDefault()
-              if (drag) return
+              if (drag !== null) return
               if (open) closeExplain()
               setPicking(false)
-              director.holdOrb(i)
+              director.holdAntenna(i)
               director.grabAntenna()
-              setDrag({ orb: i, start: { x: e.clientX, y: e.clientY } })
+              setDrag(i)
             }}
           />
         ))}
       </div>
-      {drag && <OrbGuide start={drag.start} getHome={orbHome(drag.orb)} onDrop={onDrop} onDone={onOrbHome} />}
+      {drag !== null && <AntennaGuide getBall={tipAt(drag)} onHover={noop} onDrop={onDrop} />}
       {open?.target && <TargetHighlight el={open.target.el} label={targetLabel(open.target.id)} />}
       {open && <ExplainerCard key={open.key} explainer={open.explainer} at={open.at} getFacts={getFacts} onClose={closeExplain} />}
       {picking && (

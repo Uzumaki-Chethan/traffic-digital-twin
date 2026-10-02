@@ -43,7 +43,7 @@ way before the change.
   not exist, drop the panel idea or ask for the field — never a placeholder
   that could be mistaken for real.
 - **Never show prediction confidence anywhere.** (Owner's standing rule.)
-- Zen's (formerly Blinky's) live lines use real fields only, never invent a number, and never show prediction
+- Sparky's (formerly Blinky's) live lines use real fields only, never invent a number, and never show prediction
   confidence.
 - No internal jargon on screen: lanes are "North · Left", phases are
   "N–S straight + left", modes are "Minimum green", never `N_in_0`,
@@ -196,12 +196,12 @@ change on the page you touched (and any page you moved something to or from).
   focus tools; buildings, trees and sidewalks on both map views.
 - Settings: a moving preview on every scenario card.
 
-### Zen, formerly Blinky (2026-10-01, Sections 38 and 40) — part of the inventory
+### Sparky, formerly Blinky (2026-10-01, Sections 38 and 41) — part of the inventory
 
-- the Zen mascot (3D robot-monk guide, SVG fallback) — Blinky until 2026-10-02, redesigned
-  from the owner's design sheet (Section 40);
-- the orb drag-to-explain guide (drag one of Zen's floating orbs onto a page link or
-  component; replaced Blinky's antenna), and an explanation for every `data-explain` id
+- the Sparky mascot (3D energy bot, SVG fallback) — Blinky until 2026-10-02, then briefly
+  Zen (Section 40, replaced), now Sparky from the owner's design sheet (Section 41);
+- the antenna drag-to-explain guide (drag either of Sparky's antenna tips onto a page link
+  or component), and an explanation for every `data-explain` id
   (`blinky/catalogue.ts` — a test fails on a missing one, so a new panel needs its own);
 - the explainer card: title, steps with Back/Next and dots, the live line, "Got it!";
 - the dock: Shh/Wake, Sound, Come here, Explain…;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { EXPRESSIONS, expressionFor } from '../zenFace'
+import { EXPRESSIONS, expressionFor } from '../face'
 
-describe('expressionFor (Zen speaks with his eyes only)', () => {
+describe('expressionFor (Sparky speaks with his eyes)', () => {
   it('sleeping and yawning are sleepy; held and dizzy are surprised', () => {
     expect(expressionFor('sleep', 'sleepy')).toBe('sleepy')
     expect(expressionFor('yawn', 'happy')).toBe('sleepy')

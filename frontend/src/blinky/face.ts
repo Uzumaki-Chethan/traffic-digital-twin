@@ -1,6 +1,6 @@
 import type { Anim, Mood } from './types'
 
-/** Zen's face is a black screen; only his glowing eyes change (design sheet). */
+/** Sparky's face is a black glass screen; his glowing eyes carry every mood (design sheet). */
 export const EXPRESSIONS = ['happy', 'excited', 'curious', 'thinking', 'surprised', 'sleepy', 'angry', 'peaceful', 'laughing'] as const
 export type Expression = (typeof EXPRESSIONS)[number]
 
@@ -60,12 +60,12 @@ export interface FaceState {
   shades: boolean
 }
 
-const GOLD = '#ffd27a'
-const HOT = '#fff1c9'
+const GOLD = '#ff7448'
+const HOT = '#ffd9c8'
 
 /**
  * Draw the eyes onto a transparent canvas that is mapped across the face
- * screen. Strokes are warm gold with a soft glow; the 3D bloom pass adds
+ * screen. Strokes are glowing red-orange (Sparky's palette); the 3D bloom pass adds
  * the halo on top. Everything is sized from the canvas so it stays crisp
  * at any resolution.
  */
@@ -80,7 +80,7 @@ export function drawFace(ctx: CanvasRenderingContext2D, w: number, h: number, f:
   ctx.lineJoin = 'round'
   ctx.strokeStyle = GOLD
   ctx.fillStyle = GOLD
-  ctx.shadowColor = '#ffb640'
+  ctx.shadowColor = '#ff2a10'
   ctx.shadowBlur = 5 * u
   const P = (x: number) => x * u
   const Y = (y: number) => (y * h) / 100
@@ -140,6 +140,11 @@ export function drawFace(ctx: CanvasRenderingContext2D, w: number, h: number, f:
     case 'happy':
       arc(lx, true, 9, 3.4)
       arc(rx, true, 9, 3.4)
+      // the little smile from the hero image
+      ctx.lineWidth = 2 * u
+      ctx.beginPath()
+      ctx.arc(P(50 + f.lookX * 3), Y(cy + 10), 5 * u, Math.PI * 0.18, Math.PI * 0.82)
+      ctx.stroke()
       break
     case 'excited': {
       arc(lx, true, 10, 4.2)
@@ -161,12 +166,18 @@ export function drawFace(ctx: CanvasRenderingContext2D, w: number, h: number, f:
       }
       break
     }
-    case 'curious':
-      oval(lx, 6.2, 9, true)
-      oval(rx, 7.4, 10.5, true)
-      shine(lx, 6.2)
-      shine(rx, 7.4)
+    case 'curious': {
+      // the sheet's "C" eyes, and a question mark
+      ctx.lineWidth = 3.2 * u
+      for (const cx of [lx, rx]) {
+        ctx.beginPath()
+        ctx.arc(P(cx), Y(cy), 7.5 * u, Math.PI * 0.25, Math.PI * 1.85)
+        ctx.stroke()
+      }
+      ctx.font = `700 ${9 * u}px Orbitron, Poppins, sans-serif`
+      ctx.fillText('?', P(rx + 10), Y(cy - 16))
       break
+    }
     case 'thinking':
       oval(lx, 6.8, 9.5, true)
       oval(rx, 5.2, 4.2, true)

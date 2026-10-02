@@ -36,7 +36,7 @@ const METRIC = (name: string, what: string): Explainer => ({
 })
 
 /**
- * What Zen says when one of his orbs is dropped on a page or a component
+ * What Sparky says when his antenna is dropped on a page or a component
  * (spec §7.3) — written for someone opening Trinetra for the first time.
  * Keys are `data-explain` ids; a test fails if the source uses an id that
  * is missing here.

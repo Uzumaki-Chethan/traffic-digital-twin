@@ -6,21 +6,21 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { TexturePass } from 'three/examples/jsm/postprocessing/TexturePass.js'
-import { buildZen, ORB_COUNT, type RigPose } from './model'
+import { buildSparky, HANDLE_COUNT, type RigPose } from './model'
 import { BlinkySvg } from './BlinkySvg'
 
-/** Where each floating orb is, in this canvas's CSS pixels (the drag handles). */
-export type OrbSpots = { x: number; y: number; visible: boolean }[]
+/** Where each antenna tip is, in this canvas's CSS pixels (the drag handles). */
+export type HandleSpots = { x: number; y: number; visible: boolean }[]
 
-export function emptyOrbSpots(): OrbSpots {
-  return Array.from({ length: ORB_COUNT }, () => ({ x: 0, y: 0, visible: false }))
+export function emptyHandleSpots(): HandleSpots {
+  return Array.from({ length: HANDLE_COUNT }, () => ({ x: 0, y: 0, visible: false }))
 }
 
 /**
  * Transparency after bloom. UnrealBloomPass's blur writes alpha 1 across
  * the whole canvas (a dark square over the page), so alpha is rebuilt
  * here: the scene's own alpha (rendered separately, before bloom) or the
- * glow's brightness, whichever is higher — Zen is opaque, his halo fades
+ * glow's brightness, whichever is higher — Sparky is opaque, his halo fades
  * smoothly into the page.
  */
 const AlphaFromLight = {
@@ -30,22 +30,22 @@ const AlphaFromLight = {
     'uniform sampler2D tDiffuse; uniform sampler2D tScene; varying vec2 vUv; void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb; float sa = texture2D(tScene, vUv).a; float edge = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x) * smoothstep(0.0, 0.14, vUv.y) * smoothstep(1.0, 0.86, vUv.y); float glow = max(c.r, max(c.g, c.b)) * edge; float a = clamp(max(sa, glow), 0.0, 1.0); gl_FragColor = vec4(min(c * max(edge, sa), vec3(a)), a); }',
 }
 
-export interface ZenView {
+export interface BotView {
   resize(cssPx: number): void
   dispose(): void
 }
 
 /**
- * Mount Zen's renderer into `el`: a square transparent canvas `cssPx`
+ * Mount Sparky's renderer into `el`: a square transparent canvas `cssPx`
  * wide. Ultra quality (Section 40): supersampled (up to 3x), 4x MSAA,
  * physical materials lit by a studio environment plus warm golden rim
- * lights, and a real bloom pass. `turn` (radians) spins him on the spot —
+ * lights, and a real bloom pass (Section 41). `turn` (radians) spins him on the spot —
  * the preview page's turnaround; the console leaves it at 0.
  */
-export function mountZen(
+export function mountBot(
   el: HTMLElement,
-  opts: { pose: () => RigPose; cssPx: number; orbs?: () => OrbSpots | undefined; turn?: () => number; onFail: (err?: unknown) => void },
-): ZenView | null {
+  opts: { pose: () => RigPose; cssPx: number; handles?: () => HandleSpots | undefined; turn?: () => number; onFail: (err?: unknown) => void },
+): BotView | null {
   let renderer: THREE.WebGLRenderer
   try {
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' })
@@ -64,25 +64,24 @@ export function mountZen(
   const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
   pmrem.dispose()
   scene.add(new THREE.HemisphereLight(0xfff1dc, 0x2a2018, 0.55))
-  const key = new THREE.DirectionalLight(0xffe4bd, 1.5)
+  const key = new THREE.DirectionalLight(0xfff0e0, 1.3)
   key.position.set(2.5, 4, 5)
   const fill = new THREE.DirectionalLight(0xc9dbff, 0.35)
   fill.position.set(-4, 1.5, 3)
-  const rimL = new THREE.DirectionalLight(0xffb347, 1.8)
+  const rimL = new THREE.DirectionalLight(0xff5a3a, 1.8)
   rimL.position.set(-3, 3, -4)
-  const rimR = new THREE.DirectionalLight(0xffc56b, 1.5)
+  const rimR = new THREE.DirectionalLight(0xff8a4a, 1.5)
   rimR.position.set(3, 2.5, -4)
   scene.add(key, fill, rimL, rimR)
-  const rig = buildZen(env)
+  const rig = buildSparky(env)
   const spinner = new THREE.Group()
   spinner.add(rig.group)
   scene.add(spinner)
 
-  // a little above him, looking down — the design sheet's angle, so the
-  // hat's top (band, emblem) faces the viewer rather than its underside
+  // a little above eye level, like the design sheet's turnaround
   const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100)
-  camera.position.set(0, 3.4, 8.1)
-  camera.lookAt(0, 1.25, 0)
+  camera.position.set(0, 2.2, 8.5)
+  camera.lookAt(0, 1.3, 0)
 
   // the scene renders once into its own target (keeping its true alpha);
   // the composer blooms a copy of it, then rebuilds alpha from both
@@ -91,8 +90,8 @@ export function mountZen(
   const composer = new EffectComposer(renderer, target)
   composer.setPixelRatio(pr)
   composer.addPass(new TexturePass(sceneRT.texture))
-  // only genuinely bright light blooms: eyes, orbs, core, antenna tips, aura
-  composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.55, 0.32, 1.6))
+  // only genuinely bright light blooms: eyes, antenna tips, chest core, thruster flames
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.3, 2.2))
   composer.addPass(new OutputPass())
   const alphaPass = new ShaderPass(AlphaFromLight)
   alphaPass.uniforms.tScene.value = sceneRT.texture
@@ -129,10 +128,10 @@ export function mountZen(
       renderer.render(scene, camera)
       renderer.setRenderTarget(null)
       composer.render(dt)
-      // where the orbs landed on screen, for their drag handles
-      const spots = opts.orbs?.()
+      // where the antenna tips landed on screen, for their drag handles
+      const spots = opts.handles?.()
       if (spots) {
-        rig.orbs.forEach((o, i) => {
+        rig.handles.forEach((o, i) => {
           o.getWorldPosition(v).project(camera)
           spots[i].x = ((v.x + 1) / 2) * css
           spots[i].y = ((1 - v.y) / 2) * css
@@ -165,16 +164,16 @@ export function mountZen(
 }
 
 /**
- * Zen's own transparent canvas (1.8 × size px square), drawn every frame
+ * Sparky's own transparent canvas (1.8 × size px square), drawn every frame
  * from the shared pose ref — no React render per frame. Falls back to the
  * SVG figure if WebGL is unavailable, the context is lost, or a frame
  * throws. Releases its GL context on unmount.
  */
-export function Blinky3D({ poseRef, size, orbsRef }: { poseRef: MutableRefObject<RigPose>; size: number; orbsRef?: MutableRefObject<OrbSpots> }) {
+export function Blinky3D({ poseRef, size, handlesRef }: { poseRef: MutableRefObject<RigPose>; size: number; handlesRef?: MutableRefObject<HandleSpots> }) {
   const host = useRef<HTMLDivElement>(null)
   const [failed, setFailed] = useState(false)
   const sizeRef = useRef(size)
-  const view = useRef<ZenView | null>(null)
+  const view = useRef<BotView | null>(null)
 
   useEffect(() => {
     sizeRef.current = size
@@ -184,12 +183,12 @@ export function Blinky3D({ poseRef, size, orbsRef }: { poseRef: MutableRefObject
   useEffect(() => {
     const el = host.current
     if (!el) return
-    const v = mountZen(el, {
+    const v = mountBot(el, {
       pose: () => poseRef.current,
       cssPx: 1.8 * sizeRef.current,
-      orbs: () => orbsRef?.current,
+      handles: () => handlesRef?.current,
       onFail: (err) => {
-        if (err) console.error('[Zen] 3D frame failed, using the 2D figure:', err)
+        if (err) console.error('[Sparky] 3D frame failed, using the 2D figure:', err)
         // deferred — never a synchronous setState inside an effect
         queueMicrotask(() => setFailed(true))
       },
@@ -203,7 +202,7 @@ export function Blinky3D({ poseRef, size, orbsRef }: { poseRef: MutableRefObject
       view.current = null
       v.dispose()
     }
-  }, [poseRef, orbsRef])
+  }, [poseRef, handlesRef])
 
   if (failed) return <BlinkySvg poseRef={poseRef} size={size} />
   return <div ref={host} className="pointer-events-none absolute inset-0" />

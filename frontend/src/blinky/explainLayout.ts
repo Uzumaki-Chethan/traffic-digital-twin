@@ -22,7 +22,7 @@ export function presentLayout(
   const right = roomRight >= CARD_W + 200 || roomRight >= roomLeft
   const left = right ? Math.min(view.w - CARD_W - 16, anchor.right + 200) : Math.max(16, anchor.left - 200 - CARD_W)
   const top = clamp(anchor.top, 90, view.h - 340)
-  // Zen is big (Section 40): he floats in the gap and may overlap either side.
+  // Sparky is big (Section 41): he floats in the gap and may overlap either side.
   const bx = right ? left - 100 : left + CARD_W + 100
   return { card: { left, top }, blinky: { x: bx, y: Math.min(view.h - 40, top + 290) }, size: 170 }
 }

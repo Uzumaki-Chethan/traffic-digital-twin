@@ -4227,3 +4227,61 @@ Blinky's (Section 38) — the brain, director, pranks, rides and dock are unchan
 - 2: Zen's temple home in the rail (replacing the dock badge).
 - 3: the sheet's poses (meditating, thinking-sit, casting, spinning, pointing) in his
   behaviour.
+
+## SECTION 41 — Sparky replaces Zen (CURRENT STATE)
+
+*2026-10-02 · branch `design/glass-night` · `frontend/src/blinky/` · supersedes Section 40*
+
+**Owner's call:** Zen (Section 40) "became heavy". Asked what that meant, the owner said
+the clothes and all weren't needed. The owner then supplied a new design sheet,
+**Sparky — Energy Bot**, and asked for the antenna function back in place of Zen's orbs.
+The temple home and the later Zen iterations are dropped with him.
+
+**What Sparky is** (`model.ts` → `buildSparky`, hand-built three.js):
+- **Head:**
+  - glossy white clear-coat helmet with a red seam from the visor over the crown, and a
+    small vent;
+  - a big black glass visor in a dark rim, with glowing red-orange eyes (plus a small
+    smile when happy, as in the hero image);
+  - red-ringed ear pods with glowing concentric lenses.
+- **Antennas:** two on top, with glowing red ball tips. These are the drag-to-explain
+  handles again.
+- **Body:**
+  - a red scarf whose two tails stream out to the sides;
+  - a white torso with red seams and a black waist;
+  - a glowing red triangle chest core (pointing down, on a black plate);
+  - white arms with black joints and black hands with white fingertips;
+  - chunky white boots with red rings.
+- **Thrusters:** the leg thrusters fire flame cones (a shader running from white-hot to
+  red), with sparks:
+  - small while he hovers;
+  - long and roaring whenever he flies, hops or cheers.
+
+**Kept from Section 40:**
+- **Renderer** (`Blinky3D.tsx` → `mountBot`): supersampling, MSAA, bloom and the
+  transparency fix. The bloom threshold was raised so only true light blooms, not the
+  white ceramic. The rim lights are now warm red, and the camera is slightly above eye
+  level, as on the sheet.
+- **Eye-only expressions** (`face.ts`): recoloured red-orange. "Curious" uses the sheet's
+  C-shaped eyes and a "?".
+- **Sizes:** 110 / 240 / 170 px.
+- **Dev preview:** now `frontend/sparky.html`.
+
+**Antenna guide back:**
+- `AntennaGuide.tsx` was restored from history with a red glowing cable.
+- Two grab handles follow the projected antenna tips; the pulled tip glows hot and its
+  antenna leans toward the pull (`pose.antennaHeld`).
+- A drop on nothing: "Boing! Nothing to explain there."
+
+**Removed:**
+- `OrbGuide.tsx` and `zenTextures.ts`, replaced by `sparkyTextures.ts` (scarf, triangle
+  core, glow, face canvas).
+- Zen's hat, robes, beads, orbs and aura.
+
+**Verified:**
+- 68 frontend tests; tsc, oxlint and the build are clean.
+- Preview grids: all expressions, and a six-angle turnaround (an ear-pod mirroring bug was
+  found here and fixed).
+- In the console:
+  - the antenna dropped on Lanes gives the tag, the cable and the explanation at 170 px;
+  - a drop on an empty gap gives "Boing!", with no card and no stuck cable.

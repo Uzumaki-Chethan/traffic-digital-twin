@@ -13,11 +13,12 @@ city-photo backdrop, dark-glass rail with the owner's logo, a frosted container,
 pale glass cards, Poppins / Overpass Mono with Orbitron headings, and a daytime city
 map (shared `overview/cityscape.ts`) in both the plan and the 3D view.
 
-**Zen** (`src/blinky/` — the folder keeps Blinky's name; Sections 38 and 40) lives on every
-page: a big 3D robot-monk guide (110 px at rest) that floats over cards, reacts to the run,
-plays, rides vehicles, and explains any page or panel when one of his floating orbs is
-dragged onto it (or from the dock's "Explain…" with the keyboard). `zen.html` is a dev-only
-preview page (`/zen.html?grid=expressions` or `?grid=turnaround`), not part of the build.
+**Sparky** (`src/blinky/` — the folder keeps Blinky's name; Sections 38 and 41) lives on
+every page: a big 3D energy bot (110 px at rest) that hovers on leg thrusters over cards,
+reacts to the run, plays, rides vehicles, and explains any page or panel when his antenna
+is dragged onto it (or from the dock's "Explain…" with the keyboard). `sparky.html` is a
+dev-only preview page (`/sparky.html?grid=expressions` or `?grid=turnaround`), not part of
+the build.
 Every explainable element carries `data-explain="<id>"` (`Panel` has an `explain` prop);
 `blinky/catalogue.ts` holds the words, and `catalogue.test.ts` fails on a missing entry.
 Verified in a browser (Playwright): arrival, scroll anchoring, antenna on a nav link / a
