@@ -353,12 +353,18 @@ unprompted, but do keep this section current if that changes:
   results; tests guard it). Overview moved to `/overview`. A second pass the same day
   (Section 45) made the city's windows per floor in world metres, with fading light trails,
   sky, beacons and a scanning ring. It also added the scroll-played junction, pillar
-  pictures, a chapter navigator, per-scenario results and the footer. **Since Section 47
-  the background is the console's own night photograph** (`assets/city-night.jpg`), alive
-  (`home/CityPhoto.tsx`). The owner asked for a city that looks realistic and matches the
-  console; the procedural three.js city (Sections 44–46) is gone. Traffic drives the
-  photo's real roads, traced in `home/cityPhotoData.ts` (photo pixels), so replacing the
-  photo means re-tracing that file. Free text sits on light frosted captions. **GSAP rule:** entrance tweens animate
+  pictures, a chapter navigator, per-scenario results and the footer. **Since Section 48
+  the background is the 3D city again, in morning light** (`home/MorningCity.tsx`; the
+  owner turned down Section 47's living photo: "do it like before only but morning
+  theme"):
+  - a low sun with real cast shadows, from a static shadow map rendered once;
+  - a sky that also hazes the distance;
+  - glass that reflects the sky, trees and parks;
+  - vehicles that keep their lanes, queue at red and go on green.
+  Its logic lives in pure, tested modules (`home/city/layout.ts`, `traffic.ts`,
+  `shaders.ts`; `__tests__/city.test.ts`). The flat ground is ONE procedural plane drawn
+  first without depth (roads and paint from world position), so nothing can z-fight.
+  Free text sits on light frosted captions. **GSAP rule:** entrance tweens animate
   plain wrappers with `fromTo` and explicit ends, never an element with a CSS `transform`
   transition. A refresh re-reads it mid-transition and leaves it stuck part-way, which is
   what shifted the scenario cards.

@@ -14,7 +14,8 @@
   min-height: 100vh;
   color: var(--h-ink);
   font-family: var(--font-ui);
-  background: radial-gradient(ellipse at 50% 30%, #0d1830 0%, #07101f 70%);
+  /* the morning sky, until the 3D city draws */
+  background: linear-gradient(180deg, #6f9fd0 0%, #b9cfe2 42%, #8f9599 100%);
   overflow-x: clip;
 }
 .home :is(.home-lead, .hero-line, .scn-head p, .tour-step li, .tour-line, .rig-points li, .problem-answer, .res-note) {
@@ -51,11 +52,11 @@
   inset: 0;
   z-index: -5;
   pointer-events: none;
-  /* light: the evening city should show through; just enough at the edges
-     and down the text column to keep words readable */
+  /* light: the morning city should show through; a touch of shade at the
+     edges and down the text column keeps words readable */
   background:
-    radial-gradient(ellipse at 50% 45%, transparent 45%, rgb(3 7 18 / 0.5) 100%),
-    linear-gradient(90deg, rgb(3 7 18 / 0.42), transparent 55%);
+    radial-gradient(ellipse at 50% 45%, transparent 60%, rgb(6 12 28 / 0.18) 100%),
+    linear-gradient(90deg, rgb(6 12 28 / 0.26), transparent 45%);
 }
 .home-progress {
   position: fixed;
@@ -165,7 +166,9 @@
    over the lit evening city without hiding it */
 .home-lead,
 .tour-card,
-.rig-points {
+.rig-points,
+.problem-text.small,
+.problem-answer {
   border-radius: 18px;
   background: rgb(6 12 28 / 0.42);
   border: 1px solid rgb(255 255 255 / 0.06);
@@ -182,6 +185,12 @@
 }
 .rig-points {
   padding: 16px 18px;
+  margin-left: -18px;
+}
+.problem-text.small,
+.problem-answer {
+  width: fit-content;
+  padding: 12px 18px;
   margin-left: -18px;
 }
 .home-lead {
@@ -243,7 +252,7 @@
   inset: 8% 10%;
   z-index: -1;
   pointer-events: none;
-  background: radial-gradient(ellipse at 50% 52%, rgb(3 7 18 / 0.62) 0%, rgb(3 7 18 / 0.35) 45%, transparent 72%);
+  background: radial-gradient(ellipse 40% 46% at 50% 50%, rgb(6 12 28 / 0.55) 0%, rgb(6 12 28 / 0.26) 55%, transparent 100%);
 }
 .hero-inner {
   display: flex;
@@ -351,11 +360,14 @@
   font-size: clamp(18px, 2vw, 26px);
   line-height: 1.5;
 }
+/* a word not yet lit: muted, but legible over the bright morning city */
 .pw {
-  color: rgb(255 255 255 / 0.18);
+  color: rgb(255 255 255 / 0.42);
+  text-shadow: 0 2px 4px rgb(0 0 0 / 0.35), 0 0 24px rgb(255 170 90 / 0);
 }
 .home:not(.home-anim) .pw {
   color: #fff;
+  text-shadow: 0 2px 4px rgb(0 0 0 / 0.6), 0 0 24px rgb(255 170 90 / 0.35);
 }
 .problem-answer {
   margin-top: 26px;
@@ -1468,7 +1480,12 @@
 }
 .rig-call-text {
   font: 600 14px var(--font-ui);
-  fill: #dfe5f0;
+  fill: #eef2f8;
+  /* a dark outline under the fill: legible over the bright city */
+  paint-order: stroke;
+  stroke: rgb(6 12 28 / 0.78);
+  stroke-width: 4px;
+  stroke-linejoin: round;
 }
 .rig-chain {
   margin-top: 30px;
@@ -1537,6 +1554,10 @@
 }
 .stack-marquee {
   overflow: hidden;
+  /* a frosted band, so the outlined names hold against the morning sky */
+  padding: 14px 0;
+  background: rgb(6 12 28 / 0.42);
+  backdrop-filter: blur(8px);
   mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent);
 }
 .stack-track {

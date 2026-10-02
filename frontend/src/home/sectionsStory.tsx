@@ -114,7 +114,7 @@ export function Problem() {
     setP(0)
     gsap
       .timeline({ scrollTrigger: { trigger: el, start: 'top top', end: '+=220%', scrub: 0.6, pin: true, onUpdate: (self) => setP(self.progress) } })
-      .to(words, { color: '#ffffff', textShadow: '0 0 24px rgba(255,170,90,0.35)', stagger: { amount: 0.4 }, ease: 'none', duration: 0.05 }, 0)
+      .to(words, { color: '#ffffff', textShadow: '0 2px 4px rgba(0,0,0,0.6), 0 0 24px rgba(255,170,90,0.35)', stagger: { amount: 0.4 }, ease: 'none', duration: 0.05 }, 0)
       .to('.problem-answer', { opacity: 1, y: 0, ease: 'none', duration: 0.12 }, 0.62)
       .to({}, { duration: 0.26 })
   })

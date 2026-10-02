@@ -4765,3 +4765,79 @@ console".
 - **One real bug found and fixed on the way:** the car quads were back-face culled,
   because photo y runs down and that flips their winding. They are now drawn
   double-sided.
+
+## SECTION 48 — Home page: the 3D city in morning light (CURRENT STATE)
+
+*2026-10-02 · branch `main` · `frontend/src/home/` · replaces Section 47's living photo;
+builds on Sections 44–46*
+
+**Owner, on Section 47:** "no its not good, do it like before only but morning theme".
+So the background is the 3D city again: same layout idea, same camera path, same
+junction at the centre. It is now a morning city, and in daylight it has to hold up
+close, so it is built properly rather than recoloured. `CityPhoto.tsx` and
+`cityPhotoData.ts` are deleted.
+
+**Modules** (pure ones are unit-tested; no three.js in them):
+
+| Module | What it holds |
+|---|---|
+| `city/layout.ts` | The deterministic city (fixed seed). Roads every 120 m (the junction's two are 22 m wide, others 12 m) with 4 m sidewalks. Each block is subdivided into lots; some lots stay open. Towers over 60 m stand on podiums. Roof units sit on lower roofs. Glass towers. The four blocks round the junction stay low so it stays in view. A skyline ring beyond the inner grid. Four park blocks. Street trees along every inner road and along the junction's roads all the way out. |
+| `city/traffic.ts` | Right-hand traffic on the inner grid: the junction's roads have 2 lanes each way, the others 1. A signal at every one of the 81 crossings: a 30 s cycle (N–S 13 s green, 2 s amber; E–W 11 s green, 2 s amber; 1 s all-red twice), offset per crossing. The home junction is offset 0, and its four 3D signal heads show exactly those lights. Following uses the Intelligent Driver Model. The amber rule: a vehicle that can't stop comfortably goes through ("committed"). Vehicles: car, motorbike, auto-rickshaw, bus, truck. |
+| `city/shaders.ts` | One `skyColor` (deep blue zenith, pale horizon, a warm glow round the low sun) used three ways: for the dome, for haze (every surface fades into exactly the sky behind it) and for reflections. One `lit()`: sun with shadow, plus blue sky from above and a warm bounce from below. Three facade styles (punched windows, office ribbon windows, glass curtain wall), with Fresnel sky reflection and sun glints. The roofs use the console's own pale roof tones. |
+| `MorningCity.tsx` | The scene: instanced buildings, trees, vehicles and their soft contact shadows; the four signal heads and the faint scanning ring; the camera keyframes along the scroll. |
+
+**Rendering notes:**
+- **Shadows:** a sun-aligned orthographic depth map (4096², covering ±700 m), rendered
+  once because the sun and the city are static.
+  - It is sampled with hardware comparison and linear filtering (`compareFunction`,
+    `sampler2DShadow`), nine filtered taps, so edges are soft, with no stair-steps.
+  - Only the inner city and trees cast; the skyline ring is haze.
+- **Flat ground:** blocks, parks, sidewalks, asphalt, lane lines, the double yellow
+  centre line, stop lines and zebras are all ONE plane.
+  - It is drawn procedurally from world position (the roads are a regular grid), first
+    and without depth.
+  - So no layer can z-fight at a distance, and nothing needs depth-sorting against it.
+- **Output:** every custom fragment shader ends with three's tone-mapping and colour-space
+  chunks, so the same shaders are correct both ways:
+  - through the composer (HDR target with MSAA, bloom above a sunlit wall's brightness,
+    so only the sun, lamps and glints bloom, then OutputPass);
+  - straight to the screen.
+- **Tone mapping:** Khronos Neutral, exposure 1.15.
+
+**Quality step:** if the first ~2 s run under ~40 fps, it switches to the direct path at
+1× pixels: no bloom, no cloud, every other vehicle hidden. Verified: the direct path
+looks the same apart from those.
+
+**Page tints:** the overlays were night-tuned and dimmed the morning. Changes:
+- a lighter vignette;
+- a tighter shade behind the hero's logo and words (the logo is screen-blended off black,
+  so it keeps a dark backing);
+- the problem section: the paragraph and its answer sit on frosted captions, and unlit
+  words are a legible muted white (their reveal now keeps a dark outline when lit);
+- the signal head's lens labels get a dark outline;
+- the "Built with" strip sits on a frosted band.
+
+**Tests** (`__tests__/city.test.ts`, 8):
+- **Layout:**
+  - deterministic;
+  - no building on any road or sidewalk;
+  - no building in a park;
+  - no tree in a building or on a carriageway;
+  - the junction's blocks stay low.
+- **Signals:**
+  - one way is always red;
+  - green always goes through amber to red.
+- **Traffic:** 90 simulated seconds over every lane:
+  - no vehicle ever overlaps the one ahead;
+  - none crosses a red stop line unless it committed on amber;
+  - none exceeds its free speed;
+  - queues form at red;
+  - average speed stays above 3 m/s (no gridlock).
+
+**Verified:**
+- tsc, oxlint and the build are clean; 33 frontend and 114 backend tests pass.
+- Photographed at 1440×900 in full quality: hero, problem, pillars, pipeline, results,
+  scenarios, tour, physical model, finale. Also the light-quality path, and 390×844.
+- No shader warnings: an early version's sampling inside a divergent branch produced
+  "gradient instruction in a loop" warnings; fixed.
+- As before, smoothness can't be judged in the build machine's test browser.

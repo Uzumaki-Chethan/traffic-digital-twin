@@ -201,13 +201,16 @@ change on the page you touched (and any page you moved something to or from).
   the `data-explain` tags on every panel. The owner wrote: "remove all the files regarding
   the robo, everything we are not implementing it". Section 42.
 
-### Home page (2026-10-02, Sections 44–47) — part of the inventory
+### Home page (2026-10-02, Sections 44–48) — part of the inventory
 
 The home page is at `/`, full-screen, outside the console frame. Overview moved to
 `/overview`, and the rail has a Home item first. The page holds:
-- the living city background: the console's own night photograph, with traffic driving
-  its real roads, a signal-controlled crossing, tower beacons, and a camera that follows
-  the scroll (Section 47);
+- the live 3D city background in morning light (Section 48):
+  - the sky, sun and cloud, and long shadows;
+  - street trees and parks;
+  - traffic that queues at red and goes on green, with the junction's signals at the
+    centre;
+  - a camera that follows the scroll;
 - navigation:
   - the top bar's section links (How it works, Results, Scenarios, The console,
     Physical model; hidden below 1180 px);
