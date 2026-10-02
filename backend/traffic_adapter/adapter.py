@@ -463,6 +463,17 @@ class TrafficAdapter:
             **static,
         }
 
+    def get_lane_signal_states(self) -> Dict[str, str]:
+        """
+        The signal's per-lane state characters right now, {lane_id: char}.
+        Read-only (from the per-step signal subscription when it exists) and
+        it does not touch the phase clock - for side-channels like the
+        physical rig that want the light between decision ticks.
+        """
+        tls = self._tls_results()
+        raw_state = tls[tc.TL_RED_YELLOW_GREEN_STATE] if tls is not None else self._traci.trafficlight.getRedYellowGreenState(_TLS_ID)
+        return dict(self._build_lane_states(raw_state))
+
     def _extract_signal(self, simulation_time: float) -> SignalState:
         """
         Read the current traffic signal state and return it as a

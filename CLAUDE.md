@@ -387,7 +387,13 @@ unprompted, but do keep this section current if that changes:
   hardware design & BOM doc. `firmware/bench_test/bench_test.ino` is the current bench-test
   sketch (Section 8 steps 1-2 of that doc); the toolchain (Arduino IDE + ESP32 board support
   + Adafruit NeoPixel + the CP210x USB driver) is confirmed working end to end. The
-  signal-string-reading production sketch (Section 7 of that doc) is not yet written.
+  live link exists since 2026-10-02 (PROJECT_ARCHITECTURE_REPORT.md **Section 43**,
+  `firmware/README.md` is the step-by-step): `backend/hardware/` turns the live signal
+  state into the 16 lamps (same logic as the 3D mast heads) and sends them over USB from
+  a background thread — a fourth read-only side-channel that can never stall a run —
+  and `firmware/signal_link/signal_link.ino` lights them (blinking amber if the link
+  goes quiet). Heads 1–4 (GPIO 13/4/16/17) = South, East, North, West, the owner's
+  mapping. `python -m hardware.rig_test` drives the rig without a simulation.
   The physical signal head must match `overview/Junction3D.tsx`'s mast heads exactly
   (PROJECT_ARCHITECTURE_REPORT.md **Section 36**, current — supersedes Section 34's 5-lens
   design): **4 lenses per head**, not 5 or the BOM doc's originally-drafted 12 total — a

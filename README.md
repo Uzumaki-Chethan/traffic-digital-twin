@@ -47,6 +47,7 @@ always-on console) both just call it.
 | **Real-time Dashboard** | ✔ **done** |
 | **Emergency vehicle detection** | ✔ **done** |
 | **Database logging (SQLite)** | ✔ **done** |
+| Physical rig link (ESP32 over USB: backend side-channel + live firmware; Section 43) | ✔ code done — wiring 2026-10-03 |
 | Final optimization + demo polish | ⬜ |
 
 Full engineering context and history: see `PROJECT_ARCHITECTURE_REPORT.md`

@@ -4320,3 +4320,91 @@ layout work, the Settings page strip, and the simulation speed-up (Section 39).
   errors.
 
 Sections 38–41 stay in this report as history.
+
+## SECTION 43 — The physical rig's live link (CURRENT STATE)
+
+*2026-10-02 · branch `design/glass-night` · `backend/hardware/`, `firmware/signal_link/`,
+`firmware/README.md`*
+
+**Why now:** the hardware handoff (Section 36, the wiring PDF) left "the logic that reads
+the live signal state and drives the LEDs" to be written once the rig existed. The rig
+arrives on 2026-10-03, with little time to test, so it was built and verified the day
+before, without the hardware.
+
+**Head mapping (owner's choice, 2026-10-02):**
+
+| Head | GPIO | Approach |
+|---|---|---|
+| Head 1 | 13 | South |
+| Head 2 | 4 | East |
+| Head 3 | 16 | North |
+| Head 4 | 17 | West |
+
+The order lives in one place, `hardware.lamps.HEAD_ORDER`.
+
+**Backend** (`backend/hardware/`):
+- **`lamps.py`:** the lamp logic, a line-for-line mirror of the 3D mast heads
+  (`Junction3D.tsx`, Section 36). Lenses are red circle / amber circle / combined
+  left+ahead arrow / right arrow.
+  - While anything on the approach is green, the arrows carry their movement's colour.
+  - Otherwise the arrows go dark and one circle speaks: amber if something is still
+    amber, red if not.
+- **`serial_link.py`:** one background thread owns the port.
+  - `publish()` and `idle()` only store the newest line, so a missing or unplugged board
+    can never stall a run.
+  - Each line is sent on change and repeated every second as a heartbeat.
+  - The ESP32 is found by its USB chip (CP210x / CH340); DTR and RTS are held low so
+    opening the port doesn't reboot it.
+  - If the cable is pulled, the port is reopened by itself. With no board, the link logs
+    one line and retries quietly.
+  - There is one link per process (`get_link()`), so a port is never opened twice.
+- **Wiring into the run:**
+  - `simulation_runner` publishes the lane states at every decision tick and at every
+    5 Hz motion frame (through `TrafficAdapter.get_lane_signal_states()`, read-only from
+    the per-step signal subscription), so an amber starting mid-second shows at once. It
+    sends idle when a run ends.
+  - The in-process evaluator publishes the Trinetra side, only for live (dashboard)
+    evaluations.
+  - `server.py` sends idle at start-up.
+- **Config:** `HARDWARE_ENABLED`, `HARDWARE_SERIAL_PORT` (None = auto) and
+  `HARDWARE_BAUD`. pyserial was added to `requirements.txt`.
+- **`rig_test.py`:** `python -m hardware.rig_test` walks the junction through realistic
+  phases with no simulation, printing what each head should show.
+
+**Protocol:** 115200 baud, one line each:
+
+| Line | Meaning |
+|---|---|
+| `L` + 16 × `R`/`A`/`G`/`0` | the 16 lenses, head-major in `HEAD_ORDER` |
+| `I` | idle |
+| `?` | identify |
+
+**Firmware** (`firmware/signal_link/signal_link.ino`, same pins, brightness cap and
+chain-per-head design as the bench test):
+- **Power-on:** a self-test sweep.
+- **No line for 3 s, or none yet:** the amber circles blink, a real signal's fault mode,
+  so a dead link never shows a stale green.
+- **Idle:** the red circles stay steady.
+- **Bad lines:** garbled or overlong lines are ignored.
+- **Activity light:** GPIO 2 toggles on every line.
+- **Build:** compiled clean with arduino-cli 3.3.12 for esp32:esp32:esp32 (22% of flash).
+
+**Verified (2026-10-02, no hardware):**
+- `tests/test_hardware.py` has 11 tests:
+  - the lamp cases, including amber-while-green and lowercase green;
+  - the frame layout;
+  - the link sends on change, heartbeats, never blocks, reconnects after a pulled cable,
+    stays silent with no board, and sends idle.
+- **End to end:** a real 300 s extreme run with the link writing to a recording fake port.
+  - 42 lines, all valid for the firmware, ending in idle.
+  - Every head got its greens, in the program's real order: N+S left/straight, amber,
+    E+W, amber, then the right turns.
+  - All 1,501 published snapshots are byte-identical to the pre-change baseline.
+- The backend suite passes (114).
+
+**Not verifiable before the rig exists:**
+- the real COM-port behaviour on the demo laptop, including whether the board reboots
+  on open despite DTR/RTS held low;
+- colours on the physical WS2811s.
+
+`firmware/README.md` is the checklist for 2026-10-03.

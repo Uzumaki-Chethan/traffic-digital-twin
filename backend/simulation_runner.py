@@ -44,6 +44,7 @@ from ml import MLPredictor
 from decision_engine.decision_engine import DecisionEngine, ALL_APPROACH_LANES
 from signal_controller.signal_controller import SignalController, PHASE_TO_INDEX
 from database import DatabaseLogger
+from hardware.serial_link import get_link
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +138,8 @@ def run_simulation(store, control=None, *, gui=None, base_config=Config,
     config.validate()
 
     manager = TraCIManager(config)
+    # The physical rig: a fourth read-only side-channel (Section 43).
+    rig = get_link()
     # Every row this run writes carries run_id (the console passes its
     # started_at, so a GUI handover continues the SAME run's rows); runs
     # older than the newest DB_KEEP_RUNS are pruned on the way OUT (see the
@@ -332,6 +335,7 @@ def run_simulation(store, control=None, *, gui=None, base_config=Config,
             # (the DESIRED state DecisionEngine just produced).
             sig_view = signal_view(state)
             lane_states = dict(state.signal.lane_states)
+            rig.publish(lane_states)
 
             # ---- Persistence (1 Hz, insert-only, failure-tolerant) ----
             db_logger.log_decision(
@@ -463,6 +467,9 @@ def run_simulation(store, control=None, *, gui=None, base_config=Config,
             if snapshot is None:
                 return
             try:
+                # the rig follows the light between ticks too (an amber
+                # starts mid-second)
+                rig.publish(adapter.get_lane_signal_states())
                 store.publish(motion_frame(
                     snapshot, adapter.get_simulation_time(), {None: adapter.get_vehicles()},
                 ))
@@ -482,6 +489,7 @@ def run_simulation(store, control=None, *, gui=None, base_config=Config,
         # or raised an exception above, so the TraCI connection and the
         # underlying SUMO process are never left dangling.
         manager.close()
+        rig.idle()
         # Housekeeping after SUMO is closed, so it never delays a start
         # or blocks a tick's writes; failure-tolerant like the logger.
         db_logger.prune_runs(config.DB_KEEP_RUNS)

@@ -88,6 +88,7 @@ from performance.scenarios import scenario_sumocfg_path
 from services.live_state import DEFAULT_STORE as LIVE_STATE, RemoteLiveStatePublisher
 from services.dashboard_server import start_dashboard_server
 from services.snapshot_views import _INDEX_TO_PHASE, MOTION_FRAME_INTERVAL_SECONDS, motion_frame, side_view
+from hardware.serial_link import get_link
 
 logger = logging.getLogger(__name__)
 
@@ -294,6 +295,9 @@ class PerformanceEvaluator:
         """
         predictor = self._load_predictor()
         binary_name = "sumo-gui" if self._use_gui else "sumo"
+        # The physical rig shows the Trinetra side of a live evaluation
+        # (Section 43); a headless batch run (no live store) leaves it alone.
+        rig = get_link() if live_store is not None else None
 
         manager_ai = TraCIManager(
             _SimConfig(self._sumocfg_path, binary_name), label="ai"
@@ -439,6 +443,8 @@ class PerformanceEvaluator:
                         and step_index % every != 1 % every
                         and step_index % motion_every == 1 % motion_every):
                     try:
+                        if rig is not None:
+                            rig.publish(adapter_ai.get_lane_signal_states())
                         live_store.publish(motion_frame(
                             last_live_snapshot[0],
                             max(adapter_ai.get_simulation_time(), adapter_base.get_simulation_time()),
@@ -452,6 +458,8 @@ class PerformanceEvaluator:
 
                 if ai_pending and on_tick:
                     state_ai = record(collector_ai, adapter_ai)
+                    if rig is not None:
+                        rig.publish(dict(state_ai.signal.lane_states))
                     twin.update(state_ai)
                     features = feature_engineer.generate_features()
 
@@ -587,6 +595,8 @@ class PerformanceEvaluator:
         finally:
             manager_ai.close()
             manager_base.close()
+            if rig is not None:
+                rig.idle()
 
         ai_summary = collector_ai.summary()
         base_summary = collector_base.summary()

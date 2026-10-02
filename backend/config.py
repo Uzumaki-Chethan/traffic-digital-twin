@@ -102,6 +102,15 @@ class Config:
     DASHBOARD_HOST = "127.0.0.1"
     DASHBOARD_PORT = 8000
 
+    # The physical rig (hardware/, firmware/signal_link): an ESP32 driving
+    # 16 signal LEDs over USB serial. Read-only like the dashboard. With no
+    # board plugged in it stays silent and keeps retrying in the background.
+    # HARDWARE_SERIAL_PORT None = find the ESP32 by its USB chip (CP210x /
+    # CH340); set e.g. "COM3" to force a port.
+    HARDWARE_ENABLED = True
+    HARDWARE_SERIAL_PORT = None
+    HARDWARE_BAUD = 115200
+
     @classmethod
     def get_sumo_binary(cls):
         """

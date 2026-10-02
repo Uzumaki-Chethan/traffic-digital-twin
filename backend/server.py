@@ -41,6 +41,7 @@ from services.dashboard_server import create_app
 from services.control_routes import build_control_router
 from services.sim_supervisor import SimulationSupervisor
 from ml import MLPredictor
+from hardware.serial_link import get_link
 
 
 def build_server_app(store=LIVE_STATE):
@@ -91,6 +92,9 @@ def main():
     Config.validate()
 
     app = build_server_app()
+    # The physical rig, if plugged in, shows its idle pattern from now on
+    # (and the link keeps retrying quietly if it isn't) - Section 43.
+    get_link().idle()
     logger.info("Trinetra console on http://%s:%d - press Start in the UI to "
                 "launch a simulation.", args.host, args.port)
     # Foreground, unlike start_dashboard_server()'s daemon thread: here the
