@@ -107,7 +107,12 @@ frontend replaced it; the dead fallback code path was cleaned up 2026-09-06).
   anything that reads state less often than every step must call `adapter.observe_step()`
   after EVERY step (it accumulates SUMO's last-step-only departed/arrived/stop lists), and
   decision ticks must stay on the same simulated times (0.05, 1.05, …) or the AI's
-  decisions change. Section 28.
+  decisions change. Section 28. **Since 2026-10-02 vehicles are NOT subscribed per vehicle**
+  (that made SUMO send the whole fleet in every 0.05 s step's reply, ~60% of wall time
+  in extreme traffic): each read takes a one-shot fleet snapshot (junction context
+  subscription, read, unsubscribe). Extreme at max went ~4.4x -> ~11x real time, every
+  published value byte-identical (Section 39). Don't reintroduce standing per-vehicle
+  subscriptions.
 - **Digital Twin** (`backend/digital_twin/`): current `SimulationState` + bounded rolling
   history. Nothing else stores its own copy of traffic state.
 - **ML model loading** (`backend/ml/ml_predictor.py`): `MLPredictor.from_path` caches the

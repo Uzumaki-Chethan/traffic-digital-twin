@@ -4095,3 +4095,49 @@ designed.
 | `useBlinkyWorld.ts` | `useLiveState.ts` + `worldDom.ts` |
 
 `director.ts` is new: it is the body, kept out of React.
+
+## SECTION 39 — Max-speed simulation: fleet snapshots instead of standing subscriptions (CURRENT STATE)
+
+*2026-10-02 · branch `design/glass-night` · `backend/traffic_adapter/adapter.py`*
+
+**Symptom (owner):** at max speed, Extreme traffic ran at only ~2x real time, against ~20x
+for Balanced. Not the laptop and not a regression: cost grew with the vehicle count.
+
+**Root cause (profiled, headless, max speed):** SUMO itself stepped at ~1 ms per 0.05 s step
+(~50x real time) even in extreme traffic. The time was in Python's traci library parsing
+**per-vehicle subscription results**: since Section 28 every vehicle had a standing
+subscription to five variables, so SUMO sent the whole fleet in the reply to every step —
+20 times per simulated second — while the adapter only reads it ~6 times per simulated
+second (the 1 Hz decision tick and the 5 Hz motion frames). On a 90 s extreme profile,
+~45 s of ~80 s went to parsing 408,000 vehicle records nobody read.
+
+**Fix:** no standing per-vehicle subscriptions. Each read (`_vehicle_results`) takes a
+one-shot **fleet snapshot**: a context subscription on junction C covering the whole
+network, whose reply carries the current values, unsubscribed immediately
+(`_fleet_snapshot`). Type/class are still read once per vehicle and cached; a vehicle the
+snapshot misses (mid-teleport, off every lane) falls back to direct reads, as a new
+vehicle used to.
+
+**Evidence:**
+
+| Extreme, 300 simulated s, headless, unpaced | Wall time | Real-time factor |
+|---|---|---|
+| Before | 68.9 s | ~4.4x |
+| After | 27.2 s | ~11x |
+
+- All 1,501 published snapshots (301 decision ticks + motion frames) hash identically
+  before and after, so the AI's inputs and decisions are unchanged.
+- Backend suite: 103 pass.
+- The evaluator (two sides) and the dataset generator use the same adapter, so both gain
+  too, with identical values.
+
+**What's left per simulated second (extreme):**
+- SUMO stepping: ~20 ms.
+- The AI tick: ~33 ms; the 24 isotonic confidence calibrations are ~9 ms of it.
+- Motion-frame snapshots.
+
+None of these is a single dominant cost any more. Real-time factor still falls as traffic
+builds (≈7–11x at 100–130 vehicles on the build laptop).
+
+**Not related:** the browser side (Blinky, the 3D view) never touches the simulation's
+speed; it only affects how smoothly the page draws.

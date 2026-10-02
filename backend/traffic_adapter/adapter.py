@@ -51,6 +51,18 @@ _TLS_ID = "C"
 _VEHICLE_VARS = (
     tc.VAR_LANE_ID, tc.VAR_SPEED, tc.VAR_WAITING_TIME, tc.VAR_POSITION, tc.VAR_ANGLE,
 )
+# Since 2026-10-02 these are NOT kept subscribed per vehicle: a standing
+# subscription made SUMO send all five for every vehicle in every 0.05 s
+# step's reply, and parsing that in Python's traci was ~60% of a run's
+# wall time on extreme traffic (~90 vehicles: 2-3x real time at max) -
+# yet the values are only read ~6 times per simulated second (the 1 Hz
+# tick + 5 Hz motion frames). Instead each read takes a one-shot
+# snapshot of the whole fleet: a context subscription on the junction,
+# whose reply carries the current values, then unsubscribed at once
+# (_fleet_snapshot). Same getters, same values; parsed only when used.
+_FLEET_JUNCTION = "C"
+# Radius (m) around the junction that covers the whole 400 m network.
+_FLEET_RANGE = 10000.0
 # Static for a vehicle's whole life: read once when it is first seen and
 # remembered, never subscribed - SUMO delivers a subscription every step
 # whether or not it is read, so every variable in it is parsing cost
@@ -105,13 +117,9 @@ class TrafficAdapter:
         # it never decides anything about it.
         self._observed_phase_index = None
         self._observed_phase_started_at = 0.0
-        # Subscription bookkeeping (see _VEHICLE_VARS). A vehicle is read
-        # directly on the one step it first appears - its subscription
-        # only reports from the NEXT step - and from its subscription
-        # after that. _last_vehicle_results is the most recent step's
-        # results, which get_emergency_vehicle_lanes() reads instead of
-        # asking SUMO again.
-        self._subscribed_vehicles = set()
+        # Per-vehicle static values (type, class), read once and kept.
+        # _last_vehicle_results is the most recent read's results, which
+        # get_emergency_vehicle_lanes() reads instead of asking SUMO again.
         self._static_by_vehicle = {}
         self._last_vehicle_results = {}
         self._tls_subscribed = False
@@ -390,46 +398,62 @@ class TrafficAdapter:
         This step's raw variables for every vehicle on the network, keyed
         by vehicle id: {vehicle_id: {tc.VAR_*: value}}.
 
-        Two round trips for the whole fleet - the id list and the
-        subscription results - plus, for a vehicle seen for the first
-        time this step, one subscribe and one direct read of each
-        variable (a subscription delivers from the next step on). The id
-        list is the authority, not the departed list: a run resumed from
-        a saved state starts with vehicles that never "departed".
+        Three round trips for the whole fleet - the id list and a one-shot
+        fleet snapshot (subscribe + unsubscribe, see _FLEET_JUNCTION) -
+        plus the two static reads for a vehicle seen for the first time,
+        and direct reads for any vehicle the snapshot missed (one that is
+        mid-teleport, off every lane). The id list is the authority, not
+        the departed list: a run resumed from a saved state starts with
+        vehicles that never "departed".
         """
         vehicle = self._traci.vehicle
         ids = vehicle.getIDList()
-        subscribed = vehicle.getAllSubscriptionResults() if self._subscribed_vehicles else {}
+        snapshot = self._fleet_snapshot() if ids else {}
         results = {}
         for vehicle_id in ids:
-            r = subscribed.get(vehicle_id)
+            r = snapshot.get(vehicle_id)
             if r is None or any(var not in r for var in _VEHICLE_VARS):
                 r = self._read_vehicle_directly(vehicle_id)
-                if vehicle_id not in self._subscribed_vehicles:
-                    vehicle.subscribe(vehicle_id, _VEHICLE_VARS)
-                    self._subscribed_vehicles.add(vehicle_id)
             else:
                 r = dict(r)
-                r.update(self._static_by_vehicle[vehicle_id])
+                r.update(self._static_of(vehicle_id))
             results[vehicle_id] = r
-        # Vehicles that left the network drop out of the results on their
-        # own; keep the bookkeeping from growing with them.
-        if len(self._subscribed_vehicles) > 2 * len(results) + 64:
-            self._subscribed_vehicles &= set(results)
+        # Keep the static cache from growing with vehicles that have left.
+        if len(self._static_by_vehicle) > 2 * len(results) + 64:
             self._static_by_vehicle = {k: v for k, v in self._static_by_vehicle.items() if k in results}
         self._last_vehicle_results = results
         return results
 
-    def _read_vehicle_directly(self, vehicle_id: str) -> dict:
-        """The five reads a subscription replaces, for a vehicle's first step."""
-        vehicle = self._traci.vehicle
+    def _fleet_snapshot(self) -> dict:
+        """
+        Every vehicle's _VEHICLE_VARS right now, {vehicle_id: {var: value}},
+        in one reply: a context subscription's answer carries the current
+        values, and it is dropped straight away so no later step pays to
+        deliver it.
+        """
+        junction = self._traci.junction
+        junction.subscribeContext(_FLEET_JUNCTION, tc.CMD_GET_VEHICLE_VARIABLE, _FLEET_RANGE, _VEHICLE_VARS)
+        try:
+            return dict(junction.getContextSubscriptionResults(_FLEET_JUNCTION) or {})
+        finally:
+            junction.unsubscribeContext(_FLEET_JUNCTION, tc.CMD_GET_VEHICLE_VARIABLE, _FLEET_RANGE)
+
+    def _static_of(self, vehicle_id: str) -> dict:
+        """Type and class, read the first time a vehicle is seen and kept."""
         static = self._static_by_vehicle.get(vehicle_id)
         if static is None:
+            vehicle = self._traci.vehicle
             static = {
                 tc.VAR_TYPE: vehicle.getTypeID(vehicle_id),
                 tc.VAR_VEHICLECLASS: vehicle.getVehicleClass(vehicle_id),
             }
             self._static_by_vehicle[vehicle_id] = static
+        return static
+
+    def _read_vehicle_directly(self, vehicle_id: str) -> dict:
+        """The five reads the fleet snapshot replaces, for a vehicle it missed."""
+        vehicle = self._traci.vehicle
+        static = self._static_of(vehicle_id)
         return {
             tc.VAR_LANE_ID: vehicle.getLaneID(vehicle_id),
             tc.VAR_SPEED: vehicle.getSpeed(vehicle_id),
