@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom'
+import { Outlet, Route, Routes } from 'react-router-dom'
 import { Shell } from '@/layout/Shell'
 import { useSocket } from '@/data/useSocket'
 import { useRunStatePoll } from '@/data/runState'
@@ -7,6 +7,16 @@ import { AnalyticsPage } from '@/pages/AnalyticsPage'
 import { DecisionsPage } from '@/pages/DecisionsPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { PerformancePage } from '@/pages/PerformancePage'
+import { HomePage } from '@/home/HomePage'
+
+/** The console pages share the glass frame (rail, top bar, footer). */
+function ConsoleLayout() {
+  return (
+    <Shell>
+      <Outlet />
+    </Shell>
+  )
+}
 
 export default function App() {
   useSocket()
@@ -14,14 +24,17 @@ export default function App() {
   // state both need to know what this backend will let them do.
   useRunStatePoll()
   return (
-    <Shell>
-      <Routes>
-        <Route path="/" element={<OverviewPage />} />
+    <Routes>
+      {/* The home page is full-screen, outside the console frame (Section 44). */}
+      <Route path="/" element={<HomePage />} />
+      <Route element={<ConsoleLayout />}>
+        <Route path="/overview" element={<OverviewPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/performance" element={<PerformancePage />} />
         <Route path="/decisions" element={<DecisionsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
-      </Routes>
-    </Shell>
+        <Route path="*" element={<OverviewPage />} />
+      </Route>
+    </Routes>
   )
 }

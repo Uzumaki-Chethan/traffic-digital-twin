@@ -13,7 +13,7 @@ const TARGETS: { id: Target; label: string; lead: React.ReactNode }[] = [
     label: 'Overview · demo',
     lead: (
       <>
-        What <Link to="/" className="underline decoration-[var(--rule-strong)] underline-offset-2">Overview</Link> runs
+        What <Link to="/overview" className="underline decoration-[var(--rule-strong)] underline-offset-2">Overview</Link> runs
         when you press Start — one controller, Trinetra, watched live.
       </>
     ),

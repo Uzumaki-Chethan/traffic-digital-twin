@@ -8,7 +8,7 @@ import { useRunStore } from '@/data/runState'
  * itself — what it shows and where its numbers come from.
  */
 const PAGE_NOTES: { path: string; name: string; note: string }[] = [
-  { path: '/', name: 'Overview', note: 'the junction live — signal state, lanes, and what the engine decided' },
+  { path: '/overview', name: 'Overview', note: 'the junction live — signal state, lanes, and what the engine decided' },
   { path: '/analytics', name: 'Analytics', note: 'the run in progress, read from the live stream' },
   { path: '/performance', name: 'Performance', note: 'Trinetra against VAC (vehicle-actuated control), in lockstep on one scenario' },
   { path: '/decisions', name: 'Decisions', note: 'every decision of a run, with its scores and reason — from the database' },
@@ -31,7 +31,7 @@ export function FooterBar() {
       : run
         ? 'simulation process'
         : 'backend'
-  const page = PAGE_NOTES.find((p) => (p.path === '/' ? pathname === '/' : pathname.startsWith(p.path)))
+  const page = PAGE_NOTES.find((p) => pathname.startsWith(p.path))
   return (
     <footer
       className="flex h-8 shrink-0 items-center justify-between gap-4 px-[18px] text-[11.5px] text-white/75"

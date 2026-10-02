@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import clsx from 'clsx'
-import { Activity, BarChart3, ChartColumnIncreasing, ChevronsLeft, ListTree, SlidersHorizontal } from 'lucide-react'
+import { Activity, BarChart3, ChartColumnIncreasing, ChevronsLeft, House, ListTree, SlidersHorizontal } from 'lucide-react'
 import { DUR, EASE_OUT, EASE_SPRING } from '@/ui/motion'
 import { Brand } from './Brand'
 
 const NAV = [
-  { to: '/', label: 'Overview', icon: Activity, end: true },
+  { to: '/', label: 'Home', icon: House, end: true },
+  { to: '/overview', label: 'Overview', icon: Activity, end: true },
   { to: '/analytics', label: 'Analytics', icon: ChartColumnIncreasing },
   { to: '/performance', label: 'Performance', icon: BarChart3 },
   { to: '/decisions', label: 'Decisions', icon: ListTree },

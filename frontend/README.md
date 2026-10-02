@@ -13,7 +13,18 @@ city-photo backdrop, dark-glass rail with the owner's logo, a frosted container,
 pale glass cards, Poppins / Overpass Mono with Orbitron headings, and a daytime city
 map (shared `overview/cityscape.ts`) in both the plan and the 3D view.
 
-- **Overview** (`/`) — the junction as the hero, in either a true-scale plan view
+**Home** (`/`, `src/home/`, Section 44) is the full-screen landing page outside the
+console frame:
+- a live three.js night city behind it (`CityTrails.tsx`), whose camera follows the
+  scroll and which drops its own quality on a slow machine;
+- smooth scrolling (Lenis) and GSAP ScrollTrigger scenes;
+- all its words and numbers in `content.ts`, tested against README.md's results;
+- real console screenshots in `src/assets/home/`, which should be retaken if the console
+  changes a lot.
+
+With reduced motion, the page shows simple fades and a still background.
+
+- **Overview** (`/overview`) — the junction as the hero, in either a true-scale plan view
   (one SVG unit = one metre; Ctrl + scroll or pinch to zoom about the pointer,
   drag to pan, 1× = the whole 400 m network, 3.5× on opening and under the
   "frame the junction" button; a plain scroll is left to the page) or an interactive 3D

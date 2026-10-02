@@ -24,7 +24,7 @@ export interface PageContext {
   /** The kind of run this page shows. */
   kind: RunKind
   /** Where that kind of run is watched. */
-  home: '/' | '/performance'
+  home: '/overview' | '/performance'
   /** Scenario id the page's Start would run, or is running. */
   scenario: string
   /** Its plain-language name. */
@@ -40,7 +40,7 @@ const NAMES: { path: string; name: string }[] = [
   { path: '/performance', name: 'Performance' },
   { path: '/decisions', name: 'Decisions' },
   { path: '/settings', name: 'Simulation Settings' },
-  { path: '/', name: 'Overview' },
+  { path: '/overview', name: 'Overview' },
 ]
 
 export function kindOf(pathname: string, target: Target): RunKind {
@@ -66,9 +66,9 @@ export function usePageContext(): PageContext {
 
   return {
     path: pathname,
-    name: NAMES.find((n) => (n.path === '/' ? pathname === '/' : pathname.startsWith(n.path)))?.name ?? 'Trinetra',
+    name: NAMES.find((n) => pathname.startsWith(n.path))?.name ?? 'Trinetra',
     kind,
-    home: kind === 'evaluation' ? '/performance' : '/',
+    home: kind === 'evaluation' ? '/performance' : '/overview',
     scenario,
     scenarioLabel: scenarioName(scenario),
     running,

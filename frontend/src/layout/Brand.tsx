@@ -15,7 +15,7 @@ export function Brand({ collapsed }: { collapsed: boolean }) {
   return (
     <Link
       to="/"
-      aria-label="Trinetra — Overview"
+      aria-label="Trinetra — Home"
       // Both pieces stay mounted and animate with the rail's width: the eye
       // eases between its two sizes, the wordmark folds away (height and
       // opacity) instead of vanishing — nothing pops.

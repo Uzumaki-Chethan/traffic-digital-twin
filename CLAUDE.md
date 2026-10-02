@@ -347,6 +347,10 @@ unprompted, but do keep this section current if that changes:
   in both the plan and 3D views, at the same true scale. The owner declined the
   prototype's theme picker, boot curtain, weather widget, cursor glow and its
   Throughput/Accuracy/"AI confidence" tiles.
+  **Home page (2026-10-02, Section 44):** `/` is a full-screen landing page
+  (`frontend/src/home/`): a three.js light-trail city background, GSAP ScrollTrigger and
+  Lenis scroll scenes, every number from `home/content.ts` (computed from README.md's
+  results; tests guard it). Overview moved to `/overview`.
   **No mascot:** the Blinky / Zen / Sparky mascot (Sections 38–41) was removed entirely
   on 2026-10-02 at the owner's instruction (Section 42) — don't bring it back unasked.
   A 3D miniature of the junction DOES exist now, at the user's explicit request

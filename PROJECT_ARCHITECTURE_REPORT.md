@@ -4408,3 +4408,91 @@ chain-per-head design as the bench test):
 - colours on the physical WS2811s.
 
 `firmware/README.md` is the checklist for 2026-10-03.
+
+## SECTION 44 — The home page (CURRENT STATE)
+
+*2026-10-02 · branch `main` · `frontend/src/home/`*
+
+**Request (owner):**
+- A home page that explains what Trinetra is and what it achieves, for anyone seeing it
+  for the first time.
+- A brief of every feature and the simulation scenarios, with related things grouped.
+- Highly animated, with "insane" scroll animations and a great background.
+- No team names.
+
+**Owner's choices:**
+- full-screen landing at `/` (not inside the console frame);
+- a live light-trail city background;
+- GSAP ScrollTrigger and Lenis allowed.
+
+**Routing:**
+- **Home page:** at `/`. The console pages share `Shell` through a layout route
+  (`App.tsx` `ConsoleLayout`).
+- **Overview:** at `/overview`, with every reference updated (`pageContext` home/name,
+  the rail, the footer note, the Settings link).
+- **Unknown paths:** fall back to Overview inside the frame.
+- **Rail:** gains Home first; the logo links home.
+- **Production:** `dashboard_server`'s SPA fallback already serves deep links (checked:
+  `/`, `/overview` and `/performance` all return 200 text/html from the built app).
+
+**The page (scroll order):**
+1. **Hero:** the eye and wordmark assemble, then the tagline, the one-line explanation,
+   *Open the console* and *See how it works*.
+2. **The problem:** pinned; the words light up with the scroll beside a small junction
+   (a queue at red, an empty green).
+3. **What Trinetra is:** Sees / Predicts / Decides, flying in out of depth.
+4. **How it works:** pinned and scrolling sideways; six steps from the simulator to the
+   signal, with a gradient line and a travelling pulse.
+5. **What it achieved:** counters (13/13 scenarios; 7/7 metrics won or tied; 86.2% less
+   waiting at best; 47% more accurate forecasts than persistence), then per-scenario bars
+   with metric tabs (wait, queue, worst journey, journey, speed).
+6. **Built for the unexpected:** emergency, accident, rain, rush hour, fairness and safety
+   cards, each with a small CSS animation.
+7. **Thirteen scenarios** in four groups (Everyday / Under pressure / One side busy /
+   Incidents & weather), each card with the live `ScenarioPreview`.
+8. **Inside the console:** five pages; a pinned browser frame cross-fades between real
+   screenshots (`src/assets/home/*.webp`, captured from the running console 2026-10-02,
+   about 110 KB each).
+9. **From screen to street:** the physical rig, with an animated four-lens head running
+   the real lamp rule. The combined arrow is the hardware handoff's Appendix B outline.
+10. **Finale:** a "Built with" marquee, "Watch it think." and *Open the console*.
+
+**The top bar** is fixed and frosted. It shows a red→amber→green scroll progress line
+and, while a run is up, a live badge linking to it.
+
+**Honesty:**
+- Every number lives in `home/content.ts`, transcribed from README.md's VAC sweep table
+  and the model's test MAE (1.44 vs 2.72 persistence).
+- The headline figures are computed from those rows.
+- `home/__tests__/content.test.ts` checks:
+  - every scenario appears in exactly one group;
+  - the rows match README;
+  - the headlines are derived.
+- The copy says "won or tied", and the footnote names the ties (throughput everywhere;
+  the longest queue in Light and Balanced).
+
+**Background** (`CityTrails.tsx`, three.js):
+- the scene: an instanced city with lit windows, a road grid and 900 instanced light
+  streaks (red tail-lights away, warm headlights toward), plus the junction's signals
+  cycling, a glow pool, drifting sparks, fog and an UnrealBloom pass;
+- the camera: keyframed against scroll progress, with pointer parallax;
+- self-protecting quality: after about 2 s, if it can't hold about 40 fps it drops to 1×
+  pixels and half the streaks;
+- it pauses when the tab is hidden.
+
+**Reduced motion:** native scroll, no scenes, content in place, a still background.
+
+**Verified:**
+- tsc, oxlint and the build are clean; 22 frontend tests and 114 backend tests pass.
+- Every section was photographed in the browser, with layout fixes made along the way:
+  - the stacking context that hid the city;
+  - the counter caption style;
+  - the queue in the problem scene;
+  - text readability (text shadows, a deeper vignette, a higher mid-page camera);
+  - a frosted top bar;
+  - the logo blend.
+- Animated mode loads with both pinned scenes and no console errors.
+- Navigation works both ways, and deep links work in production.
+
+**Not judged here:** animation smoothness. The build machine's test browser renders WebGL
+at about 1 fps, so smoothness is for the demo laptop to judge.
