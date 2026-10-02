@@ -1,7 +1,7 @@
 # UI change rules and the content inventory
 
 **Status:** binding from 2026-09-17 (tag `prototype-1`); the inventory below was brought
-current and re-tagged `prototype-2` on 2026-09-21 (§5). Written for whoever works on the
+current and re-tagged `prototype-2` on 2026-09-21 and `prototype-3` on 2026-10-02 (§5). Written for whoever works on the
 interface next — the owner, a teammate on a `design/<name>` branch, or Claude Code driving
 either — and read by Claude at the start of any UI task (`CLAUDE.md` points here).
 
@@ -214,13 +214,17 @@ change on the page you touched (and any page you moved something to or from).
 
 ## 5. The revert point
 
-`git tag prototype-2` is the current working prototype and revert point, current as of
-2026-09-21 — rain (Section 31), ad hoc accidents with a hazard marker and smoke (Section
-32-32.1), the design brief and its skills retired (Section 33), and the 3D signal head
-redesigned to match the physical hardware the owner is building (Section 34) all landed on
-`main` since `prototype-1`. To see it: `git checkout prototype-2`. To take `main` back to
-it: `git revert <bad commits>` (keeps history) or, with the owner's say-so, `git reset
---hard prototype-2 && git push --force-with-lease`.
+`git tag prototype-3` is the current working prototype and revert point, current as of
+2026-10-02. Since `prototype-2`, these landed on `main` (merged from `design/glass-night`):
+- the "glass over the night city" redesign (Section 37);
+- Simulation Settings cards on the page (no outer box);
+- the max-speed simulation fix (Section 39);
+- the physical rig's live link (Section 43);
+- and the mascot was added and then removed again (Sections 38–42).
 
-`git tag prototype-1` (commit `d9afd01`, 2026-09-17) is the earlier prototype this one
-superseded — still there to check out, no longer the one to revert to.
+To see it: `git checkout prototype-3`. To take `main` back to it: `git revert <bad commits>`
+(keeps history) or, with the owner's say-so, `git reset --hard prototype-3 && git push
+--force-with-lease`.
+
+`git tag prototype-2` (2026-09-21) and `git tag prototype-1` (commit `d9afd01`, 2026-09-17)
+are the earlier prototypes — still there to check out, no longer the ones to revert to.

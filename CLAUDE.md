@@ -410,9 +410,11 @@ unprompted, but do keep this section current if that changes:
   binding for any interface change (recolouring, repositioning, new panels, new pages are
   all free; removing any item of its content inventory needs the owner's explicit written
   instruction naming the item — an item lost as a side effect of a redesign is a defect).
-  Read it at the start of any UI task and tick its inventory afterwards. `prototype-2`
-  (tagged 2026-09-21) is the current working prototype and revert point that inventory
-  describes; `prototype-1` (commit d9afd01, 2026-09-17) is the earlier one it superseded.
+  Read it at the start of any UI task and tick its inventory afterwards. `prototype-3`
+  (tagged 2026-10-02: the glass redesign merged to `main`, the simulation speed-up, the
+  physical rig's live link, no mascot) is the current working prototype and revert point
+  that inventory describes; `prototype-2` (2026-09-21) and `prototype-1` (commit d9afd01,
+  2026-09-17) are the earlier ones it superseded.
 - **Explain before implementing.** If you (Claude) come up with an idea or feature beyond
   what was literally asked — even something clearly beneficial — explain it and get
   explicit approval before writing code. Things the user explicitly asks for (including
