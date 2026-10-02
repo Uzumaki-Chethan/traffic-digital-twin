@@ -60,7 +60,7 @@ export function EmptyMetricBlock({ metricKey }: { metricKey: string }) {
   const title = TITLE[metricKey] ?? metricKey
   const unit = UNIT[metricKey] ?? ''
   return (
-    <Panel explain={`pf-metric-${metricKey}`} title={title} bodyClassName="px-3 pb-2.5">
+    <Panel title={title} bodyClassName="px-3 pb-2.5">
       <div className="mb-1 flex items-baseline gap-4 text-[12.5px] text-ink-mute">
         <span className="flex items-center gap-1.5">
           <span className="h-[3px] w-4 rounded-full" style={{ background: TRINETRA }} />
@@ -113,7 +113,7 @@ export function MetricBlock({
   }[verdict.side]
 
   return (
-    <Panel explain={`pf-metric-${row.key}`}
+    <Panel
       title={title}
       meta={
         /* Keyed on WHO is ahead, not on the number. Keying it on the text

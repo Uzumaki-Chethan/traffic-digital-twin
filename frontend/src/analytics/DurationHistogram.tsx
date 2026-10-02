@@ -35,14 +35,14 @@ export function DurationHistogram({ rows }: { rows: DecisionSample[] }) {
 
   if (!stats) {
     return (
-      <Panel explain="an-greens" title="Green duration spread">
+      <Panel title="Green duration spread">
         <div className="py-6 text-center text-[13px] text-ink-mute">Waiting for the first decision.</div>
       </Panel>
     )
   }
 
   return (
-    <Panel explain="an-greens" title="Green duration spread" meta={`${BIN}s bins`}>
+    <Panel title="Green duration spread" meta={`${BIN}s bins`}>
       <div className="flex h-[92px] items-end gap-[3px]">
         {bins.map((n, i) => (
           <div

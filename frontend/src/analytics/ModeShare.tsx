@@ -61,14 +61,14 @@ export function ModeShare({ rows }: { rows: DecisionSample[] }) {
 
   if (total === 0) {
     return (
-      <Panel explain="an-modes" title="Decision modes">
+      <Panel title="Decision modes">
         <div className="py-6 text-center text-[13px] text-ink-mute">Waiting for the first decision.</div>
       </Panel>
     )
   }
 
   return (
-    <Panel explain="an-modes" title="Decision modes" meta={`${total.toLocaleString()} decisions`}>
+    <Panel title="Decision modes" meta={`${total.toLocaleString()} decisions`}>
       <div className="flex items-center gap-4">
         <svg width="128" height="128" viewBox="0 0 128 128" className="shrink-0" role="img" aria-label="Share of decisions by mode">
           <circle cx="64" cy="64" r={R} fill="none" stroke="var(--surface-inset)" strokeWidth={STROKE} />

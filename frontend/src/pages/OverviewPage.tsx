@@ -78,7 +78,7 @@ export function OverviewPage() {
             the prediction panel fills the space the plate leaves rather
             than sitting as a card inside a card. */}
         <div className="flex min-w-0 flex-col gap-3.5">
-          <Panel explain="twin"
+          <Panel
             title="Digital twin"
             glyph={powered ? (greens > 0 ? 'green' : 'red') : 'red'}
             titleExtra={<LiveBadge on={powered && !dimmed} />}

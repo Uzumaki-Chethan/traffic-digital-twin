@@ -25,7 +25,7 @@ export function MetricsStrip({ metrics, history, powered }: { metrics: MetricsVi
 
   return (
     <div className="grid grid-cols-5 gap-3.5 max-[1280px]:grid-cols-3 max-[860px]:grid-cols-2">
-      <Tile explain="kpi-vehicles"
+      <Tile
         label="Vehicles in network"
         icon={<CarFront />}
         k1="#56A2FF"
@@ -35,7 +35,7 @@ export function MetricsStrip({ metrics, history, powered }: { metrics: MetricsVi
         series={samples.map((s) => s.vehicles)}
         good="none"
       />
-      <Tile explain="kpi-wait"
+      <Tile
         label="Average wait"
         icon={<Clock3 />}
         k1="#FFC94A"
@@ -47,7 +47,7 @@ export function MetricsStrip({ metrics, history, powered }: { metrics: MetricsVi
         series={samples.map((s) => s.wait)}
         good="down"
       />
-      <Tile explain="kpi-speed"
+      <Tile
         label="Average speed"
         icon={<Gauge />}
         k1="#34D399"
@@ -59,7 +59,7 @@ export function MetricsStrip({ metrics, history, powered }: { metrics: MetricsVi
         series={samples.map((s) => s.speed)}
         good="up"
       />
-      <Tile explain="kpi-queue"
+      <Tile
         label="Queued at red"
         icon={<OctagonAlert />}
         k1="#FB7185"
@@ -69,7 +69,7 @@ export function MetricsStrip({ metrics, history, powered }: { metrics: MetricsVi
         series={samples.map((s) => s.stopped)}
         good="down"
       />
-      <Tile explain="kpi-switches"
+      <Tile
         label="Phase switches"
         icon={<Shuffle />}
         k1="#93C5FD"
@@ -106,7 +106,6 @@ function Tile({
   sub,
   series,
   good,
-  explain,
 }: {
   label: string
   icon: ReactNode
@@ -119,8 +118,6 @@ function Tile({
   series: number[]
   /** Which direction of change is an improvement; 'none' shows it neutral. */
   good: 'up' | 'down' | 'none'
-  /** Blinky's antenna target id. */
-  explain: string
 }) {
   // Change against the reading 30 samples (≈30 s) ago; hidden when that
   // reading was ~zero, where a percentage means nothing.
@@ -134,7 +131,7 @@ function Tile({
   // label wraps rather than truncating), then value · unit · trend, then
   // the caption, and the sparkline as a strip along the bottom.
   return (
-    <div data-explain={explain} className="glass-card flex min-w-0 flex-col gap-1.5 rounded-[18px] px-3.5 pb-2.5 pt-3.5 [--card-r:18px]">
+    <div className="glass-card flex min-w-0 flex-col gap-1.5 rounded-[18px] px-3.5 pb-2.5 pt-3.5 [--card-r:18px]">
       <div className="flex items-center gap-3">
         <span
           aria-hidden

@@ -347,14 +347,8 @@ unprompted, but do keep this section current if that changes:
   in both the plan and 3D views, at the same true scale. The owner declined the
   prototype's theme picker, boot curtain, weather widget, cursor glow and its
   Throughput/Accuracy/"AI confidence" tiles.
-  **Sparky, formerly Blinky (2026-10-01, Section 38; redesigned 2026-10-02, Section 41 —
-  the Zen design of Section 40 was dropped as too heavy):** a big 3D energy-bot mascot
-  (`frontend/src/blinky/` — folder name kept), mounted once in `Shell` inside its own
-  `ErrorBoundary`, strictly read-only. Dragging his antenna explains any page/panel: **every new panel needs a `data-explain` id (Panel's `explain`
-  prop) with an entry in `blinky/catalogue.ts`, or `catalogue.test.ts` fails.** Its
-  three.js canvas is its own; the only hook into `Junction3D` is the 3D joyride rider
-  (`blinky/rideBus.ts`). Sparky's look is the owner's design sheet — confirm before
-  changing it.
+  **No mascot:** the Blinky / Zen / Sparky mascot (Sections 38–41) was removed entirely
+  on 2026-10-02 at the owner's instruction (Section 42) — don't bring it back unasked.
   A 3D miniature of the junction DOES exist now, at the user's explicit request
   (`overview/Junction3D.tsx`) — three.js, true network scale, sumo-gui's own look; that is
   not the rejected neon "3D cyberpunk" direction. Since 2026-09-14 the plan view is ALSO

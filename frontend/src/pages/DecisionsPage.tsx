@@ -69,7 +69,7 @@ export function DecisionsPage() {
     <div className="flex h-full min-h-0 flex-col gap-3.5">
       <Reveal index={0} className="glass-card px-4 py-3">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <div data-explain="dc-run" className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5">
             <span className="eyebrow">Run</span>
             <GlassSelect
               label="Run"
@@ -96,7 +96,7 @@ export function DecisionsPage() {
         </div>
         {/* The filters on their own row, left-aligned at every width —
             in the picker's row they landed wherever its width left room. */}
-        <div data-explain="dc-filters" className="mt-2 flex flex-wrap items-center gap-1.5">
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <span className="flex flex-wrap items-center gap-1.5">
             <Chip active={modeFilter === null && !switchesOnly} onClick={() => { setModeFilter(null); setSwitchesOnly(false) }}>
               All
@@ -122,7 +122,7 @@ export function DecisionsPage() {
 
       {empty ? (
         <Reveal index={1}>
-          <Panel explain="dc-list" title="Decisions" bodyClassName="px-3.5 pb-3.5 pt-1">
+          <Panel title="Decisions" bodyClassName="px-3.5 pb-3.5 pt-1">
             <p className="max-w-[60ch] text-[13px] leading-[1.55] text-ink">
               No decisions recorded yet. Every demo run writes one row per second here — its phase, the
               rule it was chosen by, the reason, the four phase scores and what the light was actually
@@ -134,7 +134,7 @@ export function DecisionsPage() {
       ) : (
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)] gap-3.5">
           <Reveal index={1} className="flex min-h-0 flex-col">
-            <Panel explain="dc-list"
+            <Panel
               title="Every decision"
               meta={
                 <span className="flex items-center gap-2">

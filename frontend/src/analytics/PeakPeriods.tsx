@@ -10,7 +10,7 @@ import { GrowBar } from '@/ui/Reveal'
 export function PeakPeriods({ peaks }: { peaks: Peak[] }) {
   if (peaks.length === 0) {
     return (
-      <Panel explain="an-peaks" title="Peak periods">
+      <Panel title="Peak periods">
         <div className="py-6 text-center text-[13px] text-ink-mute">Waiting for the first tick.</div>
       </Panel>
     )
@@ -18,7 +18,7 @@ export function PeakPeriods({ peaks }: { peaks: Peak[] }) {
   const max = peaks.reduce((m, p) => Math.max(m, p.peak_congestion_score), 0)
 
   return (
-    <Panel explain="an-peaks" title="Peak periods" meta={`top ${peaks.length}`}>
+    <Panel title="Peak periods" meta={`top ${peaks.length}`}>
       <div className="flex flex-col gap-1.5">
         {peaks.map((p, i) => (
           <div key={`${p.start_time}-${i}`} className="flex items-center gap-2">

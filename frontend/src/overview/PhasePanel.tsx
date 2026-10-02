@@ -63,7 +63,7 @@ export function PhasePanel({
         : '—'
 
   return (
-    <Panel explain="active-phase"
+    <Panel
       title="Active phase"
       glyph={lamp}
       meta={powered && heldSeconds != null ? <span>{clearing ? 'amber' : 'green'} · simulated</span> : undefined}

@@ -65,7 +65,7 @@ export function SettingsPage() {
             <Glyph s="green" />
             Scenario
           </h2>
-          <div data-explain="st-for" className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5">
             <span className="eyebrow">Choose for</span>
             <TargetPicker value={target} onChange={setTarget} />
           </div>
@@ -75,7 +75,7 @@ export function SettingsPage() {
           </div>
         </div>
       </Reveal>
-      <div data-explain="st-cards" className="grid grid-cols-2 gap-3.5 xl:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3.5 xl:grid-cols-3">
         {DEMO_SCENARIOS.map((s, i) => {
           const usedBy: ScenarioUse[] = []
           if (s.id === demoScenario) usedBy.push('overview')

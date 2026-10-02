@@ -4285,3 +4285,38 @@ The temple home and the later Zen iterations are dropped with him.
 - In the console:
   - the antenna dropped on Lanes gives the tag, the cable and the explanation at 170 px;
   - a drop on an empty gap gives "Boing!", with no card and no stuck cable.
+
+## SECTION 42 — The mascot is removed (CURRENT STATE)
+
+*2026-10-02 · branch `design/glass-night` · supersedes Sections 38–41*
+
+**Owner's instruction:** "remove all the files regarding the robo, everything we are not
+implementing it, thats ok." The mascot is gone in all three forms: Blinky (Section 38),
+Zen (Section 40) and Sparky (Section 41).
+
+**Removed:**
+- **Code:** `frontend/src/blinky/` (model, renderer, director, brain, guide, explainer,
+  dock, pranks, rides, catalogue and all their tests) and the dev preview page
+  `frontend/sparky.html`.
+- **The design spec and plan:** `docs/superpowers/specs/2026-10-01-blinky-design.md` and
+  `docs/superpowers/plans/2026-10-01-blinky.md`.
+- **Hooks in the app:**
+  - the `Shell` mount;
+  - `TwinViewport`'s ride flag;
+  - `Junction3D`'s 3D rider;
+  - `VehicleLayer`'s `data-vid`/`data-ride` attributes;
+  - `MotionBuffer.latestIds`;
+  - the Blinky block in `index.css`.
+- **The explain tags:** every `data-explain` attribute and the `explain` prop on `Panel`,
+  the run buttons, the KPI tiles and the controller windows (31 files). They existed only
+  for the antenna guide.
+
+**Kept:** everything unrelated that was built alongside it, including the scroll and
+layout work, the Settings page strip, and the simulation speed-up (Section 39).
+
+**Verified:**
+- tsc, oxlint and the build are clean, and the frontend tests pass (18: the app's own).
+- The console loads with no mascot, no explain tags, all cards present, and no console
+  errors.
+
+Sections 38–41 stay in this report as history.

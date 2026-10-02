@@ -97,8 +97,6 @@ export function VehicleLayer({ side, powered }: { side: MotionSide; powered: boo
         return (
           <g
             key={id}
-            data-vid={id}
-            data-ride={beacons || stalled ? 'no' : 'yes'}
             visibility="hidden"
             ref={(el) => {
               if (el) els.current.set(id, el)

@@ -40,7 +40,7 @@ export function SpeedWaitScatter({ rows }: { rows: NetworkSample[] }) {
 
   if (pts.length === 0) {
     return (
-      <Panel explain="an-scatter" title="Speed against waiting time">
+      <Panel title="Speed against waiting time">
         <div className="py-6 text-center text-[13px] text-ink-mute">Waiting for the first tick.</div>
       </Panel>
     )
@@ -50,7 +50,7 @@ export function SpeedWaitScatter({ rows }: { rows: NetworkSample[] }) {
   const sy = (v: number) => H - PAD_B - (v / maxWait) * (H - PAD_T - PAD_B)
 
   return (
-    <Panel explain="an-scatter" title="Speed against waiting time" meta={`${pts.length.toLocaleString()} ticks`}>
+    <Panel title="Speed against waiting time" meta={`${pts.length.toLocaleString()} ticks`}>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Network average speed plotted against average waiting time">
         <line x1={PAD_L} y1={PAD_T} x2={PAD_L} y2={H - PAD_B} stroke="var(--rule)" strokeWidth="1" />
         <line x1={PAD_L} y1={H - PAD_B} x2={W - PAD_R} y2={H - PAD_B} stroke="var(--rule)" strokeWidth="1" />

@@ -43,8 +43,6 @@ way before the change.
   not exist, drop the panel idea or ask for the field — never a placeholder
   that could be mistaken for real.
 - **Never show prediction confidence anywhere.** (Owner's standing rule.)
-- Sparky's (formerly Blinky's) live lines use real fields only, never invent a number, and never show prediction
-  confidence.
 - No internal jargon on screen: lanes are "North · Left", phases are
   "N–S straight + left", modes are "Minimum green", never `N_in_0`,
   `NS_straight_left`, `min_green_hold`. Explain it or cut it. (The one known
@@ -196,16 +194,12 @@ change on the page you touched (and any page you moved something to or from).
   focus tools; buildings, trees and sidewalks on both map views.
 - Settings: a moving preview on every scenario card.
 
-### Sparky, formerly Blinky (2026-10-01, Sections 38 and 41) — part of the inventory
+### Removed on the owner's instruction (2026-10-02)
 
-- the Sparky mascot (3D energy bot, SVG fallback) — Blinky until 2026-10-02, then briefly
-  Zen (Section 40, replaced), now Sparky from the owner's design sheet (Section 41);
-- the antenna drag-to-explain guide (drag either of Sparky's antenna tips onto a page link
-  or component), and an explanation for every `data-explain` id
-  (`blinky/catalogue.ts` — a test fails on a missing one, so a new panel needs its own);
-- the explainer card: title, steps with Back/Next and dots, the live line, "Got it!";
-- the dock: Shh/Wake, Sound, Come here, Explain…;
-- the joyride on real vehicles in the plan and 3D views.
+- The mascot (Blinky → Zen → Sparky, Sections 38–41) and everything that came with it —
+  the antenna/orb drag-to-explain guide, the explainer card, the dock, the joyride, and
+  the `data-explain` tags on every panel. The owner wrote: "remove all the files regarding
+  the robo, everything we are not implementing it". Section 42.
 
 ## 4. How to check a change
 

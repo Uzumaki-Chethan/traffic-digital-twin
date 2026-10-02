@@ -15,7 +15,7 @@ import { clock } from '@/utils/format'
  */
 export function LiveDataSource({ ticks, from, to }: { ticks: number; from: number; to: number }) {
   return (
-    <Panel explain="an-source" title="Where this data comes from">
+    <Panel title="Where this data comes from">
       <p className="text-[13px] leading-[1.5] text-ink">
         Every chart above is built from the live WebSocket stream — one sample per decision tick, kept
         in the browser for the length of this run. Nothing on this page is fetched from the database,

@@ -13,7 +13,7 @@ export function CongestionTrend({ buckets }: { buckets: Bucket[] }) {
 
   if (buckets.length === 0) {
     return (
-      <Panel explain="an-congestion" title="Congestion trend">
+      <Panel title="Congestion trend">
         <div className="py-6 text-center text-[13px] text-ink-mute">Waiting for the first tick.</div>
       </Panel>
     )
@@ -22,7 +22,7 @@ export function CongestionTrend({ buckets }: { buckets: Bucket[] }) {
   const span = buckets.length > 1 ? buckets[1].bucket_start - buckets[0].bucket_start : 60
 
   return (
-    <Panel explain="an-congestion" title="Congestion trend" meta={`${span}s buckets`}>
+    <Panel title="Congestion trend" meta={`${span}s buckets`}>
       <div className="flex h-[124px] items-end gap-[3px]">
         {buckets.map((b) => {
           const h = max === 0 ? 0 : (b.avg_congestion_score / max) * 100

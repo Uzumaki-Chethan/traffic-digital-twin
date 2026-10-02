@@ -42,7 +42,7 @@ export function IncidentBar() {
   const select = 'appearance-none rounded-control border border-rule bg-plate py-1 pl-2 pr-6 text-[12.5px] font-medium text-ink-strong hover:border-[var(--rule-strong)]'
 
   return (
-    <div data-explain="incident" className="glass-card flex flex-wrap items-center gap-2 !rounded-[12px] [--card-r:12px] px-2.5 py-1.5 text-[12.5px] text-ink">
+    <div className="glass-card flex flex-wrap items-center gap-2 !rounded-[12px] [--card-r:12px] px-2.5 py-1.5 text-[12.5px] text-ink">
       <span className="flex items-center gap-1.5 font-semibold text-ink-strong">
         <TriangleAlert size={14} aria-hidden className="text-[var(--alert)]" />
         Incident

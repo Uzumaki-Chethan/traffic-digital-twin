@@ -49,7 +49,7 @@ export function RingBarrierHistory({ history }: { history: PhaseHistoryEntry[] }
 
   if (history.length === 0) {
     return (
-      <Panel explain="phase-history" title="Phase history" meta="ring-barrier">
+      <Panel title="Phase history" meta="ring-barrier">
         <div className="py-3 text-[13px] text-ink-mute">No phase history yet.</div>
       </Panel>
     )
@@ -57,7 +57,7 @@ export function RingBarrierHistory({ history }: { history: PhaseHistoryEntry[] }
 
   const ticks = 6
   return (
-    <Panel explain="phase-history" title="Phase history" meta={`last ${Math.round(span)} s`} bodyClassName="p-2">
+    <Panel title="Phase history" meta={`last ${Math.round(span)} s`} bodyClassName="p-2">
       <Track label="Ring 1 · N–S" axis="NS" segs={segs} span={span} />
       <Track label="Ring 2 · E–W" axis="EW" segs={segs} span={span} />
       <div className="ml-24 mt-1 flex justify-between text-[12px] text-ink-mute">
