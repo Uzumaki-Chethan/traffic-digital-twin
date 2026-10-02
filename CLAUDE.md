@@ -353,7 +353,12 @@ unprompted, but do keep this section current if that changes:
   results; tests guard it). Overview moved to `/overview`. A second pass the same day
   (Section 45) made the city's windows per floor in world metres, with fading light trails,
   sky, beacons and a scanning ring. It also added the scroll-played junction, pillar
-  pictures, a chapter navigator, per-scenario results and the footer.
+  pictures, a chapter navigator, per-scenario results and the footer. Since Section 46 the
+  city is at **evening** (the owner's call): a dusk sky, haze from that same sky, a
+  skyline. Free text sits on light frosted captions. **GSAP rule:** entrance tweens animate
+  plain wrappers with `fromTo` and explicit ends, never an element with a CSS `transform`
+  transition. A refresh re-reads it mid-transition and leaves it stuck part-way, which is
+  what shifted the scenario cards.
   **No mascot:** the Blinky / Zen / Sparky mascot (Sections 38–41) was removed entirely
   on 2026-10-02 at the owner's instruction (Section 42) — don't bring it back unasked.
   A 3D miniature of the junction DOES exist now, at the user's explicit request

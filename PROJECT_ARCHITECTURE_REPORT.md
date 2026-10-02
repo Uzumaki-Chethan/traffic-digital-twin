@@ -4591,3 +4591,96 @@ item is an improvement, not a removal; nothing in Section 44's inventory was los
 - A full scroll produces no errors.
 - As before, smoothness can't be judged in the build machine's test browser (about
   1 fps); the quality step still protects slow machines.
+
+## SECTION 46 — Home page: evening city, stuck-card fix (CURRENT STATE)
+
+*2026-10-02 · branch `main` · `frontend/src/home/` · on top of Sections 44–45*
+
+**Owner's report:**
+- The scenario cards "went to the left, so the first card is a bit cropped — same for
+  the next ones also".
+- "I need the city backside to be more visible and make it like an evening one."
+
+### The stuck cards (a real defect, root-caused)
+
+- **The setup:** each scenario card carried a CSS `transition: transform 0.35s` (for its
+  hover lift). GSAP animated that same element with `gsap.from({ x: ±140 })` under a
+  ScrollTrigger.
+- **What goes wrong:**
+  - On every ScrollTrigger refresh (load, fonts, resize, our own refresh at 600 ms),
+    the from-tween is reverted and re-initialised.
+  - Re-initialising reads the element's computed transform as the tween's *end* value.
+  - With the CSS transition running, that read lands mid-transition, for example
+    x = −60 px.
+  - The tween then animates to the wrong end and stays there.
+- **What the owner saw:** cards fully opaque (opacity has no CSS transition, so its end
+  was read right) but parked off to the side. Alternate groups go left or right.
+- **Same exposure:** `.pillar` and `.res-card` (also transitioned, and seen tilted in
+  earlier screenshots).
+- **A second bug from the same overlap:** GSAP's leftover inline transform silently
+  disabled the cards' hover lift.
+
+**Fix:**
+- GSAP now animates plain wrappers (`.pillar-slot`, `.res-slot`, `.scn-slot`), and the
+  cards keep their own hover.
+- Every entrance tween is a `fromTo` with explicit end values, so nothing is ever read
+  back from the page.
+- The hero eye's float animation moved to a wrapper. A CSS animation on the eye's own
+  transform had been overriding GSAP's intro scale/rotate.
+- The hero buttons now animate as one block.
+- **Verified:** after a reload and scroll, every scenario slot ends at
+  `matrix(1,0,0,1,0,0)` at the exact column positions (126 / 525 / 925 px at 1440 wide).
+- **The rule** is written into CLAUDE.md and `frontend/README.md` so it isn't
+  reintroduced.
+
+### Evening city (`CityTrails.tsx`)
+
+- **One sky function (`duskSky`), shared by:**
+  - the sky dome;
+  - a new flat-surface shader for the ground, roads and markings;
+  - the tower shader.
+  Every surface fades into exactly the sky behind it.
+- **The sky itself:** deep indigo overhead, violet, then a rosy band at the horizon,
+  burning orange towards where the sun has just set (a little left of the opening view).
+  There are only a few faint stars, high up.
+- **Haze:** lighter (density 0.0036 → 0.0015), so far more of the city is visible.
+  Distant towers fade into the dusk instead of black.
+- **Towers:**
+  - dusk-blue walls;
+  - faces turned to the sunset keep a last warm glow, stronger higher up;
+  - unlit glass reflects a little sky;
+  - window glow slightly softer.
+- **Skyline:** roads run on to ±1080 m (merged into three draw calls), and a skyline ring
+  of taller towers surrounds the city on three sides, beyond the traffic grid.
+- **Camera:** opens above the rooftops looking across the city to the sunset, and ends on
+  the same view. The middle of the page still descends to the junction.
+- **Bloom threshold:** raised to 0.78, so lights bloom but the sunset doesn't smear.
+- **Page overlay:** the vignette is much lighter (a light edge darkening and a gentle
+  left-column shade), the glass is a touch more transparent, and the base and top-bar
+  tints are dusk violet.
+
+### Readability over a brighter city
+
+- **Hero:** a soft dark shadow behind the hero's words. The logo is screen-blended off its
+  black ground, so it needs a darker backing to keep its contrast.
+- **Text shadows:**
+  - stronger three-layer shadows on body text;
+  - heading shadows;
+  - gradient text gets a `drop-shadow` instead (a text-shadow would show through
+    clipped glyphs).
+- **Frosted captions** in the cards' glass style:
+  - section intros (`.home-lead`);
+  - scenario group headings;
+  - the tour's page notes (`.tour-card`);
+  - the hardware notes;
+  - the footer.
+- **Other tweaks:**
+  - the muted text colour is a little brighter;
+  - the "Built with" outline is firmer;
+  - on phones the tagline breaks as SMARTER SIGNALS / SAFER CITIES.
+
+**Verified:**
+- tsc, oxlint and the build are clean; 25 frontend tests pass.
+- Hero, problem, pillars, results, scenarios, tour and finale were photographed at
+  1440×900 in animated mode, and hero and scenarios at 390×844.
+- No horizontal overflow.

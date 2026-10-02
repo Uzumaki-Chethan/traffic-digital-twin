@@ -33,15 +33,11 @@ const RES_ICON = { emergency: Ambulance, accident: TrafficCone, rain: CloudRain,
 export function Resilience() {
   const ref = useRef<HTMLElement>(null)
   useScene(ref, () => {
-    gsap.from('.res-card', {
-      opacity: 0,
-      y: 90,
-      rotate: (i: number) => (i % 2 ? 4 : -4),
-      stagger: { each: 0.1, from: 'start' },
-      duration: 1,
-      ease: 'power3.out',
-      scrollTrigger: { trigger: '.res-grid', start: 'top 80%' },
-    })
+    gsap.fromTo(
+      '.res-slot',
+      { opacity: 0, y: 90, rotate: (i: number) => (i % 2 ? 4 : -4) },
+      { opacity: 1, y: 0, rotate: 0, stagger: 0.1, duration: 1, ease: 'power3.out', scrollTrigger: { trigger: '.res-grid', start: 'top 80%' } },
+    )
   })
   return (
     <section ref={ref} className="home-section" id="unexpected">
@@ -56,14 +52,16 @@ export function Resilience() {
           {RESILIENCE.map((r) => {
             const Icon = RES_ICON[r.key]
             return (
-              <article key={r.key} className={`res-card spot fx-${r.key}`}>
-                <div className="res-fx" aria-hidden>
-                  <Icon size={30} />
-                  <span className="fx-layer" />
-                </div>
-                <h3>{r.title}</h3>
-                <p>{r.body}</p>
-              </article>
+              <div key={r.key} className="res-slot">
+                <article className={`res-card spot fx-${r.key}`}>
+                  <div className="res-fx" aria-hidden>
+                    <Icon size={30} />
+                    <span className="fx-layer" />
+                  </div>
+                  <h3>{r.title}</h3>
+                  <p>{r.body}</p>
+                </article>
+              </div>
             )
           })}
         </div>
@@ -80,14 +78,11 @@ export function Scenarios() {
   const ref = useRef<HTMLElement>(null)
   useScene(ref, (el) => {
     el.querySelectorAll('.scn-group').forEach((g, i) => {
-      gsap.from(g.querySelectorAll('.scn-card'), {
-        opacity: 0,
-        x: i % 2 ? 140 : -140,
-        stagger: 0.1,
-        duration: 1.1,
-        ease: 'power3.out',
-        scrollTrigger: { trigger: g, start: 'top 78%' },
-      })
+      gsap.fromTo(
+        g.querySelectorAll('.scn-slot'),
+        { opacity: 0, x: i % 2 ? 140 : -140 },
+        { opacity: 1, x: 0, stagger: 0.1, duration: 1.1, ease: 'power3.out', scrollTrigger: { trigger: g, start: 'top 78%' } },
+      )
     })
   })
   const byId = new Map(EVAL_SCENARIOS.map((s) => [s.id, s]))
@@ -119,28 +114,30 @@ export function Scenarios() {
                 if (!s) return null
                 const res = resultOf.get(id)
                 return (
-                  <Link key={id} to="/settings" className="scn-card spot" aria-label={`${s.name} — open Simulation Settings`}>
-                    <div className="scn-preview">
-                      <ScenarioPreview id={id} seed={gi * 10 + i + 1} />
-                    </div>
-                    <div className="scn-body">
-                      <div className="flex items-center justify-between gap-2">
-                        <h4>{s.name}</h4>
-                        <span className={`scn-tag tag-${s.demand}`}>{DEMAND_LABEL[s.demand]}</span>
+                  <div key={id} className="scn-slot">
+                    <Link to="/settings" className="scn-card spot" aria-label={`${s.name} — open Simulation Settings`}>
+                      <div className="scn-preview">
+                        <ScenarioPreview id={id} seed={gi * 10 + i + 1} />
                       </div>
-                      <p>{s.blurb}</p>
-                      {res && (
-                        <div className="scn-result">
-                          <span>
-                            <b>{res.wait.toFixed(1)}%</b> less waiting
-                          </span>
-                          <span>
-                            <b>{res.wins}/7</b> measures
-                          </span>
+                      <div className="scn-body">
+                        <div className="flex items-center justify-between gap-2">
+                          <h4>{s.name}</h4>
+                          <span className={`scn-tag tag-${s.demand}`}>{DEMAND_LABEL[s.demand]}</span>
                         </div>
-                      )}
-                    </div>
-                  </Link>
+                        <p>{s.blurb}</p>
+                        {res && (
+                          <div className="scn-result">
+                            <span>
+                              <b>{res.wait.toFixed(1)}%</b> less waiting
+                            </span>
+                            <span>
+                              <b>{res.wins}/7</b> measures
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                  </div>
                 )
               })}
             </div>
@@ -173,14 +170,11 @@ export function ConsoleTour() {
     return () => triggers.forEach((t) => t.kill())
   }, [])
   useScene(ref, () => {
-    gsap.from('.tour-frame', {
-      rotateX: 22,
-      rotateY: -14,
-      scale: 0.88,
-      opacity: 0.4,
-      ease: 'none',
-      scrollTrigger: { trigger: '.tour', start: 'top bottom', end: 'top 30%', scrub: 0.6 },
-    })
+    gsap.fromTo(
+      '.tour-frame',
+      { rotateX: 22, rotateY: -14, scale: 0.88, opacity: 0.4 },
+      { rotateX: 0, rotateY: 0, scale: 1, opacity: 1, ease: 'none', scrollTrigger: { trigger: '.tour', start: 'top bottom', end: 'top 30%', scrub: 0.6 } },
+    )
   })
   return (
     <section ref={ref} className="home-section" id="console">
@@ -195,18 +189,20 @@ export function ConsoleTour() {
           <div className="tour-steps">
             {CONSOLE_PAGES.map((p, i) => (
               <div key={p.key} className={`tour-step ${active === i ? 'on' : ''}`}>
-                <span className="tour-num">{String(i + 1).padStart(2, '0')}</span>
-                <h3>{p.name}</h3>
-                <p className="tour-line">{p.line}</p>
-                <ul>
-                  {p.points.map((pt) => (
-                    <li key={pt}>{pt}</li>
-                  ))}
-                </ul>
-                <img src={SHOTS[p.key]} alt="" className="tour-inline" loading="lazy" />
-                <Link to={p.path} className="tour-link">
-                  Open {p.name} <ArrowRight size={14} aria-hidden />
-                </Link>
+                <div className="tour-card">
+                  <span className="tour-num">{String(i + 1).padStart(2, '0')}</span>
+                  <h3>{p.name}</h3>
+                  <p className="tour-line">{p.line}</p>
+                  <ul>
+                    {p.points.map((pt) => (
+                      <li key={pt}>{pt}</li>
+                    ))}
+                  </ul>
+                  <img src={SHOTS[p.key]} alt="" className="tour-inline" loading="lazy" />
+                  <Link to={p.path} className="tour-link">
+                    Open {p.name} <ArrowRight size={14} aria-hidden />
+                  </Link>
+                </div>
               </div>
             ))}
           </div>
@@ -315,9 +311,9 @@ export function Rig() {
     return () => window.clearInterval(id)
   }, [])
   useScene(ref, () => {
-    gsap.from('.rig-head', { opacity: 0, y: 120, rotateY: 50, duration: 1.4, ease: 'power3.out', scrollTrigger: { trigger: '.rig', start: 'top 75%' } })
-    gsap.from('.rig-call-line', { strokeDashoffset: 1, stagger: 0.18, duration: 1.1, ease: 'power2.inOut', scrollTrigger: { trigger: '.rig', start: 'top 60%' } })
-    gsap.from('.rig-call-text', { opacity: 0, x: -14, stagger: 0.18, duration: 0.8, delay: 0.5, ease: 'power2.out', scrollTrigger: { trigger: '.rig', start: 'top 60%' } })
+    gsap.fromTo('.rig-head', { opacity: 0, y: 120, rotateY: 50 }, { opacity: 1, y: 0, rotateY: 0, duration: 1.4, ease: 'power3.out', scrollTrigger: { trigger: '.rig', start: 'top 75%' } })
+    gsap.fromTo('.rig-call-line', { strokeDashoffset: 1 }, { strokeDashoffset: 0, stagger: 0.18, duration: 1.1, ease: 'power2.inOut', scrollTrigger: { trigger: '.rig', start: 'top 60%' } })
+    gsap.fromTo('.rig-call-text', { opacity: 0, x: -14 }, { opacity: 1, x: 0, stagger: 0.18, duration: 0.8, delay: 0.5, ease: 'power2.out', scrollTrigger: { trigger: '.rig', start: 'top 60%' } })
   })
   return (
     <section ref={ref} className="home-section" id="rig">
@@ -358,7 +354,11 @@ export function Rig() {
 export function Finale({ onTop }: { onTop: () => void }) {
   const ref = useRef<HTMLElement>(null)
   useScene(ref, () => {
-    gsap.from('.finale-title', { opacity: 0, scale: 0.7, filter: 'blur(14px)', duration: 1.4, ease: 'power4.out', scrollTrigger: { trigger: '.finale-title', start: 'top 85%' } })
+    gsap.fromTo(
+      '.finale-title',
+      { opacity: 0, scale: 0.7, filter: 'blur(14px)' },
+      { opacity: 1, scale: 1, filter: 'blur(0px)', duration: 1.4, ease: 'power4.out', scrollTrigger: { trigger: '.finale-title', start: 'top 85%' } },
+    )
   })
   return (
     <section ref={ref} className="home-finale" id="start">

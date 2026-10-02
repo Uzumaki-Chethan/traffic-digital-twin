@@ -15,8 +15,13 @@ map (shared `overview/cityscape.ts`) in both the plan and the 3D view.
 
 **Home** (`/`, `src/home/`, Section 44) is the full-screen landing page outside the
 console frame:
-- a live three.js night city behind it (`CityTrails.tsx`), whose camera follows the
-  scroll and which drops its own quality on a slow machine;
+- a live three.js city at dusk behind it (`CityTrails.tsx`), whose camera follows the
+  scroll and which drops its own quality on a slow machine. One sky function colours the
+  dome and hazes every tower and road into it.
+- a GSAP rule for this page: animate a plain wrapper (`.pillar-slot`, `.res-slot`,
+  `.scn-slot`) with `fromTo` and explicit end values, never an element that has a CSS
+  `transform` transition. GSAP reads such an element mid-transition on a refresh and
+  stops short (the shifted scenario cards, Section 46).
 - smooth scrolling (Lenis) and GSAP ScrollTrigger scenes;
 - all its words and numbers in `content.ts`, tested against README.md's results;
 - the problem section's junction story in `ProblemScene.tsx`, a pure function of scroll

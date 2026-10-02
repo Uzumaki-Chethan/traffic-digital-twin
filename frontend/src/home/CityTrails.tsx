@@ -6,14 +6,44 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
-const FOG = new THREE.Color(0x05070e)
-const FOG_DENSITY = 0.0036
+/** The sun has just set, a little left of the way the opening view looks. */
+const SUN_DIR = new THREE.Vector3(-0.5, -0.035, -1).normalize()
+const FOG_DENSITY = 0.0015
+/** What simple materials (trails, lamps, sparks) fade into: the dusk haze. */
+const HAZE = new THREE.Color().setRGB(0.11, 0.05, 0.08)
+
+/**
+ * The evening sky, shared by the dome and every hazed surface, so distant
+ * towers and ground fade into exactly the sky behind them: deep indigo
+ * overhead, violet, then a rosy band at the horizon that burns orange
+ * towards where the sun went down. Linear colour (the output pass tone-maps).
+ */
+const DUSK_GLSL = /* glsl */ `
+  uniform vec3 uSunDir;
+  vec3 duskSky(vec3 d) {
+    float y = d.y;
+    vec3 zenith = vec3(0.012, 0.016, 0.055);
+    vec3 upper = vec3(0.05, 0.032, 0.11);
+    vec3 low = vec3(0.2, 0.075, 0.1);
+    vec3 col = mix(low, upper, smoothstep(0.0, 0.2, y));
+    col = mix(col, zenith, smoothstep(0.18, 0.75, y));
+    vec2 h = normalize(d.xz + vec2(1e-5));
+    vec2 s = normalize(uSunDir.xz);
+    float toward = max(dot(h, s), 0.0);
+    float band = exp(-abs(y) * 8.0);
+    col += vec3(1.05, 0.36, 0.08) * pow(toward, 4.0) * band;
+    col += vec3(0.16, 0.05, 0.07) * band * 0.5;
+    if (y < 0.0) col = mix(col, low * 0.45, smoothstep(0.0, -0.3, y));
+    return col;
+  }
+`
 
 /**
  * Towers whose windows are drawn per floor in world metres (so a 140 m
  * tower has 40 floors of normal-sized windows, not 16 giant ones), lit at
- * random, warm or cool, a few flickering; side faces a shade darker, a
- * warm spill of street light at their feet.
+ * random, warm or cool, a few flickering. Walls are dusk-blue; the faces
+ * turned to the sunset keep a last warm glow, stronger higher up; street
+ * light washes the lowest floors; distance fades them into the sky.
  */
 const BUILDING_VERT = /* glsl */ `
   varying vec3 vWorld;
@@ -31,20 +61,23 @@ const BUILDING_VERT = /* glsl */ `
 `
 const BUILDING_FRAG = /* glsl */ `
   uniform float uTime;
-  uniform vec3 uFog;
   uniform float uFogDensity;
   varying vec3 vWorld;
   varying vec3 vN;
   varying float vSeed;
   varying float vTop;
   float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  ${DUSK_GLSL}
   void main() {
     vec3 col;
+    vec3 sunFlat = normalize(vec3(uSunDir.x, 0.0, uSunDir.z));
     if (vN.y > 0.5) {
-      col = vec3(0.016, 0.02, 0.032);
+      col = vec3(0.05, 0.042, 0.09); // roofs catch the sky
     } else {
-      float side = abs(vN.x) > 0.5 ? 0.7 : 1.0;
-      col = vec3(0.022, 0.03, 0.052) * side;
+      float facing = max(dot(vN, sunFlat), 0.0);
+      float up = clamp(vWorld.y / 170.0, 0.0, 1.0);
+      col = vec3(0.034, 0.036, 0.075);
+      col += vec3(0.34, 0.13, 0.06) * facing * (0.2 + 0.8 * up);
       float u = abs(vN.x) > 0.5 ? vWorld.z : vWorld.x;
       float h = vWorld.y;
       vec2 cell = vec2(floor(u / 3.0), floor(h / 3.5));
@@ -54,25 +87,26 @@ const BUILDING_FRAG = /* glsl */ `
                 * smoothstep(0.24, 0.32, f.y) * smoothstep(0.84, 0.76, f.y);
       vec2 key = cell + vec2(vSeed * 97.0, vN.x * 13.0 + vN.z * 29.0);
       float r = hash(key);
-      // whole floors go dark together sometimes: offices after hours
+      // whole floors stay dark sometimes: offices already empty
       float floorOn = step(0.22, hash(vec2(cell.y, vSeed * 41.0)));
-      float lit = step(0.58, r) * floorOn;
-      float warm = step(0.3, hash(key * 1.7));
+      float lit = step(0.56, r) * floorOn;
+      float warm = step(0.28, hash(key * 1.7));
       vec3 wc = mix(vec3(0.5, 0.72, 1.25), vec3(1.5, 0.98, 0.52), warm);
       float flick = 1.0 - 0.6 * step(0.985, r) * step(0.5, fract(uTime * 0.7 + r * 9.0));
-      col += win * lit * wc * (0.3 + 0.7 * hash(key + 3.1)) * flick;
-      // street light washing up the lowest floors
+      // unlit glass still shows a little of the evening sky
+      col = mix(col, vec3(0.09, 0.07, 0.16), win * (1.0 - lit) * 0.6);
+      col += win * lit * wc * (0.25 + 0.6 * hash(key + 3.1)) * flick;
       col += vec3(0.32, 0.17, 0.06) * exp(-h * 0.22);
       // a thin lit cornice on the tall ones
       col += vec3(0.9, 0.55, 0.25) * step(vTop - 0.6, h) * step(60.0, vTop) * 0.8;
     }
-    float d = length(vWorld - cameraPosition);
+    vec3 v = vWorld - cameraPosition;
+    float d = length(v);
     float fog = 1.0 - exp(-uFogDensity * uFogDensity * d * d);
-    gl_FragColor = vec4(mix(col, uFog, clamp(fog, 0.0, 1.0)), 1.0);
+    gl_FragColor = vec4(mix(col, duskSky(v / d), clamp(fog, 0.0, 1.0)), 1.0);
   }
 `
 
-/** Night sky: deep blue overhead, an amber city haze along the horizon. */
 const SKY_VERT = /* glsl */ `
   varying vec3 vDir;
   void main() {
@@ -81,15 +115,33 @@ const SKY_VERT = /* glsl */ `
   }
 `
 const SKY_FRAG = /* glsl */ `
-  uniform vec3 uFog;
   varying vec3 vDir;
+  ${DUSK_GLSL}
   void main() {
-    float y = vDir.y;
-    vec3 top = vec3(0.012, 0.018, 0.045);
-    vec3 haze = vec3(0.30, 0.12, 0.05);
-    vec3 col = mix(top, uFog, smoothstep(0.55, 0.0, y));
-    col += haze * exp(-abs(y) * 9.0) * 0.8;
-    gl_FragColor = vec4(col, 1.0);
+    gl_FragColor = vec4(duskSky(normalize(vDir)), 1.0);
+  }
+`
+
+/** Flat ground pieces (ground, roads, markings), hazed into the same sky. */
+const FLAT_VERT = /* glsl */ `
+  varying vec3 vWorld;
+  void main() {
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorld = wp.xyz;
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`
+const FLAT_FRAG = /* glsl */ `
+  uniform vec3 uColor;
+  uniform float uOpacity;
+  uniform float uFogDensity;
+  varying vec3 vWorld;
+  ${DUSK_GLSL}
+  void main() {
+    vec3 v = vWorld - cameraPosition;
+    float d = length(v);
+    float fog = 1.0 - exp(-uFogDensity * uFogDensity * d * d);
+    gl_FragColor = vec4(mix(uColor, duskSky(v / d), clamp(fog, 0.0, 1.0)), uOpacity);
   }
 `
 
@@ -121,15 +173,32 @@ function trailTexture() {
   return t
 }
 
+/** A soft round dot, so points are discs rather than squares. */
+function dotTexture() {
+  const c = document.createElement('canvas')
+  c.width = c.height = 32
+  const g = c.getContext('2d')
+  if (g) {
+    const grad = g.createRadialGradient(16, 16, 0, 16, 16, 16)
+    grad.addColorStop(0, 'rgba(255,255,255,1)')
+    grad.addColorStop(0.4, 'rgba(255,255,255,0.6)')
+    grad.addColorStop(1, 'rgba(255,255,255,0)')
+    g.fillStyle = grad
+    g.fillRect(0, 0, 32, 32)
+  }
+  return new THREE.CanvasTexture(c)
+}
+
 /**
- * The home page's background (Section 44): a night city seen like a
- * long-exposure photograph — streams of red tail-lights and white/amber
- * headlights flowing along the roads into a junction whose signals
- * change, with a scanning ring sweeping out from it (the "eye" watching),
- * rooftop beacons, sparks drifting up, a soft bloom over everything. The
- * camera flies with the page: high above the city at the top, down to the
- * junction through the middle, back up at the end (`progress` 0..1). The
- * pointer adds a little parallax. Purely decorative.
+ * The home page's background (Sections 44–45): a city at dusk, seen like a
+ * long-exposure photograph — the sky still glowing where the sun went
+ * down, towers lighting up floor by floor, streams of red tail-lights and
+ * white/amber headlights flowing into a junction whose signals change,
+ * with a scanning ring sweeping out from it (the "eye" watching), rooftop
+ * beacons, sparks drifting up, a soft bloom over everything. The camera
+ * flies with the page: across the skyline at the top, down to the junction
+ * through the middle, back out to the skyline at the end (`progress`
+ * 0..1). The pointer adds a little parallax. Purely decorative.
  */
 export function CityTrails({ progress, still }: { progress: MutableRefObject<number>; still: boolean }) {
   const host = useRef<HTMLDivElement>(null)
@@ -146,69 +215,85 @@ export function CityTrails({ progress, still }: { progress: MutableRefObject<num
     const pr = Math.min(1.75, window.devicePixelRatio || 1)
     renderer.setPixelRatio(pr)
     renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.setClearColor(FOG, 1)
+    renderer.toneMappingExposure = 1.05
+    renderer.setClearColor(HAZE, 1)
     el.appendChild(renderer.domElement)
 
     const scene = new THREE.Scene()
-    scene.fog = new THREE.FogExp2(FOG, FOG_DENSITY)
-    const camera = new THREE.PerspectiveCamera(55, 1, 0.5, 3000)
+    scene.fog = new THREE.FogExp2(HAZE, FOG_DENSITY)
+    const camera = new THREE.PerspectiveCamera(55, 1, 0.5, 3200)
 
     const trash: { dispose(): void }[] = []
     const keep = <T extends { dispose(): void }>(x: T) => (trash.push(x), x)
+    // one set of shared uniforms, so every hazed surface agrees with the sky
+    const shared = { uSunDir: { value: SUN_DIR }, uFogDensity: { value: FOG_DENSITY } }
+    const flat = (hex: number, opacity = 1) =>
+      keep(
+        new THREE.ShaderMaterial({
+          vertexShader: FLAT_VERT,
+          fragmentShader: FLAT_FRAG,
+          uniforms: { ...shared, uColor: { value: new THREE.Color(hex) }, uOpacity: { value: opacity } },
+          transparent: opacity < 1,
+          depthWrite: opacity >= 1,
+        }),
+      )
+    const dot = keep(dotTexture())
 
-    // ---- sky and stars -----------------------------------------------------
+    // ---- sky and the first stars ---------------------------------------------
     const sky = new THREE.Mesh(
-      keep(new THREE.SphereGeometry(1600, 32, 16)),
-      keep(new THREE.ShaderMaterial({ vertexShader: SKY_VERT, fragmentShader: SKY_FRAG, uniforms: { uFog: { value: FOG } }, side: THREE.BackSide, depthWrite: false, fog: false })),
+      keep(new THREE.SphereGeometry(1700, 48, 24)),
+      keep(new THREE.ShaderMaterial({ vertexShader: SKY_VERT, fragmentShader: SKY_FRAG, uniforms: { ...shared }, side: THREE.BackSide, depthWrite: false })),
     )
     scene.add(sky)
-    const STARS = 700
+    const STARS = 260
     const starPos = new Float32Array(STARS * 3)
     for (let i = 0; i < STARS; i++) {
       const th = Math.random() * Math.PI * 2
-      const y = 0.15 + Math.random() * 0.85
+      const y = 0.4 + Math.random() * 0.6 // evening: only high up, where it's already dark
       const r = Math.sqrt(1 - y * y)
-      starPos.set([Math.cos(th) * r * 1400, y * 1400, Math.sin(th) * r * 1400], i * 3)
+      starPos.set([Math.cos(th) * r * 1500, y * 1500, Math.sin(th) * r * 1500], i * 3)
     }
     const starGeo = keep(new THREE.BufferGeometry())
     starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3))
-    const stars = new THREE.Points(starGeo, keep(new THREE.PointsMaterial({ color: 0x9fb4ff, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0.55, fog: false, depthWrite: false })))
+    const stars = new THREE.Points(
+      starGeo,
+      keep(new THREE.PointsMaterial({ color: 0xc8d4ff, map: dot, size: 2.4, sizeAttenuation: false, transparent: true, opacity: 0.4, fog: false, depthWrite: false })),
+    )
     scene.add(stars)
 
     // ---- ground and roads -------------------------------------------------
-    const ground = new THREE.Mesh(keep(new THREE.PlaneGeometry(3000, 3000)), keep(new THREE.MeshBasicMaterial({ color: 0x060912 })))
+    const ground = new THREE.Mesh(keep(new THREE.PlaneGeometry(7000, 7000)), flat(0x0d0e1c))
     ground.rotation.x = -Math.PI / 2
     scene.add(ground)
-    const grid = new THREE.GridHelper(2400, 120, 0x1a2236, 0x0d1220)
-    ;(grid.material as THREE.Material).transparent = true
-    ;(grid.material as THREE.Material).opacity = 0.4
-    grid.position.y = 0.05
-    scene.add(grid)
 
-    // Roads every 120 m both ways; the junction sits on the two at 0.
+    // Roads every 120 m both ways; the junction sits on the two at 0. The
+    // inner grid carries traffic; the outer roads run on into the haze.
     const ROADS = [-480, -360, -240, -120, 0, 120, 240, 360, 480]
-    const roadMat = keep(new THREE.MeshBasicMaterial({ color: 0x0b101b }))
-    const edgeMat = keep(new THREE.MeshBasicMaterial({ color: 0x33456c, transparent: true, opacity: 0.55 }))
-    const dashMat = keep(new THREE.MeshBasicMaterial({ color: 0x8a6a2a, transparent: true, opacity: 0.45 }))
-    for (const c of ROADS) {
+    const ALL_ROADS = Array.from({ length: 19 }, (_, i) => -1080 + i * 120)
+    const piece = (w: number, d: number, x: number, y: number, z: number) => {
+      const g = new THREE.PlaneGeometry(w, d)
+      g.rotateX(-Math.PI / 2)
+      g.translate(x, y, z)
+      return g
+    }
+    const roadParts: THREE.BufferGeometry[] = []
+    const edgeParts: THREE.BufferGeometry[] = []
+    const centreParts: THREE.BufferGeometry[] = []
+    const L = 2400
+    for (const c of ALL_ROADS) {
       const w = c === 0 ? 22 : 12
-      for (const axis of ['x', 'z'] as const) {
-        const road = new THREE.Mesh(keep(new THREE.PlaneGeometry(axis === 'x' ? 1200 : w, axis === 'x' ? w : 1200)), roadMat)
-        road.rotation.x = -Math.PI / 2
-        road.position.set(axis === 'x' ? 0 : c, 0.1, axis === 'x' ? c : 0)
-        scene.add(road)
-        for (const side of [-1, 1]) {
-          const edge = new THREE.Mesh(keep(new THREE.PlaneGeometry(axis === 'x' ? 1200 : 0.4, axis === 'x' ? 0.4 : 1200)), edgeMat)
-          edge.rotation.x = -Math.PI / 2
-          edge.position.set(axis === 'x' ? 0 : c + (side * w) / 2, 0.15, axis === 'x' ? c + (side * w) / 2 : 0)
-          scene.add(edge)
-        }
-        // a faint amber centre line
-        const centre = new THREE.Mesh(keep(new THREE.PlaneGeometry(axis === 'x' ? 1200 : 0.3, axis === 'x' ? 0.3 : 1200)), dashMat)
-        centre.rotation.x = -Math.PI / 2
-        centre.position.set(axis === 'x' ? 0 : c, 0.16, axis === 'x' ? c : 0)
-        scene.add(centre)
-      }
+      roadParts.push(piece(L, w, 0, 0.1, c), piece(w, L, c, 0.1, 0))
+      for (const side of [-1, 1]) edgeParts.push(piece(L, 0.4, 0, 0.15, c + (side * w) / 2), piece(0.4, L, c + (side * w) / 2, 0.15, 0))
+      centreParts.push(piece(L, 0.3, 0, 0.16, c), piece(0.3, L, c, 0.16, 0))
+    }
+    for (const [parts, mat] of [
+      [roadParts, flat(0x161828)],
+      [edgeParts, flat(0x4a5578, 0.55)],
+      [centreParts, flat(0xa57a35, 0.5)],
+    ] as const) {
+      const geo = keep(mergeGeometries(parts))
+      parts.forEach((p) => p.dispose())
+      scene.add(new THREE.Mesh(geo, mat))
     }
 
     // ---- buildings ----------------------------------------------------------
@@ -216,30 +301,38 @@ export function CityTrails({ progress, still }: { progress: MutableRefObject<num
       new THREE.ShaderMaterial({
         vertexShader: BUILDING_VERT,
         fragmentShader: BUILDING_FRAG,
-        uniforms: { uTime: { value: 0 }, uFog: { value: FOG }, uFogDensity: { value: FOG_DENSITY } },
+        uniforms: { ...shared, uTime: { value: 0 } },
       }),
     )
     const boxGeo = keep(new THREE.BoxGeometry(1, 1, 1))
     const blocks: THREE.Matrix4[] = []
     const beacons: number[] = []
     const m4 = new THREE.Matrix4()
-    for (let i = 0; i < ROADS.length - 1; i++) {
-      for (let j = 0; j < ROADS.length - 1; j++) {
-        const x0 = ROADS[i] + 10
-        const z0 = ROADS[j] + 10
-        // the four blocks round the junction stay low so it stays in view
-        const near = Math.abs(ROADS[i] + 60) < 70 && Math.abs(ROADS[j] + 60) < 70
-        const dist = Math.hypot(ROADS[i] + 60, ROADS[j] + 60)
-        for (let k = 0; k < 6; k++) {
-          const w = 14 + Math.random() * 26
-          const d = 14 + Math.random() * 26
-          const tall = near ? 50 : 60 + Math.min(1, dist / 400) * 150
-          const h = (near ? 12 : 18) + Math.random() ** 2.2 * tall
-          const x = x0 + Math.random() * (100 - w) + w / 2
-          const z = z0 + Math.random() * (100 - d) + d / 2
-          m4.compose(new THREE.Vector3(x, h / 2, z), new THREE.Quaternion(), new THREE.Vector3(w, h, d))
-          blocks.push(m4.clone())
-          if (h > 90) beacons.push(x, h + 1.5, z)
+    const addBlock = (x0: number, z0: number, count: number, tall: number, base: number) => {
+      for (let k = 0; k < count; k++) {
+        const w = 14 + Math.random() * 26
+        const d = 14 + Math.random() * 26
+        const h = base + Math.random() ** 2.2 * tall
+        const x = x0 + Math.random() * (100 - w) + w / 2
+        const z = z0 + Math.random() * (100 - d) + d / 2
+        m4.compose(new THREE.Vector3(x, h / 2, z), new THREE.Quaternion(), new THREE.Vector3(w, h, d))
+        blocks.push(m4.clone())
+        if (h > 90) beacons.push(x, h + 1.5, z)
+      }
+    }
+    for (let i = 0; i < ALL_ROADS.length - 1; i++) {
+      for (let j = 0; j < ALL_ROADS.length - 1; j++) {
+        const x0 = ALL_ROADS[i] + 10
+        const z0 = ALL_ROADS[j] + 10
+        const inner = Math.abs(x0 + 50) < 480 && Math.abs(z0 + 50) < 480
+        if (inner) {
+          // the four blocks round the junction stay low so it stays in view
+          const near = Math.abs(ALL_ROADS[i] + 60) < 70 && Math.abs(ALL_ROADS[j] + 60) < 70
+          const dist = Math.hypot(ALL_ROADS[i] + 60, ALL_ROADS[j] + 60)
+          addBlock(x0, z0, 6, near ? 50 : 60 + Math.min(1, dist / 400) * 150, near ? 12 : 18)
+        } else if (z0 < 480) {
+          // the skyline beyond (not to the south, where the opening view stands)
+          addBlock(x0, z0, 3, 230, 40)
         }
       }
     }
@@ -249,22 +342,7 @@ export function CityTrails({ progress, still }: { progress: MutableRefObject<num
     // red aviation beacons on the tall towers, blinking slowly together
     const beaconGeo = keep(new THREE.BufferGeometry())
     beaconGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(beacons), 3))
-    // a fixed few pixels across whatever the distance, and round
-    const dotTex = (() => {
-      const c = document.createElement('canvas')
-      c.width = c.height = 32
-      const g = c.getContext('2d')
-      if (g) {
-        const grad = g.createRadialGradient(16, 16, 0, 16, 16, 16)
-        grad.addColorStop(0, 'rgba(255,255,255,1)')
-        grad.addColorStop(0.4, 'rgba(255,255,255,0.6)')
-        grad.addColorStop(1, 'rgba(255,255,255,0)')
-        g.fillStyle = grad
-        g.fillRect(0, 0, 32, 32)
-      }
-      return keep(new THREE.CanvasTexture(c))
-    })()
-    const beaconMat = keep(new THREE.PointsMaterial({ color: new THREE.Color(4, 0.3, 0.2), map: dotTex, size: 7, sizeAttenuation: false, transparent: true, depthWrite: false, toneMapped: false }))
+    const beaconMat = keep(new THREE.PointsMaterial({ color: new THREE.Color(4, 0.3, 0.2), map: dot, size: 7, sizeAttenuation: false, transparent: true, depthWrite: false, toneMapped: false }))
     scene.add(new THREE.Points(beaconGeo, beaconMat))
 
     // ---- light trails ------------------------------------------------------
@@ -280,11 +358,11 @@ export function CityTrails({ progress, still }: { progress: MutableRefObject<num
       }
     }
     const STREAKS = 1100
-    const flat = new THREE.PlaneGeometry(1, 2.6)
-    flat.rotateX(-Math.PI / 2)
+    const flatQuad = new THREE.PlaneGeometry(1, 2.6)
+    flatQuad.rotateX(-Math.PI / 2)
     const upright = new THREE.PlaneGeometry(1, 1.2)
-    const streakGeo = keep(mergeGeometries([flat, upright]))
-    flat.dispose()
+    const streakGeo = keep(mergeGeometries([flatQuad, upright]))
+    flatQuad.dispose()
     upright.dispose()
     const streakMat = keep(
       new THREE.MeshBasicMaterial({ map: keep(trailTexture()), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }),
@@ -311,7 +389,7 @@ export function CityTrails({ progress, still }: { progress: MutableRefObject<num
 
     // ---- the junction's signals --------------------------------------------
     const lampGeo = keep(new THREE.SphereGeometry(1.6, 16, 12))
-    const poleMat = keep(new THREE.MeshBasicMaterial({ color: 0x1a1f2b }))
+    const poleMat = keep(new THREE.MeshBasicMaterial({ color: 0x1d2133 }))
     type Head = { mats: THREE.MeshBasicMaterial[]; axis: 'ns' | 'ew' }
     const heads: Head[] = []
     for (const [x, z, axis] of [
@@ -356,14 +434,18 @@ export function CityTrails({ progress, still }: { progress: MutableRefObject<num
     const sparkPos = new Float32Array(SPARKS * 3)
     const sparkSeed = Array.from({ length: SPARKS }, () => [Math.random() * 900 - 450, Math.random() * 900 - 450, Math.random() * 200, 2 + Math.random() * 6])
     sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3))
-    const sparks = new THREE.Points(sparkGeo, keep(new THREE.PointsMaterial({ color: new THREE.Color(1.6, 0.9, 0.5), map: dotTex, size: 2.2, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false })))
+    const sparks = new THREE.Points(
+      sparkGeo,
+      keep(new THREE.PointsMaterial({ color: new THREE.Color(1.6, 0.9, 0.5), map: dot, size: 2.2, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false })),
+    )
     scene.add(sparks)
 
     // ---- bloom -------------------------------------------------------------
     const composer = new EffectComposer(renderer)
     composer.setPixelRatio(pr)
     composer.addPass(new RenderPass(scene, camera))
-    const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.95, 0.5, 0.6)
+    // threshold above the sky's own glow: lights bloom, the sunset doesn't smear
+    const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.9, 0.5, 0.78)
     composer.addPass(bloom)
     composer.addPass(new OutputPass())
 
@@ -386,12 +468,12 @@ export function CityTrails({ progress, still }: { progress: MutableRefObject<num
 
     // camera keyframes along the page: [progress, position, look-at]
     const KEYS: [number, THREE.Vector3, THREE.Vector3][] = [
-      [0, new THREE.Vector3(0, 300, 430), new THREE.Vector3(0, 20, 0)],
+      [0, new THREE.Vector3(0, 240, 730), new THREE.Vector3(0, 10, -200)],
       [0.2, new THREE.Vector3(150, 120, 230), new THREE.Vector3(0, 0, 0)],
       [0.42, new THREE.Vector3(95, 70, 150), new THREE.Vector3(0, 6, 0)],
       [0.62, new THREE.Vector3(-150, 85, 110), new THREE.Vector3(0, 6, 0)],
       [0.8, new THREE.Vector3(-260, 60, -160), new THREE.Vector3(0, 30, 0)],
-      [1, new THREE.Vector3(0, 420, 520), new THREE.Vector3(0, 0, 0)],
+      [1, new THREE.Vector3(80, 250, 760), new THREE.Vector3(-40, 10, -220)],
     ]
     const camPos = KEYS[0][1].clone()
     const camLook = KEYS[0][2].clone()
@@ -455,7 +537,7 @@ export function CityTrails({ progress, still }: { progress: MutableRefObject<num
       stars.position.copy(camPos)
       buildingMat.uniforms.uTime.value = t
 
-      // trails glide; they wrap at the city's edge
+      // trails glide; they wrap at the inner city's edge
       const flow = still ? 0 : dt
       for (let i = 0; i < streaks.count; i++) {
         const st = sState[i]
@@ -520,8 +602,6 @@ export function CityTrails({ progress, still }: { progress: MutableRefObject<num
       window.removeEventListener('resize', resize)
       window.removeEventListener('pointermove', onMove)
       trash.forEach((x) => x.dispose())
-      grid.geometry.dispose()
-      ;(grid.material as THREE.Material).dispose()
       streaks.dispose()
       buildings.dispose()
       composer.dispose()
@@ -531,5 +611,5 @@ export function CityTrails({ progress, still }: { progress: MutableRefObject<num
     }
   }, [progress, still])
 
-  return <div ref={host} className="fixed inset-0 -z-10 bg-[#05070e]" aria-hidden />
+  return <div ref={host} className="fixed inset-0 -z-10 bg-[#1a1226]" aria-hidden />
 }

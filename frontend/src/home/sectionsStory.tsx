@@ -31,9 +31,9 @@ export function Hero({ onMore }: { onMore: () => void }) {
     const tl = gsap.timeline({ defaults: { ease: 'power4.out' } })
     tl.from('.hero-eye', { scale: 0.2, opacity: 0, rotate: -40, duration: 1.6 })
       .from('.hero-word', { clipPath: 'inset(0 100% 0 0)', opacity: 0, duration: 1.4 }, '-=0.9')
-      .from('.hero-tag span', { y: 40, opacity: 0, stagger: 0.12, duration: 0.9 }, '-=0.7')
+      .from('.hero-tag span span, .hero-tag .dot', { y: 40, opacity: 0, stagger: 0.12, duration: 0.9 }, '-=0.7')
       .from('.hero-line', { y: 30, opacity: 0, filter: 'blur(8px)', duration: 1 }, '-=0.5')
-      .from('.hero-actions > *', { y: 24, opacity: 0, stagger: 0.12, duration: 0.8 }, '-=0.6')
+      .from('.hero-actions', { y: 24, opacity: 0, duration: 0.8 }, '-=0.6')
       .from('.hero-facts li', { y: 16, opacity: 0, stagger: 0.08, duration: 0.6 }, '-=0.4')
       .from('.hero-cue', { opacity: 0, duration: 0.8 }, '-=0.3')
     // leaving the hero: it sinks back and fades as the page scrolls on
@@ -48,10 +48,18 @@ export function Hero({ onMore }: { onMore: () => void }) {
   return (
     <section ref={ref} className="home-hero" id="top">
       <div className="hero-inner">
-        <img src={eye} alt="" className="hero-eye" />
+        <span className="hero-eye-float">
+          <img src={eye} alt="" className="hero-eye" />
+        </span>
         <img src={wordmark} alt="Trinetra" className="hero-word" />
         <p className="hero-tag">
-          <span>Smarter</span> <span>Signals</span> <span className="dot">·</span> <span>Safer</span> <span>Cities</span>
+          <span className="tag-pair">
+            <span>Smarter</span> <span>Signals</span>
+          </span>{' '}
+          <span className="dot">·</span>{' '}
+          <span className="tag-pair">
+            <span>Safer</span> <span>Cities</span>
+          </span>
         </p>
         <p className="hero-line">
           An AI that watches a road junction, predicts the next {PREDICTION.horizonSeconds} seconds of traffic, and decides — every second — who gets the green.
@@ -135,16 +143,11 @@ const PILLAR_VIZ = { sees: SeesViz, predicts: PredictsViz, decides: DecidesViz }
 export function Pillars() {
   const ref = useRef<HTMLElement>(null)
   useScene(ref, () => {
-    gsap.from('.pillar', {
-      opacity: 0,
-      y: 120,
-      rotateX: 35,
-      z: -200,
-      stagger: 0.18,
-      duration: 1.2,
-      ease: 'power3.out',
-      scrollTrigger: { trigger: '.pillars', start: 'top 80%' },
-    })
+    gsap.fromTo(
+      '.pillar-slot',
+      { opacity: 0, y: 120, rotateX: 35, z: -200 },
+      { opacity: 1, y: 0, rotateX: 0, z: 0, stagger: 0.18, duration: 1.2, ease: 'power3.out', scrollTrigger: { trigger: '.pillars', start: 'top 80%' } },
+    )
   })
   return (
     <section ref={ref} className="home-section" id="what">
@@ -163,16 +166,18 @@ export function Pillars() {
             const Icon = PILLAR_ICON[p.key]
             const Viz = PILLAR_VIZ[p.key]
             return (
-              <article key={p.key} className={`pillar pillar-${i} spot`}>
-                <Viz />
-                <div className="pillar-row">
-                  <span className="pillar-icon">
-                    <Icon size={24} aria-hidden />
-                  </span>
-                  <h3>{p.title}</h3>
-                </div>
-                <p>{p.body}</p>
-              </article>
+              <div key={p.key} className="pillar-slot">
+                <article className={`pillar pillar-${i} spot`}>
+                  <Viz />
+                  <div className="pillar-row">
+                    <span className="pillar-icon">
+                      <Icon size={24} aria-hidden />
+                    </span>
+                    <h3>{p.title}</h3>
+                  </div>
+                  <p>{p.body}</p>
+                </article>
+              </div>
             )
           })}
         </div>
@@ -198,12 +203,11 @@ export function Pipeline() {
       .to('.pipe-fill', { scaleX: 1, ease: 'none' }, 0)
       .to('.pipe-pulse', { left: '100%', ease: 'none' }, 0)
     el.querySelectorAll('.pipe-step').forEach((step) => {
-      gsap.from(step, {
-        opacity: 0.25,
-        scale: 0.88,
-        ease: 'none',
-        scrollTrigger: { trigger: step, containerAnimation: tl, start: 'left 85%', end: 'left 45%', scrub: true },
-      })
+      gsap.fromTo(
+        step,
+        { opacity: 0.25, scale: 0.88 },
+        { opacity: 1, scale: 1, ease: 'none', scrollTrigger: { trigger: step, containerAnimation: tl, start: 'left 85%', end: 'left 45%', scrub: true } },
+      )
     })
   })
   return (
@@ -310,8 +314,8 @@ export function Results() {
   const rows = RESULTS.toSorted((a, b) => (b[metric] as number) - (a[metric] as number))
   const max = Math.max(...rows.map((r) => r[metric] as number), 1)
   useScene(ref, () => {
-    gsap.from('.res-stat', { opacity: 0, y: 60, scale: 0.9, stagger: 0.12, duration: 1, ease: 'back.out(1.6)', scrollTrigger: { trigger: '.res-stats', start: 'top 82%' } })
-    gsap.from('.bar-fill', { scaleX: 0, stagger: 0.05, duration: 1.3, ease: 'power3.out', scrollTrigger: { trigger: '.res-bars', start: 'top 80%' } })
+    gsap.fromTo('.res-stat', { opacity: 0, y: 60, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, stagger: 0.12, duration: 1, ease: 'back.out(1.6)', scrollTrigger: { trigger: '.res-stats', start: 'top 82%' } })
+    gsap.fromTo('.bar-fill', { scaleX: 0 }, { scaleX: 1, stagger: 0.05, duration: 1.3, ease: 'power3.out', scrollTrigger: { trigger: '.res-bars', start: 'top 80%' } })
   })
   return (
     <section ref={ref} className="home-section" id="results">

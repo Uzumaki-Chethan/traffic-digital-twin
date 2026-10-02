@@ -4,8 +4,8 @@
   --h-amber: #ffb020;
   --h-green: #34e27c;
   --h-ink: #e9eef8;
-  --h-mute: #9aa6bd;
-  --h-glass: rgb(14 20 34 / 0.55);
+  --h-mute: #b3bccf;
+  --h-glass: rgb(16 15 32 / 0.5);
   --h-edge: rgb(255 255 255 / 0.12);
   position: relative;
   /* its own stacking context, so the fixed 3D city (z -10) paints above
@@ -14,12 +14,27 @@
   min-height: 100vh;
   color: var(--h-ink);
   font-family: var(--font-ui);
-  background: radial-gradient(ellipse at 50% 30%, #0d1424 0%, #04060c 70%);
+  background: radial-gradient(ellipse at 50% 30%, #3a2240 0%, #120d1f 70%);
   overflow-x: clip;
 }
-.home :is(.home-lead, .hero-line, .scn-head p, .tour-step li, .tour-line, .rig-points li, .problem-answer) {
-  /* readable over the moving city whatever passes behind */
-  text-shadow: 0 1px 14px rgb(0 0 0 / 0.95), 0 0 2px rgb(0 0 0 / 0.8);
+.home :is(.home-lead, .hero-line, .scn-head p, .tour-step li, .tour-line, .rig-points li, .problem-answer, .res-note) {
+  /* readable over the lit evening city whatever passes behind: a tight
+     edge, a halo, and a wide soft shadow */
+  text-shadow:
+    0 1px 2px rgb(0 0 0 / 0.9),
+    0 0 12px rgb(0 0 0 / 0.85),
+    0 2px 28px rgb(0 0 0 / 0.75);
+}
+.home :is(.home-h2, .home-eyebrow, .scn-head h3, .tour-step h3, .problem-text, .finale-title, .tour-num) {
+  text-shadow:
+    0 2px 4px rgb(0 0 0 / 0.6),
+    0 0 32px rgb(0 0 0 / 0.6);
+}
+/* gradient text is clipped to its glyphs: a text-shadow would show through
+   them, so it gets a drop-shadow instead */
+.home .grad {
+  text-shadow: none;
+  filter: drop-shadow(0 2px 12px rgb(0 0 0 / 0.65));
 }
 .home ::selection {
   background: rgb(255 176 32 / 0.35);
@@ -29,9 +44,11 @@
   inset: 0;
   z-index: -5;
   pointer-events: none;
+  /* light: the evening city should show through; just enough at the edges
+     and down the text column to keep words readable */
   background:
-    radial-gradient(ellipse at 50% 50%, rgb(2 3 8 / 0.25) 30%, rgb(2 3 8 / 0.8) 100%),
-    linear-gradient(90deg, rgb(4 6 12 / 0.55), rgb(4 6 12 / 0.15) 60%, rgb(4 6 12 / 0.35));
+    radial-gradient(ellipse at 50% 45%, transparent 45%, rgb(8 5 16 / 0.5) 100%),
+    linear-gradient(90deg, rgb(8 5 16 / 0.42), transparent 55%);
 }
 .home-progress {
   position: fixed;
@@ -56,7 +73,7 @@
   justify-content: space-between;
   padding: 12px clamp(16px, 3vw, 40px);
   /* frosted, so page text scrolling underneath never collides with the logo */
-  background: rgb(4 6 12 / 0.55);
+  background: rgb(10 8 20 / 0.5);
   backdrop-filter: blur(14px) saturate(1.2);
   border-bottom: 1px solid rgb(255 255 255 / 0.06);
 }
@@ -137,6 +154,29 @@
   background-clip: text;
   color: transparent;
 }
+/* free-standing text sits on a light frosted caption, so it stays readable
+   over the lit evening city without hiding it */
+.home-lead,
+.tour-card,
+.rig-points {
+  border-radius: 18px;
+  background: rgb(10 8 20 / 0.42);
+  border: 1px solid rgb(255 255 255 / 0.06);
+  backdrop-filter: blur(8px);
+}
+.home-lead {
+  width: fit-content;
+  padding: 12px 18px;
+  margin-left: -18px;
+}
+.tour-card {
+  padding: 20px 18px;
+  margin-left: -18px;
+}
+.rig-points {
+  padding: 16px 18px;
+  margin-left: -18px;
+}
 .home-lead {
   margin-top: 18px;
   max-width: 760px;
@@ -188,17 +228,31 @@
   place-items: center;
   text-align: center;
 }
+/* a soft dusk shadow behind the hero's words, so the logo (screen-blended
+   off its black ground) and the lines keep their contrast over the sky */
+.home-hero::before {
+  content: '';
+  position: absolute;
+  inset: 8% 10%;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 52%, rgb(8 5 16 / 0.62) 0%, rgb(8 5 16 / 0.35) 45%, transparent 72%);
+}
 .hero-inner {
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 0 20px;
 }
+/* the float lives on a wrapper: GSAP owns the eye's own transform */
+.hero-eye-float {
+  display: block;
+  animation: hero-float 6s ease-in-out infinite;
+}
 .hero-eye {
   mix-blend-mode: screen;
   width: clamp(120px, 15vw, 210px);
   filter: drop-shadow(0 0 30px rgb(255 110 40 / 0.55));
-  animation: hero-float 6s ease-in-out infinite;
 }
 @keyframes hero-float {
   50% {
@@ -222,6 +276,10 @@
 }
 .hero-tag span {
   display: inline-block;
+}
+/* each half of the tagline stays whole when it has to wrap */
+.hero-tag .tag-pair {
+  white-space: nowrap;
 }
 .hero-tag .dot {
   color: var(--h-red);
@@ -396,6 +454,20 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 22px;
   perspective: 1200px;
+}
+/* GSAP moves the slots (never the cards: a card's CSS hover transition on
+   transform would be read mid-way as the tween's end, leaving it stuck) */
+.pillar-slot,
+.res-slot,
+.scn-slot {
+  display: flex;
+  min-width: 0;
+}
+.pillar-slot > *,
+.res-slot > *,
+.scn-slot > * {
+  flex: 1;
+  min-width: 0;
 }
 .pillar {
   position: relative;
@@ -1070,6 +1142,14 @@
   align-items: flex-start;
   gap: 18px;
   margin-bottom: 20px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 12px 20px 12px 14px;
+  border-radius: 18px;
+  /* frosted, so the line stays readable over the lit towers behind */
+  background: rgb(10 8 20 / 0.5);
+  border: 1px solid rgb(255 255 255 / 0.07);
+  backdrop-filter: blur(10px);
 }
 .scn-idx {
   font-family: var(--font-display);
@@ -1463,7 +1543,8 @@
   font-size: clamp(22px, 3vw, 38px);
   font-weight: 800;
   color: transparent;
-  -webkit-text-stroke: 1.2px rgb(255 255 255 / 0.35);
+  -webkit-text-stroke: 1.2px rgb(255 255 255 / 0.6);
+  filter: drop-shadow(0 2px 8px rgb(0 0 0 / 0.55));
   white-space: nowrap;
 }
 @keyframes marquee {
@@ -1485,18 +1566,24 @@
   color: #fff;
 }
 .finale-inner .home-lead {
+  margin-left: auto;
+  margin-right: auto;
   margin-bottom: 34px;
   text-align: center;
 }
 .home-foot {
   margin-top: clamp(80px, 14vh, 140px);
-  padding: 28px 0 10px;
+  margin-bottom: 18px;
+  padding: 18px 22px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 22px;
-  border-top: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 20px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background: rgb(10 8 20 / 0.55);
+  backdrop-filter: blur(10px);
   text-align: left;
 }
 .foot-brand {
@@ -1625,7 +1712,7 @@
 .home-top.scrolled {
   padding-top: 8px;
   padding-bottom: 8px;
-  background: rgb(4 6 12 / 0.72);
+  background: rgb(10 8 20 / 0.68);
 }
 @media (max-width: 1180px) {
   .home-links {
@@ -1668,6 +1755,9 @@
   }
   .hero-tag {
     letter-spacing: 0.2em;
+  }
+  .hero-tag .dot {
+    display: none;
   }
   .problem-grid,
   .rig,
