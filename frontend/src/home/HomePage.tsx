@@ -7,7 +7,7 @@ import { ArrowRight } from 'lucide-react'
 import { useRunStore } from '@/data/runState'
 import { TrafficCursor } from '@/layout/TrafficCursor'
 import eye from '@/assets/trinetra-eye.png'
-import { CityTrails } from './CityTrails'
+import { CityPhoto } from './CityPhoto'
 import { Hero, Pillars, Pipeline, Problem, Results } from './sectionsStory'
 import { ConsoleTour, Finale, Resilience, Rig, Scenarios } from './sectionsShow'
 import './home.css'
@@ -35,7 +35,7 @@ const reduced = () => typeof window !== 'undefined' && window.matchMedia('(prefe
  * what Trinetra is, how it works, what it achieved (real numbers only,
  * from home/content.ts), what it copes with, every scenario, a tour of
  * the console, and the physical model. Smooth scrolling (Lenis) drives
- * GSAP ScrollTrigger scenes and the 3D city behind (CityTrails). With
+ * GSAP ScrollTrigger scenes over the console's own night city, alive (CityPhoto). With
  * reduced motion: native scrolling, simple fades, a still background.
  */
 export function HomePage() {
@@ -133,7 +133,7 @@ export function HomePage() {
 
   return (
     <div ref={root} className={still ? 'home' : 'home home-anim'}>
-      <CityTrails progress={progress} still={still} />
+      <CityPhoto progress={progress} still={still} />
       <div className="home-vignette" aria-hidden />
       <div ref={bar} className="home-progress" aria-hidden />
 

@@ -15,9 +15,11 @@ map (shared `overview/cityscape.ts`) in both the plan and the 3D view.
 
 **Home** (`/`, `src/home/`, Section 44) is the full-screen landing page outside the
 console frame:
-- a live three.js city at dusk behind it (`CityTrails.tsx`), whose camera follows the
-  scroll and which drops its own quality on a slow machine. One sky function colours the
-  dome and hazes every tower and road into it.
+- behind it, the console's own night photograph, brought to life (`CityPhoto.tsx`):
+  - traffic drives the photo's real roads, traced in `cityPhotoData.ts` in photo pixels;
+  - a camera glides over the photo with the scroll;
+  - the page drops its own quality on a slow machine.
+  Re-trace `cityPhotoData.ts` if `assets/city-night.jpg` is ever replaced.
 - a GSAP rule for this page: animate a plain wrapper (`.pillar-slot`, `.res-slot`,
   `.scn-slot`) with `fromTo` and explicit end values, never an element that has a CSS
   `transform` transition. GSAP reads such an element mid-transition on a refresh and

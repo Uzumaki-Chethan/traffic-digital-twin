@@ -5,7 +5,7 @@
   --h-green: #34e27c;
   --h-ink: #e9eef8;
   --h-mute: #b3bccf;
-  --h-glass: rgb(16 15 32 / 0.5);
+  --h-glass: rgb(8 14 30 / 0.55);
   --h-edge: rgb(255 255 255 / 0.12);
   position: relative;
   /* its own stacking context, so the fixed 3D city (z -10) paints above
@@ -14,7 +14,7 @@
   min-height: 100vh;
   color: var(--h-ink);
   font-family: var(--font-ui);
-  background: radial-gradient(ellipse at 50% 30%, #3a2240 0%, #120d1f 70%);
+  background: radial-gradient(ellipse at 50% 30%, #0d1830 0%, #07101f 70%);
   overflow-x: clip;
 }
 .home :is(.home-lead, .hero-line, .scn-head p, .tour-step li, .tour-line, .rig-points li, .problem-answer, .res-note) {
@@ -25,7 +25,14 @@
     0 0 12px rgb(0 0 0 / 0.85),
     0 2px 28px rgb(0 0 0 / 0.75);
 }
-.home :is(.home-h2, .home-eyebrow, .scn-head h3, .tour-step h3, .problem-text, .finale-title, .tour-num) {
+/* small amber captions need a tight dark halo over the bright trails */
+.home :is(.home-eyebrow, .tour-num) {
+  text-shadow:
+    0 0 4px rgb(0 0 0 / 0.95),
+    0 0 10px rgb(0 0 0 / 0.85),
+    0 0 22px rgb(0 0 0 / 0.6);
+}
+.home :is(.home-h2, .scn-head h3, .tour-step h3, .problem-text, .finale-title) {
   text-shadow:
     0 2px 4px rgb(0 0 0 / 0.6),
     0 0 32px rgb(0 0 0 / 0.6);
@@ -47,8 +54,8 @@
   /* light: the evening city should show through; just enough at the edges
      and down the text column to keep words readable */
   background:
-    radial-gradient(ellipse at 50% 45%, transparent 45%, rgb(8 5 16 / 0.5) 100%),
-    linear-gradient(90deg, rgb(8 5 16 / 0.42), transparent 55%);
+    radial-gradient(ellipse at 50% 45%, transparent 45%, rgb(3 7 18 / 0.5) 100%),
+    linear-gradient(90deg, rgb(3 7 18 / 0.42), transparent 55%);
 }
 .home-progress {
   position: fixed;
@@ -73,7 +80,7 @@
   justify-content: space-between;
   padding: 12px clamp(16px, 3vw, 40px);
   /* frosted, so page text scrolling underneath never collides with the logo */
-  background: rgb(10 8 20 / 0.5);
+  background: rgb(6 12 28 / 0.5);
   backdrop-filter: blur(14px) saturate(1.2);
   border-bottom: 1px solid rgb(255 255 255 / 0.06);
 }
@@ -160,7 +167,7 @@
 .tour-card,
 .rig-points {
   border-radius: 18px;
-  background: rgb(10 8 20 / 0.42);
+  background: rgb(6 12 28 / 0.42);
   border: 1px solid rgb(255 255 255 / 0.06);
   backdrop-filter: blur(8px);
 }
@@ -236,7 +243,7 @@
   inset: 8% 10%;
   z-index: -1;
   pointer-events: none;
-  background: radial-gradient(ellipse at 50% 52%, rgb(8 5 16 / 0.62) 0%, rgb(8 5 16 / 0.35) 45%, transparent 72%);
+  background: radial-gradient(ellipse at 50% 52%, rgb(3 7 18 / 0.62) 0%, rgb(3 7 18 / 0.35) 45%, transparent 72%);
 }
 .hero-inner {
   display: flex;
@@ -1147,7 +1154,7 @@
   padding: 12px 20px 12px 14px;
   border-radius: 18px;
   /* frosted, so the line stays readable over the lit towers behind */
-  background: rgb(10 8 20 / 0.5);
+  background: rgb(6 12 28 / 0.5);
   border: 1px solid rgb(255 255 255 / 0.07);
   backdrop-filter: blur(10px);
 }
@@ -1582,7 +1589,7 @@
   gap: 22px;
   border-radius: 20px;
   border: 1px solid rgb(255 255 255 / 0.08);
-  background: rgb(10 8 20 / 0.55);
+  background: rgb(6 12 28 / 0.55);
   backdrop-filter: blur(10px);
   text-align: left;
 }
@@ -1712,7 +1719,7 @@
 .home-top.scrolled {
   padding-top: 8px;
   padding-bottom: 8px;
-  background: rgb(10 8 20 / 0.68);
+  background: rgb(6 12 28 / 0.68);
 }
 @media (max-width: 1180px) {
   .home-links {

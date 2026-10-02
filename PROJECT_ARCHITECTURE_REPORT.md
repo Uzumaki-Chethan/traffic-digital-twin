@@ -4684,3 +4684,84 @@ item is an improvement, not a removal; nothing in Section 44's inventory was los
 - Hero, problem, pillars, results, scenarios, tour and finale were photographed at
   1440×900 in animated mode, and hero and scenarios at 390×844.
 - No horizontal overflow.
+
+## SECTION 47 — Home page: the console's own city, alive (CURRENT STATE)
+
+*2026-10-02 · branch `main` · `frontend/src/home/` · replaces the procedural city of
+Sections 44–46*
+
+**Owner:** "can't you make a city that looks realistic, and matches the theme of the
+console".
+
+**Decision:**
+- The console's theme *is* its night photograph (`assets/city-night.jpg`, behind every
+  console page via `layout/Backdrop.tsx`).
+- No hand-built 3D city made of boxes will look as real as a real photograph.
+- So the home page now uses that same photograph and brings it to life. It matches the
+  console exactly, because it is the same city.
+- `CityTrails.tsx` (the procedural three.js city) is deleted.
+
+**Roads, traced on the photo** (`cityPhotoData.ts`):
+- **13 road pieces, 25 lanes, 306 points**, in photo pixels:
+  - the S-curve flyover;
+  - the long flyover across the lower third;
+  - the upper flyover (split where it passes behind the tower);
+  - the loop ramp and the rising ramp;
+  - the central avenue (above, between and below the flyovers);
+  - a diagonal road, a bright curve, the far highway and the east edge.
+- **How they were traced:**
+  - rough lines were drawn by eye on a gridded copy of the photo;
+  - each point was snapped along its normal to the brightest smoothed trail pixel
+    (light trails are bright and warm, so the trail field was luminance × (0.5 + red − blue));
+  - then smoothed, with a pull back towards the rough line where two roads cross;
+  - every road was checked by drawing its lanes back over the photo.
+- **Lanes:** a lane is `[offset, direction]`, right-hand traffic (positive offset with the
+  points, negative against).
+- **Seven rooftops** carry aviation beacons.
+
+**Living layer** (`CityPhoto.tsx`, three.js, orthographic, everything in photo pixels):
+- **The photo:** a textured plane.
+  - A 2.5D depth shift: the lower (nearer) part of the photo moves more than the horizon,
+    with the pointer and a slow idle drift.
+  - The same shift is applied to the traffic, so the lights stay on their roads.
+- **Traffic:** 157 lights on 25 lanes.
+  - They are instanced streaks: a hot head with a fading tail and a soft halo, additive.
+  - Headlights come towards the viewer, tail-lights go away; across-lanes get a mix.
+  - Size and speed scale with nearness (lower in the photo = nearer).
+  - Each lane is a loop:
+    - cars keep their distance from the car ahead;
+    - they fade in and out at a lane's ends (behind buildings, off the photo);
+    - on the avenue below the long flyover, they stop at the zebra crossing on red or
+      amber (a 30 s cycle: 16 green, 3 amber, 11 red) and go again on green.
+  - Two signal lamps at that crossing show the same state.
+- **Beacons:** red, flashing together every 1.5 s.
+- **Camera:** follows the scroll along a path in photo pixels:
+  - the whole city;
+  - the interchange;
+  - along the flyover;
+  - the avenue crossing;
+  - the towers;
+  - the lower right;
+  - the whole city again.
+  The frame is always covered, clamped inside a margin kept for the depth shift.
+- **Quality and fallbacks:**
+  - The same self-protecting quality step: if the first ~2 s run under ~40 fps, it drops
+    to 1× pixels and every other car.
+  - It pauses on a hidden tab.
+  - Before the texture loads (and without WebGL), the same photo shows as a plain CSS
+    background, so there is never an empty frame.
+  - Reduced motion: no traffic movement, no drift, the opening frame.
+
+**Theme alignment:**
+- The page's tints moved from dusk violet back to the console's night navy: the glass,
+  vignette, top bar and captions all use the console's `--chrome` rgb(6 12 28).
+- Small amber captions get a tight dark halo over the bright trails.
+
+**Verified:**
+- tsc, oxlint and the build are clean; 25 frontend tests pass.
+- Photographed at 1440×900 (hero, interchange, avenue, towers) and 390×844.
+- With the drift frozen, a frame diff shows the moving lights exactly on the traced
+  roads.
+- **One real bug found and fixed on the way:** the car quads were back-face culled,
+  because photo y runs down and that flips their winding. They are now drawn
+  double-sided.
