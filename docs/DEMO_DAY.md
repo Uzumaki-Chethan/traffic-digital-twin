@@ -26,8 +26,11 @@ board already runs the `signal_link` sketch.
 4. **Check the footer:** at the bottom right of any console page, wait for
    **● Physical model connected (COMx)** in green. Red ("not connected") means the board
    isn't answering; see the table below.
-5. **Start a demo:**
-   - Go to Simulation Settings, pick a scenario, then press **Start** in the top bar.
+5. **Start everything from Simulation Settings:**
+   - Set **Choose for** to **Overview · demo** (Trinetra alone) or **Performance · Trinetra vs VAC**
+     (Trinetra against the vehicle-actuated signal).
+   - Click a scenario card, then press **Start** in the top bar.
+   - It starts that scenario and takes you to Overview or Performance by itself.
    - The four signal heads on the model follow the junction on screen, five times a
      second.
 
@@ -36,9 +39,9 @@ board already runs the `signal_link` sketch.
 | Show | Where | Why |
 |---|---|---|
 | The home page, scrolled slowly | `/` | The whole story in two minutes; ends on "Open the console". |
-| **Normal day**, speed 2× | Overview | Busiest everyday case; Trinetra's biggest win (86 % less waiting). |
+| **Normal day**, speed 2× | Settings → Choose for *Overview* → Normal day → Start | Busiest everyday case; Trinetra's biggest win (86 % less waiting). |
 | Send an **ambulance** mid-run | Overview top bar → Dispatch | The emergency green, live, on screen and on the model. |
-| **Heavy traffic**, Trinetra vs VAC | Performance | Two junctions side by side, seven measures scored live. |
+| **Heavy traffic**, Trinetra vs VAC | Settings → Choose for *Performance* → Heavy traffic → Start (it stops the demo first) | Two junctions side by side, seven measures scored live. |
 | Why it chose each green | Decisions | Every decision, with its reasons. |
 
 ## If something goes wrong
@@ -49,7 +52,7 @@ board already runs the `signal_link` sketch.
 | Every head **blinks amber** | The board lost the link (cable, or the console closed). Same as above. The simulation is unaffected. |
 | Lamps on the model don't match the screen | Head order is South, East, North, West on GPIO 13 / 4 / 16 / 17. Check which chain is in which socket. |
 | Home page feels slow | It lowers its own quality after ~2 s on a slow machine. Or go straight to `http://localhost:8000/overview`. |
-| A page shows "no data" | Nothing is running: press **Start**. |
+| A page shows "no data" | Nothing is running: go to Simulation Settings and press **Start**. |
 | The console window was closed | Run `python server.py` again and reload the browser. |
 
 ## Revert point

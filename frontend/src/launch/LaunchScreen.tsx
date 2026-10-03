@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import eye from '@/assets/trinetra-eye.png'
+import wordmark from '@/assets/trinetra-wordmark.png'
 import { getPhase, subscribe, type LaunchPhase } from './launch'
 import './launch.css'
 
@@ -25,7 +26,10 @@ export function LaunchScreen() {
   const on = lit(phase)
   return (
     <div className={`launch ${phase === 'out' ? 'launch-out' : ''}`} role="status" aria-live="polite">
-      <img src={eye} alt="" className="launch-eye" />
+      <div className="launch-logo">
+        <img src={eye} alt="" className="launch-eye" />
+        <img src={wordmark} alt="Trinetra" className="launch-word-mark" />
+      </div>
       <div className="launch-head" aria-hidden>
         {LAMPS.map((l) => (
           <div key={l.key} className={`launch-row ${on === l.key ? 'on' : ''}`}>
