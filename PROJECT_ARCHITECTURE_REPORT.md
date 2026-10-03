@@ -5033,3 +5033,10 @@ footer reads "Physical model not connected".
    - **Scope:** development only (port 5173). The built console on 8000 never hot-swaps
      and was never affected.
 
+### 51.3 Footer wording, and a bigger launch eye (owner, 2026-10-03)
+
+- **Footer:** the console footer no longer shows "SUMO · TraCI · console localhost:…". This
+  was removed at the owner's explicit instruction and recorded in `docs/UI_CHANGE_RULES.md`.
+  Its right side now shows only the physical model's link and the stream state.
+- **Launch screen:** the eye is larger, `clamp(240px, min(32vw, 40vh), 440px)`.
+

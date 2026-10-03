@@ -87,7 +87,10 @@ change on the page you touched (and any page you moved something to or from).
   instruction — the top bar's link pill and the footer's stream state carry the
   same fact.)
 - **Footer:** the page's name and one-line description on the left; on the
-  right the data source (SUMO · TraCI · console/host) and stream state.
+  right the physical model's link and the stream state. (The data-source
+  wording "SUMO · TraCI · console/host" was removed at the owner's explicit
+  instruction, 2026-10-03: "remove the sumo, traci, console and localhost
+  wordings".)
 
 ### Overview
 

@@ -15,22 +15,14 @@ const PAGE_NOTES: { path: string; name: string; note: string }[] = [
   { path: '/settings', name: 'Simulation Settings', note: 'which scenario each page runs' },
 ]
 
-/** Thin footer: what page this is on the left; on the right, where the
- * data comes from — the backend host and the link to it — since the
- * status bar already carries the simulation's clock and rate. A
- * dark glass strip at the foot of the frosted container. */
+/** Thin footer: what page this is on the left; on the right, the physical
+ * model's link and the live stream's. (The "SUMO · TraCI · console host"
+ * wording was removed at the owner's instruction, 2026-10-03.) A dark
+ * glass strip at the foot of the frosted container. */
 export function FooterBar() {
   const link = useSim((s) => s.link)
   const run = useRunStore((s) => s.state)
   const { pathname } = useLocation()
-  const host = typeof window !== 'undefined' ? window.location.host : ''
-  const source = run?.available === false
-    ? 'evaluator dashboard'
-    : run?.managed
-      ? 'console'
-      : run
-        ? 'simulation process'
-        : 'backend'
   const page = PAGE_NOTES.find((p) => pathname.startsWith(p.path))
   const rig = run?.rig
   return (
@@ -63,8 +55,6 @@ export function FooterBar() {
             <span className="ml-3 opacity-70">·</span>
           </span>
         )}
-        SUMO · TraCI · {source} {host}
-        <span className="opacity-70"> · </span>
         {link === 'open' ? 'stream open' : link === 'connecting' ? 'connecting' : 'stream closed'}
       </span>
     </footer>
