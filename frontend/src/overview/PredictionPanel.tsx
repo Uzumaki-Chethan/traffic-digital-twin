@@ -57,7 +57,7 @@ export function PredictionPanel({ prediction, powered }: { prediction: Predictio
 
   if (!powered || prediction === null || prediction.rows.length === 0) {
     return (
-      <Panel title="Prediction vs actual" glyph="amber" meta={horizon != null ? `${horizon}s horizon` : undefined}>
+      <Panel title="Prediction vs actual" meta={horizon != null ? `${horizon}s horizon` : undefined}>
         <div className="py-4 text-center text-[13px] leading-[1.5] text-ink-mute">
           {!powered ? (
             <>No simulation running.</>
@@ -75,7 +75,7 @@ export function PredictionPanel({ prediction, powered }: { prediction: Predictio
   }
 
   return (
-    <Panel title="Prediction vs actual" meta={meta} glyph="amber">
+    <Panel title="Prediction vs actual" meta={meta}>
       <div className="mb-4 grid grid-cols-4 gap-3 max-[1100px]:grid-cols-2">
         {(['N', 'S', 'E', 'W'] as const).map((a) => (
           <ApproachChart key={a} approach={a} series={series} />

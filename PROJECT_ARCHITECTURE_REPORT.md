@@ -4964,3 +4964,25 @@ footer reads "Physical model not connected".
 - **Note:** the bars still only appear in the incident scenarios, Emergency vehicles and
   Accident (unchanged).
 
+## SECTION 51 — Random title signals; Performance's incident bars below the junctions (CURRENT STATE)
+
+*2026-10-03 · branch `main` · owner's request*
+
+- **Performance:** the Dispatch and Incident bars moved from above the Trinetra/VAC windows
+  to directly under them.
+- **Title signals:** the little signal heads beside every panel title now show a random
+  lamp (red, amber or green) that changes every 30 s.
+  - All of them change together, on one shared beat (`ui/lampClock.ts`).
+  - A head's lamp is a pure function of its own `useId` and the beat, so re-renders never
+    flicker it.
+  - `Panel`'s `glyph` prop became optional: left out, the head is random (`RandomGlyph`).
+  - **Exception:** the two heads that show a real signal state keep doing so: the Digital
+    twin's (green while any lane is green) and the Active phase's lamp. This follows
+    `tokens.css`'s rule that a lamp colour must mean the real state wherever one is shown.
+  - The fixed decorative colours (Prediction and Recent switches amber, the Settings strip
+    green) became random.
+  - `ui/__tests__/lampClock.test.ts` checks three things: stable within a beat, all three
+    colours used and they change between beats, and different heads on the same beat.
+- **Untouched:** the nav rail's lights. They show which page is open (green = this
+  page), so they are navigation state, not decoration.
+

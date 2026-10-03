@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import clsx from 'clsx'
+import { lampFor, useBeat } from './lampClock'
 
 export type GlyphState = 'red' | 'amber' | 'green' | 'off'
 
@@ -14,11 +15,19 @@ export function Glyph({ s = 'green', className }: { s?: GlyphState; className?: 
   )
 }
 
+/** A decorative signal head: a random lamp, re-drawn every 30 s (ui/lampClock). */
+export function RandomGlyph({ className }: { className?: string }) {
+  const key = useId()
+  const beat = useBeat()
+  return <Glyph s={lampFor(key, beat)} className={className} />
+}
+
 /**
  * The one container: a pale glass card over the frosted page, titled in
  * Poppins and led by a signal-head glyph. `glyph` is the panel's own lamp —
  * where a panel has a live signal state (the twin, the active phase) the
- * page passes that state in; elsewhere it's the panel's fixed colour.
+ * page passes that state in; elsewhere it's left out, and the head shows
+ * a random lamp that changes every 30 s (owner, Section 51).
  */
 export function Panel({
   title,
@@ -26,7 +35,7 @@ export function Panel({
   children,
   className,
   bodyClassName,
-  glyph = 'green',
+  glyph,
   titleExtra,
 }: {
   title: string
@@ -45,7 +54,7 @@ export function Panel({
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[inherit]">
       <header className="flex min-h-[54px] shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-[18px] py-2">
         <h2 className="panel-title">
-          <Glyph s={glyph} />
+          {glyph ? <Glyph s={glyph} /> : <RandomGlyph />}
           {title}
           {titleExtra}
         </h2>

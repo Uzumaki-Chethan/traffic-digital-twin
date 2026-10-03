@@ -54,7 +54,6 @@ export function RecentSwitches({ history, powered }: { history: PhaseHistoryEntr
       meta={powered && switches.length > 0 ? 'last 60 s' : undefined}
       className="w-full"
       bodyClassName="px-[18px] pb-4 pt-1"
-      glyph="amber"
     >
       {!powered ? (
         <div className="py-3 text-center text-[12.5px] text-ink-mute">No simulation running.</div>

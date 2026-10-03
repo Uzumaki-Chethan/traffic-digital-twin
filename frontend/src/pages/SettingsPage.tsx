@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Glyph } from '@/ui/Panel'
+import { RandomGlyph } from '@/ui/Panel'
 import { Reveal } from '@/ui/Reveal'
 import { ScenarioCard, type ScenarioUse } from '@/settings/ScenarioCard'
 import { TargetPicker } from '@/settings/TargetPicker'
@@ -62,7 +62,7 @@ export function SettingsPage() {
       <Reveal index={0}>
         <div className="glass-card flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2.5">
           <h2 className="panel-title shrink-0">
-            <Glyph s="green" />
+            <RandomGlyph />
             Scenario
           </h2>
           <div className="flex items-center gap-2.5">

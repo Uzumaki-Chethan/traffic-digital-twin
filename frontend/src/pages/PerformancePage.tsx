@@ -74,21 +74,6 @@ export function PerformancePage() {
 
   return (
     <div className={dimmed ? 'flex flex-col gap-3.5 opacity-70 transition-opacity' : 'flex flex-col gap-3.5 transition-opacity'}>
-      {showIncidentControls && (
-        <div className="flex flex-wrap gap-2">
-          {incidentFirst ? (
-            <>
-              <IncidentBar />
-              <DispatchBar />
-            </>
-          ) : (
-            <>
-              <DispatchBar />
-              <IncidentBar />
-            </>
-          )}
-        </div>
-      )}
       <div className="grid grid-cols-2 gap-3.5">
         <Reveal index={0}>
           <ControllerWindow
@@ -117,6 +102,23 @@ export function PerformancePage() {
           />
         </Reveal>
       </div>
+
+      {/* under the two junctions they act on */}
+      {showIncidentControls && (
+        <div className="flex flex-wrap gap-2">
+          {incidentFirst ? (
+            <>
+              <IncidentBar />
+              <DispatchBar />
+            </>
+          ) : (
+            <>
+              <DispatchBar />
+              <IncidentBar />
+            </>
+          )}
+        </div>
+      )}
 
       {(failure || run?.error) && !powered && (
         <div className="rounded-control border border-alert bg-alert-wash px-3 py-1.5 text-[12.5px] text-alert">
