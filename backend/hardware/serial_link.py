@@ -197,3 +197,15 @@ def get_link():
                 else:
                     _link = SignalLink(port=getattr(Config, "HARDWARE_SERIAL_PORT", None), baud=getattr(Config, "HARDWARE_BAUD", 115200))
         return _link
+
+
+def link_status() -> dict:
+    """
+    What the console shows about the rig: is a link running, is the board
+    answering, on which port. Never creates the link (a process that never
+    asked for one reports it disabled), so reading it costs nothing.
+    """
+    link = _link
+    if link is None or isinstance(link, _NoLink):
+        return {"enabled": False, "connected": False, "port": None}
+    return {"enabled": True, "connected": bool(link.connected), "port": link.port_name}

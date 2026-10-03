@@ -242,6 +242,8 @@ The home page is at `/`, full-screen, outside the console frame. Overview moved 
 - the footer (logo and tagline, links to all five console pages, back to top).
 - the "Get, set, go" signal screen shown while the console opens from the home page (Section 49).
 
+Console footer (Section 50): the physical model's link status, "● Physical model connected (COMx)" or "not connected", shown whenever a link is running.
+
 Every number comes from `home/content.ts`, which is transcribed from README.md's results;
 its tests fail if a headline is typed in rather than computed.
 

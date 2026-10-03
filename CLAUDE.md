@@ -414,7 +414,10 @@ unprompted, but do keep this section current if that changes:
   a background thread — a fourth read-only side-channel that can never stall a run —
   and `firmware/signal_link/signal_link.ino` lights them (blinking amber if the link
   goes quiet). Heads 1–4 (GPIO 13/4/16/17) = South, East, North, West, the owner's
-  mapping. `python -m hardware.rig_test` drives the rig without a simulation.
+  mapping. `python -m hardware.rig_test` drives the rig without a simulation. Since
+  2026-10-03 (Section 50) `run-state` carries `rig: {enabled, connected, port}` and the
+  console footer shows it; `docs/DEMO_DAY.md` is the one-page demo checklist;
+  `prototype-4` is the restore point.
   The physical signal head must match `overview/Junction3D.tsx`'s mast heads exactly
   (PROJECT_ARCHITECTURE_REPORT.md **Section 36**, current — supersedes Section 34's 5-lens
   design): **4 lenses per head**, not 5 or the BOM doc's originally-drafted 12 total — a
@@ -431,7 +434,9 @@ unprompted, but do keep this section current if that changes:
   binding for any interface change (recolouring, repositioning, new panels, new pages are
   all free; removing any item of its content inventory needs the owner's explicit written
   instruction naming the item — an item lost as a side effect of a redesign is a defect).
-  Read it at the start of any UI task and tick its inventory afterwards. `prototype-3`
+  Read it at the start of any UI task and tick its inventory afterwards. `prototype-4`
+  (tagged 2026-10-03: the morning home page and launch screen on top of prototype-3)
+  supersedes `prototype-3`
   (tagged 2026-10-02: the glass redesign merged to `main`, the simulation speed-up, the
   physical rig's live link, no mascot) is the current working prototype and revert point
   that inventory describes; `prototype-2` (2026-09-21) and `prototype-1` (commit d9afd01,

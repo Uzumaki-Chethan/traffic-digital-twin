@@ -50,6 +50,9 @@ export interface RunState {
   /** Scenario id of the current (or last) run — "default" is the
    * production route. Never shown raw; data/scenarios.ts names it. */
   scenario?: string | null
+  /** The physical model's USB link (Section 50): is one running, is the
+   * board answering, on which port. Absent from older backends. */
+  rig?: { enabled: boolean; connected: boolean; port: string | null }
 }
 
 interface Store {

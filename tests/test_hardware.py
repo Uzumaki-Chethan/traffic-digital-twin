@@ -152,3 +152,30 @@ def test_idle_tells_the_rig_the_run_is_over():
         assert wait_until(lambda: port.written and port.written[-1] == "I\n")
     finally:
         link.close()
+
+
+# ---------------------------------------------------------------- status for the console
+
+def test_status_reports_disabled_before_any_link_exists(monkeypatch):
+    import hardware.serial_link as sl
+
+    monkeypatch.setattr(sl, "_link", None)
+    assert sl.link_status() == {"enabled": False, "connected": False, "port": None}
+
+
+def test_status_reports_a_live_link_and_its_port(monkeypatch):
+    import hardware.serial_link as sl
+
+    class Fake:
+        connected = True
+        port_name = "COM5"
+
+    monkeypatch.setattr(sl, "_link", Fake())
+    assert sl.link_status() == {"enabled": True, "connected": True, "port": "COM5"}
+
+
+def test_status_reports_a_disabled_rig(monkeypatch):
+    import hardware.serial_link as sl
+
+    monkeypatch.setattr(sl, "_link", sl._NoLink())
+    assert sl.link_status() == {"enabled": False, "connected": False, "port": None}

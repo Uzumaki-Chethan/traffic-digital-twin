@@ -176,3 +176,9 @@ def test_incident_is_queued_on_the_run_control_and_refused_when_idle(console):
     assert sup.run_control.take_incidents() == [(1, "truck", "route_E_W", "E_in", 1, 120.0)]
     assert sup.run_control.take_incidents() == []
     assert client.get("/api/control/run-state").json()["incidents"] == 1
+
+
+def test_run_state_reports_the_rig(console):
+    client, _, _ = console
+    rig = client.get("/api/control/run-state").json()["rig"]
+    assert set(rig) == {"enabled", "connected", "port"}

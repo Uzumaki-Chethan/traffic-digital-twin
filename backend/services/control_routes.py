@@ -243,7 +243,10 @@ def build_control_router(store: LiveStateStore, run_control=None,
 
     @router.get("/api/control/run-state")
     async def run_state():
-        return _run_state_dict()
+        # the physical rig's link rides along: read-only, for the console's footer
+        from hardware.serial_link import link_status
+
+        return {**_run_state_dict(), "rig": link_status()}
 
     def _require_run_control(verb: str):
         if run_control is None:

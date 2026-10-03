@@ -32,6 +32,7 @@ export function FooterBar() {
         ? 'simulation process'
         : 'backend'
   const page = PAGE_NOTES.find((p) => pathname.startsWith(p.path))
+  const rig = run?.rig
   return (
     <footer
       className="flex h-8 shrink-0 items-center justify-between gap-4 px-[18px] text-[11.5px] text-white/75"
@@ -48,7 +49,20 @@ export function FooterBar() {
           'Trinetra'
         )}
       </span>
-      <span className="num shrink-0">
+      <span className="num flex shrink-0 items-center">
+        {rig?.enabled && (
+          <span
+            className="mr-3 inline-flex items-center gap-1.5"
+            title={rig.connected ? `The physical model's board is answering on ${rig.port ?? 'USB'}` : 'Plug the physical model in by USB; it connects by itself'}
+          >
+            <span
+              className="inline-block h-2 w-2 rounded-full"
+              style={{ background: rig.connected ? 'var(--lamp-green)' : 'var(--lamp-red)', boxShadow: rig.connected ? '0 0 6px var(--lamp-green)' : 'none' }}
+            />
+            {rig.connected ? `Physical model connected${rig.port ? ` (${rig.port})` : ''}` : 'Physical model not connected'}
+            <span className="ml-3 opacity-70">·</span>
+          </span>
+        )}
         SUMO · TraCI · {source} {host}
         <span className="opacity-70"> · </span>
         {link === 'open' ? 'stream open' : link === 'connecting' ? 'connecting' : 'stream closed'}

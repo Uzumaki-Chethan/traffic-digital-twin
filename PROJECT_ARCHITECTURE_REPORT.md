@@ -4924,3 +4924,27 @@ set, go", and then the console.
 the console" gave Get → Set → Go → gone, with the route already `/overview` from the
 first light.
 
+## SECTION 50 — Ready for the hardware: restore point, rig status, demo checklist (CURRENT STATE)
+
+*2026-10-03 · branch `main`*
+
+- **`prototype-4`** (tag) is the new restore point: the morning home page, the "Get, set,
+  go" launch screen, the rig link and the glass console. It supersedes `prototype-3`.
+- **Rig status in the console:**
+  - `hardware/serial_link.link_status()` returns `{enabled, connected, port}`. It never
+    creates the link, so a process that never asked for one reports it disabled.
+  - `GET /api/control/run-state` now carries it as `rig`. The route stays read-only, like
+    the link itself.
+  - The console's footer shows **● Physical model connected (COMx)** in green or **not
+    connected** in red, whenever a link is running (`server.py` starts one at launch).
+  - It reconnects by itself, so the light turns green within ~2 s of plugging in.
+  - Tests: three new ones in `test_hardware.py` and one in `test_control_routes.py`.
+- **`docs/DEMO_DAY.md`:** one page covering:
+  - the night before: build, `rig_test`, free the port;
+  - the day's start-up order;
+  - a suggested running order;
+  - a "what you see → what to do" table for the board and the console.
+
+**Verified:** 118 backend and 35 frontend tests pass. The live backend reports
+`"rig":{"enabled":true,"connected":false,"port":null}` with no board attached, and the
+footer reads "Physical model not connected".
