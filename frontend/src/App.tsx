@@ -1,3 +1,4 @@
+import { useLayoutEffect } from 'react'
 import { Outlet, Route, Routes } from 'react-router-dom'
 import { Shell } from '@/layout/Shell'
 import { useSocket } from '@/data/useSocket'
@@ -9,9 +10,12 @@ import { SettingsPage } from '@/pages/SettingsPage'
 import { PerformancePage } from '@/pages/PerformancePage'
 import { HomePage } from '@/home/HomePage'
 import { LaunchScreen } from '@/launch/LaunchScreen'
+import { arrived } from '@/launch/launch'
 
 /** The console pages share the glass frame (rail, top bar, footer). */
 function ConsoleLayout() {
+  // tells "Get, set, go" the console is really on screen now (Section 49)
+  useLayoutEffect(() => arrived(), [])
   return (
     <Shell>
       <Outlet />

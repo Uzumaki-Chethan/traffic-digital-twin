@@ -70,7 +70,9 @@ export function StatusBar() {
             Single 4-way junction <span className="mx-1.5">•</span> Digital twin <span className="mx-1.5">•</span> AI-powered traffic intelligence
           </p>
         </div>
-        {side && mode.loud && (
+        {/* only while the run is on: after a stop the last frame (and its
+            mode) stays in memory, and an alert must not outlive its run */}
+        {side && mode.loud && !ended && (
           <span className="loud-chip shrink-0 rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold text-white">{mode.label}</span>
         )}
       </div>

@@ -4986,3 +4986,28 @@ footer reads "Physical model not connected".
 - **Untouched:** the nav rail's lights. They show which page is open (green = this
   page), so they are navigation state, not decoration.
 
+### 51.1 Three bugs the owner caught (2026-10-03)
+
+1. **Home page flashed after "Go" on a slow load.**
+   - **Cause:** React Router v7 runs navigations inside `startTransition`, so the home page
+     stays committed until the console finishes rendering. The launch screen faded on a
+     fixed timer, revealing it.
+   - **Fix:** the screen holds on green until BOTH the green has shown AND the console's
+     layout has committed (`arrived()` from `ConsoleLayout`'s layout effect), with a 12 s
+     safety fade.
+   - **Verified:** a frame-by-frame trace showed the home page still in the DOM until about
+     1 s after the click, covered the whole time. Zero frames showed it uncovered.
+   - **Tests:** the test file now covers holding on green until arrival, and the give-up
+     fade.
+2. **The "Emergency" chip in the top bar stayed after a stop.**
+   - **Cause:** the chip read the last received frame's decision mode, and that frame
+     stays in memory after a run ends.
+   - **Fix:** the chip now also requires the run not to have ended.
+   - **Verified:** stopped the run while the chip was up; it was gone afterwards.
+3. **Pause / Stop / speed blinked when Send or Stall was pressed.**
+   - **Cause:** dispatch and stall went through the same `send()` as start/stop, which
+     sets the global `busy` flag.
+   - **Fix:** they are now "quiet" sends, and each bar tracks its own `sending` state, so
+     only its own button waits.
+   - **Verified:** zero frames with Pause or Stop disabled during a Send.
+

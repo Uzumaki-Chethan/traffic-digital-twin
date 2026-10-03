@@ -29,12 +29,19 @@ export function IncidentBar() {
   const [approach, setApproach] = useState<(typeof APPROACHES)[number]['id']>('E')
   const [turn, setTurn] = useState<(typeof TURNS)[number]['id']>('straight')
   const [sent, setSent] = useState<number | null>(null)
+  // its own "sending", so only this button waits, not the run controls
+  const [sending, setSending] = useState(false)
 
   if (!run?.managed || !page.running) return null
   const count = run.incidents ?? 0
 
   const send = async () => {
-    await runControl.stall(type, approach, turn)
+    setSending(true)
+    try {
+      await runControl.stall(type, approach, turn)
+    } finally {
+      setSending(false)
+    }
     setSent(Date.now())
     window.setTimeout(() => setSent(null), 1500)
   }
@@ -52,7 +59,7 @@ export function IncidentBar() {
       <button
         type="button"
         onClick={() => void send()}
-        disabled={busy || run.paused}
+        disabled={busy || sending || run.paused}
         title={run.paused ? 'Resume the run to stall a vehicle' : page.kind === 'evaluation' ? 'Enters both simulations at the same moment' : 'Stalls it on that lane now'}
         className={clsx(
           'fx-btn fx-dark h-8 rounded-full border px-3.5 text-[12.5px] font-semibold',

@@ -125,8 +125,15 @@ async function refresh(signal?: AbortSignal): Promise<void> {
   }
 }
 
-async function send(path: string, body?: unknown): Promise<void> {
-  useRunStore.setState({ busy: true, failure: null })
+/**
+ * POST a control request. `busy` greys out the run controls while it is in
+ * flight, which is right for start/stop/pause; `quiet` skips that for the
+ * one-shot actions (dispatch, stall) that don't change the run's state,
+ * so pressing Send doesn't make Pause and Stop blink.
+ */
+async function send(path: string, body?: unknown, quiet = false): Promise<void> {
+  if (quiet) useRunStore.setState({ failure: null })
+  else useRunStore.setState({ busy: true, failure: null })
   try {
     const res = await fetch(path, {
       method: 'POST',
@@ -145,7 +152,7 @@ async function send(path: string, body?: unknown): Promise<void> {
   } catch (e: unknown) {
     useRunStore.setState({ failure: e instanceof Error ? e.message : String(e) })
   } finally {
-    useRunStore.setState({ busy: false })
+    if (!quiet) useRunStore.setState({ busy: false })
     // A start takes a few seconds to reach its first tick (SUMO launch +
     // model load), so confirm the real state shortly after.
     window.setTimeout(() => void refresh(), 600)
@@ -203,11 +210,11 @@ export const runControl = {
   stop: () => send('/api/control/stop-simulation'),
   /** Send an emergency vehicle into the running simulation (both sides of an evaluation). */
   dispatch: (vehicleType: string, approach: string, turn: string) =>
-    send('/api/control/dispatch', { vehicle_type: vehicleType, approach, turn }),
+    send('/api/control/dispatch', { vehicle_type: vehicleType, approach, turn }, true),
   /** Stall a vehicle on the chosen lane — an ad hoc accident, on demand
    * (both sides of an evaluation). */
   stall: (vehicleType: string, approach: string, turn: string) =>
-    send('/api/control/dispatch-incident', { vehicle_type: vehicleType, approach, turn }),
+    send('/api/control/dispatch-incident', { vehicle_type: vehicleType, approach, turn }, true),
   /**
    * Continue the running simulation in a SUMO window. Not a restart: the
    * run saves its state and resumes from it, so the same vehicles and
