@@ -30,7 +30,7 @@
   gap: 4px;
 }
 .launch-eye {
-  width: clamp(180px, min(22vw, 30vh), 300px);
+  width: clamp(240px, min(32vw, 40vh), 440px);
   filter: drop-shadow(0 0 18px rgb(255 150 60 / 0.35));
 }
 .launch-word-mark {
