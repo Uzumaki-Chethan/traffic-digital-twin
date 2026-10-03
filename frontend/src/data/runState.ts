@@ -256,3 +256,9 @@ export function useRunStatePoll(): void {
     }
   }, [])
 }
+
+// This module owns app-wide singletons (the store, the poller's state). A
+// hot swap in the dev server would give the page a fresh, empty store
+// while the old poller kept feeding the old one — the run controls then
+// vanish until a reload. So an edit here reloads the page instead.
+if (import.meta.hot) import.meta.hot.accept(() => window.location.reload())

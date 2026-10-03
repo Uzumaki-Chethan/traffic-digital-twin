@@ -235,6 +235,9 @@ class RunControl:
             self._sim_elapsed = 0.0
             self._dispatch_queue.clear()
             self._dispatch_seq = 0
+            # the incident counter is per run too (it used to carry over)
+            self._incident_queue.clear()
+            self._incident_seq = 0
 
     # ---- called by the simulation side ----------------------------------
 

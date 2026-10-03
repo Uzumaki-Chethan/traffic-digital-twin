@@ -482,3 +482,16 @@ def test_unknown_scenario_is_refused_before_a_thread_starts():
     with pytest.raises(ValueError):
         sup.start(scenario_name="../../evil")
     assert not sup.is_running()
+
+
+def test_reset_clears_dispatches_and_incidents_for_a_second_run():
+    rc = RunControl()
+    rc.request_dispatch("ambulance", "N_to_S")
+    rc.request_incident("truck", "E_to_W", "E_in", 1, 120.0)
+    rc.request_incident("bus", "N_to_S", "N_in", 1, 120.0)
+    assert rc.dispatched == 1 and rc.incidents == 2
+    rc.reset()
+    assert rc.dispatched == 0
+    assert rc.incidents == 0
+    assert rc.take_dispatches() == []
+    assert rc.take_incidents() == []

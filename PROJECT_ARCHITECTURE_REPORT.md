@@ -5011,3 +5011,25 @@ footer reads "Physical model not connected".
      only its own button waits.
    - **Verified:** zero frames with Pause or Stop disabled during a Send.
 
+### 51.2 Two more bugs (owner, 2026-10-03)
+
+1. **The incident count carried over between runs** (the emergency count didn't).
+   - **Cause:** `RunControl.reset()`, which readies the shared instance for the next run,
+     zeroed the dispatch queue and counter but not the incident ones.
+   - **Fix:** it zeroes both now.
+   - **Tests:** `test_reset_clears_dispatches_and_incidents_for_a_second_run`.
+   - **Verified live:** 1 incident in one run, 0 at the next start.
+2. **The run controls sometimes vanished while a run was live** (the footer read "backend"
+   instead of "console").
+   - **What it wasn't:** the server. 45 polls in a row answered in under 65 ms.
+   - **Cause:** the dev server's hot module swap. When `data/runState.ts` changed on disk,
+     the open page got a fresh, empty `useRunStore` while the old poller kept feeding the
+     old one, so every button had no state to draw.
+   - **Reproduced:** one edit to the file, and Pause/Stop disappeared and the footer read
+     "backend".
+   - **Fix:** that module now reloads the page on a hot update
+     (`import.meta.hot.accept(() => location.reload())`).
+   - **Verified:** the same edit now reloads, and the controls stay.
+   - **Scope:** development only (port 5173). The built console on 8000 never hot-swaps
+     and was never affected.
+
