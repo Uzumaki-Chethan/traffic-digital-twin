@@ -4948,3 +4948,19 @@ first light.
 **Verified:** 118 backend and 35 frontend tests pass. The live backend reports
 `"rig":{"enabled":true,"connected":false,"port":null}` with no board attached, and the
 footer reads "Physical model not connected".
+
+### 50.1 Dispatch / Incident dropdowns (owner, 2026-10-03)
+
+- **The old pickers:** the two bars used native `<select>`s with `appearance-none`. They had
+  no arrow, so they didn't read as dropdowns, and their menus opened in the browser's
+  unstyled look.
+- **Now:** the bars use the console's own `GlassSelect` (the Settings "Choose for" one)
+  with two new options:
+  - `size="sm"`: a 32 px pill, for inline bars.
+  - `floating`: the menu is portalled to `document.body` with fixed positioning, and opens
+    upward when there's no room below. Without it, the Digital twin card clipped the menu
+    and the bar below covered it.
+- **Buttons:** Send and Stall are the same height as the pills.
+- **Note:** the bars still only appear in the incident scenarios, Emergency vehicles and
+  Accident (unchanged).
+

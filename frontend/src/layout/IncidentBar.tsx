@@ -39,25 +39,23 @@ export function IncidentBar() {
     window.setTimeout(() => setSent(null), 1500)
   }
 
-  const select = 'appearance-none rounded-control border border-rule bg-plate py-1 pl-2 pr-6 text-[12.5px] font-medium text-ink-strong hover:border-[var(--rule-strong)]'
-
   return (
     <div className="glass-card flex flex-wrap items-center gap-2 !rounded-[12px] [--card-r:12px] px-2.5 py-1.5 text-[12.5px] text-ink">
       <span className="flex items-center gap-1.5 font-semibold text-ink-strong">
         <TriangleAlert size={14} aria-hidden className="text-[var(--alert)]" />
         Incident
       </span>
-      <Sel value={type} onChange={(v) => setType(v as typeof type)} options={TYPES} className={select} label="Vehicle" />
+      <Sel value={type} onChange={(v) => setType(v as typeof type)} options={TYPES} label="Vehicle" width={92} />
       <span className="text-ink-mute">on</span>
-      <Sel value={approach} onChange={(v) => setApproach(v as typeof approach)} options={APPROACHES} className={select} label="Approach" />
-      <Sel value={turn} onChange={(v) => setTurn(v as typeof turn)} options={TURNS} className={select} label="Turn" />
+      <Sel value={approach} onChange={(v) => setApproach(v as typeof approach)} options={APPROACHES} label="Approach" width={92} />
+      <Sel value={turn} onChange={(v) => setTurn(v as typeof turn)} options={TURNS} label="Turn" width={140} />
       <button
         type="button"
         onClick={() => void send()}
         disabled={busy || run.paused}
         title={run.paused ? 'Resume the run to stall a vehicle' : page.kind === 'evaluation' ? 'Enters both simulations at the same moment' : 'Stalls it on that lane now'}
         className={clsx(
-          'fx-btn fx-dark rounded-control border px-2.5 py-1 text-[12.5px] font-semibold',
+          'fx-btn fx-dark h-8 rounded-full border px-3.5 text-[12.5px] font-semibold',
           busy || run.paused
             ? 'cursor-not-allowed border-rule text-ink-mute'
             : 'border-[var(--ink-strong)] bg-ink-strong text-ink-on-dark hover:opacity-90',
@@ -65,7 +63,7 @@ export function IncidentBar() {
       >
         {sent ? 'Sent' : 'Stall'}
       </button>
-      <span className="num text-[11.5px] text-ink-mute">
+      <span className="num whitespace-nowrap text-[11.5px] text-ink-mute">
         {count === 0 ? 'none this run' : `${count} this run`}
         {page.kind === 'evaluation' && ' · both sides'}
       </span>

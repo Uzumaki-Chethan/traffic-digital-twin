@@ -3,6 +3,7 @@ import { Siren } from 'lucide-react'
 import clsx from 'clsx'
 import { runControl, useRunStore } from '@/data/runState'
 import { usePageContext } from '@/data/pageContext'
+import { GlassSelect } from '@/ui/GlassSelect'
 
 /**
  * Send an emergency vehicle into the run that is on now: which kind,
@@ -52,25 +53,23 @@ export function DispatchBar() {
     window.setTimeout(() => setSent(null), 1500)
   }
 
-  const select = 'appearance-none rounded-control border border-rule bg-plate py-1 pl-2 pr-6 text-[12.5px] font-medium text-ink-strong hover:border-[var(--rule-strong)]'
-
   return (
     <div className="glass-card flex flex-wrap items-center gap-2 !rounded-[12px] [--card-r:12px] px-2.5 py-1.5 text-[12.5px] text-ink">
       <span className="flex items-center gap-1.5 font-semibold text-ink-strong">
         <Siren size={14} aria-hidden className="text-[var(--signal-red)]" />
         Dispatch
       </span>
-      <Sel value={type} onChange={(v) => setType(v as typeof type)} options={TYPES} className={select} label="Vehicle" />
+      <Sel value={type} onChange={(v) => setType(v as typeof type)} options={TYPES} label="Vehicle" width={122} />
       <span className="text-ink-mute">from</span>
-      <Sel value={approach} onChange={(v) => setApproach(v as typeof approach)} options={APPROACHES} className={select} label="Approach" />
-      <Sel value={turn} onChange={(v) => setTurn(v as typeof turn)} options={TURNS} className={select} label="Turn" />
+      <Sel value={approach} onChange={(v) => setApproach(v as typeof approach)} options={APPROACHES} label="Approach" width={92} />
+      <Sel value={turn} onChange={(v) => setTurn(v as typeof turn)} options={TURNS} label="Turn" width={140} />
       <button
         type="button"
         onClick={() => void send()}
         disabled={busy || run.paused}
         title={run.paused ? 'Resume the run to dispatch' : page.kind === 'evaluation' ? 'Enters both simulations at the same moment' : 'Enters the simulation now'}
         className={clsx(
-          'fx-btn fx-dark rounded-control border px-2.5 py-1 text-[12.5px] font-semibold',
+          'fx-btn fx-dark h-8 rounded-full border px-3.5 text-[12.5px] font-semibold',
           busy || run.paused
             ? 'cursor-not-allowed border-rule text-ink-mute'
             : 'border-[var(--ink-strong)] bg-ink-strong text-ink-on-dark hover:opacity-90',
@@ -78,7 +77,7 @@ export function DispatchBar() {
       >
         {sent ? 'Sent' : 'Send'}
       </button>
-      <span className="num text-[11.5px] text-ink-mute">
+      <span className="num whitespace-nowrap text-[11.5px] text-ink-mute">
         {count === 0 ? 'none this run' : `${count} this run`}
         {page.kind === 'evaluation' && ' · both sides'}
       </span>
@@ -86,26 +85,31 @@ export function DispatchBar() {
   )
 }
 
+/** The bars' compact picker: the console's own dropdown (GlassSelect), small. */
 export function Sel({
   value,
   onChange,
   options,
-  className,
   label,
+  width,
 }: {
   value: string
   onChange: (v: string) => void
   options: readonly { id: string; label: string }[]
-  className: string
   label: string
+  /** Fits the longest option, so the bar doesn't jump as choices change. */
+  width: number
 }) {
   return (
-    <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className={className}>
-      {options.map((o) => (
-        <option key={o.id} value={o.id}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <GlassSelect
+      size="sm"
+      floating
+      label={label}
+      value={value}
+      onChange={onChange}
+      options={options.map((o) => ({ value: o.id, label: o.label }))}
+      minWidth={width}
+      menuWidth={Math.max(width, 160)}
+    />
   )
 }
