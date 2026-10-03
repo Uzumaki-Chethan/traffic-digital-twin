@@ -4875,3 +4875,14 @@ looks the same apart from those.
   - `settings.webp` was retaken after the page's cards had finished appearing; the
     earlier capture had caught them mid-fade, which looked blurry.
 
+### 48.3 Top bar brand like the footer; clearer footer (owner, 2026-10-03)
+
+- **Top bar:** no black badge any more. The brand is laid out like the footer's: the eye,
+  TRINETRA, and the tagline beneath it in amber. The bar's glass is a deep navy tint
+  (still blurred and see-through), dark enough for the logo's colours and white text.
+- **Solid eye:** `assets/trinetra-eye-solid.png` is a copy of the eye whose faint glow is
+  given firmer alpha, made by compositing it over black and then boosting alpha 2.6×. It
+  keeps its colours over glass instead of washing out. It is used in the top bar and the
+  footer; the console's own `Brand` still uses the original.
+- **Footer:** a darker glass (0.82), a white page-link colour and an amber tagline.
+

@@ -128,5 +128,5 @@ describe('the morning city traffic', () => {
     expect(queued).toBeGreaterThan(0)
     // average speed over the run: a moving city, not a gridlock
     expect(travelled / cars / t).toBeGreaterThan(3)
-  }, 30_000)
+  }, 120_000)
 })

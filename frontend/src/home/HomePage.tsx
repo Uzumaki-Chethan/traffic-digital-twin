@@ -6,8 +6,7 @@ import Lenis from 'lenis'
 import { ArrowRight } from 'lucide-react'
 import { useRunStore } from '@/data/runState'
 import { TrafficCursor } from '@/layout/TrafficCursor'
-import eye from '@/assets/trinetra-eye.png'
-import wordmark from '@/assets/trinetra-wordmark.png'
+import eyeSolid from '@/assets/trinetra-eye-solid.png'
 import { MorningCity } from './MorningCity'
 import { Hero, Pillars, Pipeline, Problem, Results } from './sectionsStory'
 import { ConsoleTour, Finale, Resilience, Rig, Scenarios } from './sectionsShow'
@@ -124,8 +123,11 @@ export function HomePage() {
 
       <header className={scrolled ? 'home-top scrolled' : 'home-top'}>
         <Link to="/" className="home-brand" aria-label="Trinetra home">
-          <img src={eye} alt="" />
-          <img src={wordmark} alt="" className="home-top-word" />
+          <img src={eyeSolid} alt="" />
+          <span className="home-top-word">
+            <b>TRINETRA</b>
+            <small>Smarter Signals · Safer Cities</small>
+          </span>
         </Link>
         <nav className="home-links" aria-label="Sections">
           {CHAPTERS.filter((c) => c.top).map((c) => (
