@@ -240,6 +240,7 @@ The home page is at `/`, full-screen, outside the console frame. Overview moved 
   - the Console → USB → ESP32 → lamps chain;
 - the "Built with" marquee and the finale;
 - the footer (logo and tagline, links to all five console pages, back to top).
+- the "Get, set, go" signal screen shown while the console opens from the home page (Section 49).
 
 Every number comes from `home/content.ts`, which is transcribed from README.md's results;
 its tests fail if a headline is typed in rather than computed.

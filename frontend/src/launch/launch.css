@@ -1,0 +1,99 @@
+/* "Get, set, go" — the console's loading signal (Section 49) */
+.launch {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgb(30 42 70 / 0.96), rgb(5 9 20 / 0.99) 70%);
+  backdrop-filter: blur(10px);
+  animation: launch-in 0.25s ease-out;
+}
+.launch-out {
+  opacity: 0;
+  transition: opacity 0.4s ease-in;
+}
+@keyframes launch-in {
+  from {
+    opacity: 0;
+  }
+}
+.launch-eye {
+  width: 120px;
+  filter: drop-shadow(0 0 14px rgb(255 150 60 / 0.3));
+}
+.launch-head {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px 26px;
+  border-radius: 28px;
+  background: linear-gradient(180deg, #15181f, #090b10);
+  border: 2px solid #2a3142;
+  box-shadow: 0 30px 80px -20px rgb(0 0 0 / 0.8), inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+.launch-row {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+.launch-lamp {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  background: #1c2028;
+  box-shadow: inset 0 4px 10px rgb(0 0 0 / 0.7);
+  transition: background 0.18s, box-shadow 0.18s;
+}
+.launch-word {
+  width: 110px;
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.14);
+  transition: color 0.18s, text-shadow 0.18s, transform 0.25s;
+}
+.launch-row.on .launch-word {
+  color: #fff;
+  transform: scale(1.08);
+}
+.launch-row.on .lamp-get {
+  background: radial-gradient(circle at 40% 35%, #ff8a80, #ff0505 60%);
+  box-shadow: 0 0 30px #ff0505, 0 0 70px rgb(255 5 5 / 0.6);
+}
+.launch-row.on .lamp-set {
+  background: radial-gradient(circle at 40% 35%, #ffe08a, #efb700 60%);
+  box-shadow: 0 0 30px #efb700, 0 0 70px rgb(239 183 0 / 0.6);
+}
+.launch-row.on .lamp-go {
+  background: radial-gradient(circle at 40% 35%, #b6f59a, #4cbb17 60%);
+  box-shadow: 0 0 30px #4cbb17, 0 0 70px rgb(76 187 23 / 0.6);
+}
+.launch-row.on:has(.lamp-get) .launch-word {
+  text-shadow: 0 0 20px rgb(255 5 5 / 0.7);
+}
+.launch-row.on:has(.lamp-set) .launch-word {
+  text-shadow: 0 0 20px rgb(239 183 0 / 0.7);
+}
+.launch-row.on:has(.lamp-go) .launch-word {
+  text-shadow: 0 0 20px rgb(76 187 23 / 0.7);
+}
+.launch-caption {
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #b3bccf;
+}
+@media (prefers-reduced-motion: reduce) {
+  .launch,
+  .launch-out {
+    animation: none;
+    transition: none;
+  }
+}

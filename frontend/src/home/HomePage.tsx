@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { launch } from '@/launch/launch'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import Lenis from 'lenis'
@@ -106,6 +107,19 @@ export function HomePage() {
     }
   }, [still])
 
+  // Any link from here into the console goes through "Get, set, go": the
+  // screen covers the console's first mount (Section 49).
+  const navigate = useNavigate()
+  const onClickCapture = (e: React.MouseEvent) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+    const a = (e.target as Element).closest?.('a[href]') as HTMLAnchorElement | null
+    if (!a || a.target === '_blank' || a.origin !== window.location.origin) return
+    const to = a.pathname + a.search + a.hash
+    if (a.pathname === '/') return
+    e.preventDefault()
+    launch(() => navigate(to))
+  }
+
   const scrollTo = (id: string) => {
     const el = document.getElementById(id)
     if (!el) return
@@ -116,7 +130,7 @@ export function HomePage() {
   }
 
   return (
-    <div ref={root} className={still ? 'home' : 'home home-anim'}>
+    <div ref={root} className={still ? 'home' : 'home home-anim'} onClickCapture={onClickCapture}>
       <MorningCity progress={progress} still={still} />
       <div className="home-vignette" aria-hidden />
       <div ref={bar} className="home-progress" aria-hidden />

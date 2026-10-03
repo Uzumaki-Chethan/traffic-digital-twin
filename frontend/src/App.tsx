@@ -8,6 +8,7 @@ import { DecisionsPage } from '@/pages/DecisionsPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { PerformancePage } from '@/pages/PerformancePage'
 import { HomePage } from '@/home/HomePage'
+import { LaunchScreen } from '@/launch/LaunchScreen'
 
 /** The console pages share the glass frame (rail, top bar, footer). */
 function ConsoleLayout() {
@@ -24,17 +25,21 @@ export default function App() {
   // state both need to know what this backend will let them do.
   useRunStatePoll()
   return (
-    <Routes>
-      {/* The home page is full-screen, outside the console frame (Section 44). */}
-      <Route path="/" element={<HomePage />} />
-      <Route element={<ConsoleLayout />}>
-        <Route path="/overview" element={<OverviewPage />} />
-        <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="/performance" element={<PerformancePage />} />
-        <Route path="/decisions" element={<DecisionsPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="*" element={<OverviewPage />} />
-      </Route>
-    </Routes>
+    <>
+      {/* "Get, set, go" while the console loads from the home page (Section 49) */}
+      <LaunchScreen />
+      <Routes>
+        {/* The home page is full-screen, outside the console frame (Section 44). */}
+        <Route path="/" element={<HomePage />} />
+        <Route element={<ConsoleLayout />}>
+          <Route path="/overview" element={<OverviewPage />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/performance" element={<PerformancePage />} />
+          <Route path="/decisions" element={<DecisionsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="*" element={<OverviewPage />} />
+        </Route>
+      </Routes>
+    </>
   )
 }

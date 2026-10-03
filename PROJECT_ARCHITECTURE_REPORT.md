@@ -4886,3 +4886,41 @@ looks the same apart from those.
   footer; the console's own `Brand` still uses the original.
 - **Footer:** a darker glass (0.82), a white page-link colour and an amber tagline.
 
+## SECTION 49 — "Get, set, go": the console's loading signal (CURRENT STATE)
+
+*2026-10-03 · branch `main` · `frontend/src/launch/`*
+
+**Owner:** opening the console from the home page takes a moment, so they asked for a
+loading screen in that gap: a signal with three lights (red, amber, green) reading "Get,
+set, go", and then the console.
+
+**What it does:**
+- Any link from the home page into the console goes through it:
+  - the "Open the console" buttons;
+  - the tour's page links;
+  - the scenario cards;
+  - the footer links;
+  - the live badge.
+- How links are caught: `HomePage` catches them in a click-capture handler and hands them
+  to `launch()`. Plain links are left alone: new tab, modified clicks, links home.
+- What shows: a three-lamp head lights red **Get** (0 ms), amber **Set** (600 ms) and green
+  **Go** (1200 ms), over the console's navy with the eye above; the screen then fades
+  (1750 → 2150 ms).
+
+**How:**
+- `launch/launch.ts` is a tiny store outside the React tree.
+- `LaunchScreen` is mounted once in `App`, above `<Routes>`, so the screen survives the
+  route change underneath it.
+- The navigation fires 60 ms after the click, on the red light, so the console's heavy
+  first mount happens behind the screen.
+- Nothing's correctness depends on the animation: by the time the lights change, the
+  console is already the current route.
+- `launch/__tests__/launch.test.ts` checks:
+  - the order;
+  - that it navigates once, on red;
+  - that a second click while it runs is ignored.
+
+**Verified:** tsc, oxlint and 35 frontend tests pass. In the browser, a click on "Open
+the console" gave Get → Set → Go → gone, with the route already `/overview` from the
+first light.
+
