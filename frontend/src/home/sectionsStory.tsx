@@ -48,19 +48,24 @@ export function Hero({ onMore }: { onMore: () => void }) {
   return (
     <section ref={ref} className="home-hero" id="top">
       <div className="hero-inner">
-        <span className="hero-eye-float">
-          <img src={eye} alt="" className="hero-eye" />
-        </span>
-        <img src={wordmark} alt="Trinetra" className="hero-word" />
-        <p className="hero-tag">
-          <span className="tag-pair">
-            <span>Smarter</span> <span>Signals</span>
-          </span>{' '}
-          <span className="dot">·</span>{' '}
-          <span className="tag-pair">
-            <span>Safer</span> <span>Cities</span>
+        {/* the logo files fade their dark parts to transparent (brightness →
+            alpha), so they only show their true colours over near-black: the
+            plate gives them that, over the bright morning sky */}
+        <div className="hero-brand">
+          <span className="hero-eye-float">
+            <img src={eye} alt="" className="hero-eye" />
           </span>
-        </p>
+          <img src={wordmark} alt="Trinetra" className="hero-word" />
+          <p className="hero-tag">
+            <span className="tag-pair">
+              <span>Smarter</span> <span>Signals</span>
+            </span>{' '}
+            <span className="dot">·</span>{' '}
+            <span className="tag-pair">
+              <span>Safer</span> <span>Cities</span>
+            </span>
+          </p>
+        </div>
         <p className="hero-line">
           An AI that watches a road junction, predicts the next {PREDICTION.horizonSeconds} seconds of traffic, and decides — every second — who gets the green.
         </p>

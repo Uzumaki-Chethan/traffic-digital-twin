@@ -4857,3 +4857,21 @@ looks the same apart from those.
 - **Pointer glow:** the glow that followed the pointer over the glass cards is removed,
   CSS and handler both. The signal-head cursor itself is the console-wide one and stays.
 
+### 48.2 Glass top bar, the logo's true colours, still screenshots (owner, 2026-10-03)
+
+- **Why the logo looked pale:** the logo PNGs were made by turning brightness into alpha
+  (black → transparent). That means they only show their true colours over near-black,
+  and over the bright morning sky they washed out.
+  - The hero's eye, wordmark and tagline now sit on a dark glass plate (`.hero-brand`).
+  - The top bar's logo sits on its own dark badge.
+  - The orange glow filter is gone; the logo uses the console rail's own faint glow.
+- **Top bar:** frosted glassmorphism (white-tinted, blur 22 px, saturate 1.7, light edge),
+  with the section links in a dark translucent group.
+- **Hero:** padded down 104 px, so the floating bar never covers the logo on shorter
+  screens.
+- **Console tour:**
+  - The screenshots no longer zoom or pan; it is a cross-fade only, and the frame's
+    scroll tilt is removed.
+  - `settings.webp` was retaken after the page's cards had finished appearing; the
+    earlier capture had caught them mid-fade, which looked blurry.
+

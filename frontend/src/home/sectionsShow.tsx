@@ -169,13 +169,6 @@ export function ConsoleTour() {
     )
     return () => triggers.forEach((t) => t.kill())
   }, [])
-  useScene(ref, () => {
-    gsap.fromTo(
-      '.tour-frame',
-      { rotateX: 22, rotateY: -14, scale: 0.88, opacity: 0.4 },
-      { rotateX: 0, rotateY: 0, scale: 1, opacity: 1, ease: 'none', scrollTrigger: { trigger: '.tour', start: 'top bottom', end: 'top 30%', scrub: 0.6 } },
-    )
-  })
   return (
     <section ref={ref} className="home-section" id="console">
       <div className="home-wrap">
