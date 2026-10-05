@@ -362,12 +362,27 @@ export function MorningCity({ progress, still }: { progress: MutableRefObject<nu
       tgtLook.lerpVectors(l0, l1, t)
     }
 
-    // traffic warms up for a minute before the first frame, so queues have formed
+    // Traffic warms up for a simulated minute so queues have formed — but
+    // spread over the first frames (a few ms each), never in one block: done
+    // all at once it froze the page for seconds, which showed as a blank
+    // screen on a slow machine with a simulation running. The vehicles stay
+    // hidden until it's done.
     let simT = 0
-    for (let i = 0; i < 600; i++) {
-      for (const lane of lanes) stepLane(lane, simT, 0.1)
-      simT += 0.1
+    const WARM_STEPS = 600
+    let warmed = 0
+    const warmUp = (budgetMs: number) => {
+      const until = performance.now() + budgetMs
+      while (warmed < WARM_STEPS && performance.now() < until) {
+        for (const lane of lanes) stepLane(lane, simT, 0.1)
+        simT += 0.1
+        warmed++
+      }
+      const done = warmed >= WARM_STEPS
+      for (const { mesh } of fleetMeshes) mesh.visible = done
+      blobs.visible = done
+      return done
     }
+    warmUp(0)
 
     let raf = 0
     let last = performance.now()
@@ -392,7 +407,8 @@ export function MorningCity({ progress, still }: { progress: MutableRefObject<nu
       const rawDt = (now - last) / 1000
       const dt = Math.min(0.05, rawDt)
       last = now
-      if (!light && probeFrames < 120) {
+      const warm = warmUp(6)
+      if (warm && !light && probeFrames < 120) {
         probeFrames++
         probeTime += rawDt
         if (probeFrames === 120 && probeTime / 120 > 1 / 40) {
@@ -405,7 +421,7 @@ export function MorningCity({ progress, still }: { progress: MutableRefObject<nu
           skyMat.uniforms.uClouds.value = 0
         }
       }
-      const simDt = still ? 0 : dt
+      const simDt = still || !warm ? 0 : dt
       simT += simDt
       skyMat.uniforms.uTime.value = simT
 
@@ -460,7 +476,14 @@ export function MorningCity({ progress, still }: { progress: MutableRefObject<nu
       else renderer.render(scene, camera)
       raf = requestAnimationFrame(frame)
     }
-    raf = requestAnimationFrame(frame)
+    // compile every shader without blocking the page (parallel compile where
+    // the browser supports it), then start drawing
+    renderer
+      .compileAsync(scene, camera)
+      .catch(() => undefined)
+      .then(() => {
+        if (running) raf = requestAnimationFrame(frame)
+      })
 
     return () => {
       cancelAnimationFrame(raf)

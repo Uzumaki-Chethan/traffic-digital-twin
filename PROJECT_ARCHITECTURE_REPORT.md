@@ -5080,3 +5080,18 @@ The rig is wired and driven by the AI end to end:
   lower it.
 - **Tests:** `test_link_can_hold_frames_back_to_match_the_screen`.
 
+### 52.2 Home page went blank while a simulation ran (owner, 2026-10-05)
+
+- **Cause:** opening the home page ran one ~3.8 s main-thread task on the build machine
+  (and longer on the owner's laptop with a simulation running). That task held the
+  traffic warm-up (600 steps over every lane, all at once), the city's construction and
+  first-render shader compilation. The browser could not paint, so the page showed blank.
+- **Fix** (`MorningCity.tsx`):
+  - The warm-up is time-sliced into ~6 ms per frame, with the vehicles hidden until it
+    completes.
+  - Shaders compile with `renderer.compileAsync` before the first frame.
+  - The slow-machine quality probe starts only after the warm-up, so warm-up frames don't
+    trip it.
+- **Verified:** with a demo running, the longest task on opening Home went from 3825 ms to
+  168 ms, and the city and its traffic appear normally.
+
