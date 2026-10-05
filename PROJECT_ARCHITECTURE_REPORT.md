@@ -5040,3 +5040,29 @@ footer reads "Physical model not connected".
   Its right side now shows only the physical model's link and the stream state.
 - **Launch screen:** the eye is larger, `clamp(240px, min(32vw, 40vh), 440px)`.
 
+## SECTION 52 — The physical model, live for the first time (CURRENT STATE)
+
+*2026-10-05 · branch `main`*
+
+The rig is wired and driven by the AI end to end:
+- the owner wired all four heads and bench-tested them;
+- `firmware/signal_link/signal_link.ino` was flashed to the ESP32, which shows up on COM3
+  through its CP210x chip;
+- `backend/config.py` now sets `HARDWARE_SERIAL_PORT = "COM3"`.
+
+**Verified on the real board:**
+- **Identifies itself:** at boot it printed "TRINETRA signal link ready, heads wired: 4",
+  and it answered `?` with "TRINETRA signal link 1".
+- **Lamp test:** `python -m hardware.rig_test --port COM3 --loops 2` ran every phase,
+  connected throughout, then left the rig idle.
+- **Live run:** `python server.py` logged "Physical rig connected on COM3." `run-state`
+  reported `rig: {enabled: true, connected: true, port: "COM3"}`. A live "Normal day" demo
+  then drove the heads: at 35 s simulated, East and West were green on left+straight and
+  North and South were red, which the heads mirror.
+
+**Also added that day:**
+- the backend recognises more ESP32 USB chips: Espressif native USB (0x303A) and FTDI
+  (0x0403);
+- the sketch has one-line `PIXEL_ORDER` / `PIXEL_SPEED` settings;
+- `firmware/README.md` ends with a step-by-step troubleshooting ladder.
+

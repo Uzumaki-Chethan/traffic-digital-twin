@@ -47,7 +47,7 @@ always-on console) both just call it.
 | **Real-time Dashboard** | ✔ **done** |
 | **Emergency vehicle detection** | ✔ **done** |
 | **Database logging (SQLite)** | ✔ **done** |
-| Physical rig link (ESP32 over USB: backend side-channel + live firmware; Section 43) | ✔ code done — wiring 2026-10-03 |
+| Physical rig link (ESP32 over USB: backend side-channel + live firmware; Sections 43, 52) | ✔ live on the real model, COM3 (2026-10-05) |
 | Rig status in the console footer + demo-day checklist (`docs/DEMO_DAY.md`; Section 50) | ✔ done |
 | Home page — what Trinetra is, how it works, results, scenarios, console tour (`/`; Sections 44–48) | ✔ done |
 | Final optimization + demo polish | ⬜ |
