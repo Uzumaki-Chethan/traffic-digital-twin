@@ -16,7 +16,7 @@ The steps are written for **Windows**. macOS and Linux differ only where noted.
 | **Python 3.11 – 3.13** | python.org | On Windows, **tick "Add python.exe to PATH"** on the installer's first screen. |
 | **SUMO 1.27** | eclipse.dev/sumo → Download | The traffic simulator. On Windows, use the 64-bit installer and let it **set `SUMO_HOME`**. On macOS/Linux, install it and set `SUMO_HOME` yourself (see SUMO's install page). 1.27 matches the project's `traci`/`sumolib`. |
 | **Node.js 22 LTS** | nodejs.org | Builds the web console. |
-| *(physical model only)* **CP210x USB driver** | silabs.com → "CP210x USB to UART Bridge VCP Drivers" | Often installs by itself when the ESP32 is plugged in. |
+| *(physical model only)* **CP210x USB driver** | silabs.com → "CP210x USB to UART Bridge VCP Drivers" | Often installs by itself when the ESP32 is plugged in. If Windows doesn't recognise the board, follow [`firmware/USB_DRIVER.md`](firmware/USB_DRIVER.md). |
 
 **Close and reopen your terminal after installing**, so it sees the new PATH and `SUMO_HOME`.
 

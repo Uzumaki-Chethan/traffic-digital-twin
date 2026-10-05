@@ -87,6 +87,8 @@ head matches the printed line. Ctrl+C ends it and the rig goes idle.
 
 ## When it isn't working: find the step that fails
 
+**Windows doesn't show the board as a COM port?** See [`USB_DRIVER.md`](USB_DRIVER.md) (installing the Silicon Labs CP210x driver).
+
 Work down this ladder. Stop at the first step that fails; the fix is in that row.
 
 | # | Do this | You should see | If not |
