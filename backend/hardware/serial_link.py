@@ -25,8 +25,9 @@ from hardware.lamps import frame_for
 
 logger = logging.getLogger(__name__)
 
-# USB-to-serial chips found on ESP32 DevKit boards.
-_ESP32_USB_VIDS = {0x10C4, 0x1A86}  # Silicon Labs CP210x, WCH CH340/CH9102
+# USB-to-serial chips found on ESP32 boards: Silicon Labs CP210x, WCH
+# CH340/CH9102, Espressif's own native USB (S2/S3/C3), FTDI.
+_ESP32_USB_VIDS = {0x10C4, 0x1A86, 0x303A, 0x0403}
 
 
 def find_port(preferred: Optional[str] = None) -> str:

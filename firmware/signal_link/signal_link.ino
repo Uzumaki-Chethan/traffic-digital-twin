@@ -33,6 +33,13 @@
 
 #include <Adafruit_NeoPixel.h>
 
+// Colour order of the pixels. If the power-on sweep shows red and green
+// swapped (red lens lights green), change NEO_GRB to NEO_RGB and re-upload.
+#define PIXEL_ORDER NEO_GRB
+// Most WS2811/WS2812 run at 800 kHz; if lights flicker or stay dark with
+// good wiring, try NEO_KHZ400.
+#define PIXEL_SPEED NEO_KHZ800
+
 #define LENSES_PER_HEAD 4
 #define NUM_HEADS 4
 // Raise to 4 once all heads are wired (the same as the bench test).
@@ -41,10 +48,10 @@
 const uint8_t HEAD_PIN[NUM_HEADS] = {13, 4, 16, 17};
 
 Adafruit_NeoPixel heads[NUM_HEADS] = {
-  Adafruit_NeoPixel(LENSES_PER_HEAD, HEAD_PIN[0], NEO_GRB + NEO_KHZ800),
-  Adafruit_NeoPixel(LENSES_PER_HEAD, HEAD_PIN[1], NEO_GRB + NEO_KHZ800),
-  Adafruit_NeoPixel(LENSES_PER_HEAD, HEAD_PIN[2], NEO_GRB + NEO_KHZ800),
-  Adafruit_NeoPixel(LENSES_PER_HEAD, HEAD_PIN[3], NEO_GRB + NEO_KHZ800),
+  Adafruit_NeoPixel(LENSES_PER_HEAD, HEAD_PIN[0], PIXEL_ORDER + PIXEL_SPEED),
+  Adafruit_NeoPixel(LENSES_PER_HEAD, HEAD_PIN[1], PIXEL_ORDER + PIXEL_SPEED),
+  Adafruit_NeoPixel(LENSES_PER_HEAD, HEAD_PIN[2], PIXEL_ORDER + PIXEL_SPEED),
+  Adafruit_NeoPixel(LENSES_PER_HEAD, HEAD_PIN[3], PIXEL_ORDER + PIXEL_SPEED),
 };
 
 #define BRIGHTNESS 153              // 60%: the brownout cap from the handoff doc
