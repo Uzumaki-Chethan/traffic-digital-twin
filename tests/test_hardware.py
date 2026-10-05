@@ -179,3 +179,24 @@ def test_status_reports_a_disabled_rig(monkeypatch):
 
     monkeypatch.setattr(sl, "_link", sl._NoLink())
     assert sl.link_status() == {"enabled": False, "connected": False, "port": None}
+
+
+def test_link_can_hold_frames_back_to_match_the_screen():
+    # the console draws the junction a moment behind the live data; the rig
+    # waits the same moment so the real heads change together with the screen
+    port = FakePort()
+    link = SignalLink(opener=lambda: port, heartbeat_seconds=0.05, retry_seconds=0.05, delay_seconds=0.4)
+    try:
+        link.publish(lanes(s="GGr"))
+        time.sleep(0.25)
+        assert not any(w.startswith("L00GR") for w in port.written)
+        assert wait_until(lambda: any(w.startswith("L00GR") for w in port.written))
+        # changes keep their order
+        link.publish(lanes(n="GGr"))
+        link.idle()
+        assert wait_until(lambda: port.written and port.written[-1] == "I\n")
+        seen = [w for w in port.written if w.startswith("L") or w == "I\n"]
+        order = [w[:6] for w in dict.fromkeys(seen)]
+        assert order.index("L00GRR") < order.index("I\n")
+    finally:
+        link.close()

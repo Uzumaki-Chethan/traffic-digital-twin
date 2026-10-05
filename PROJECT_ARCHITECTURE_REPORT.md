@@ -5066,3 +5066,17 @@ The rig is wired and driven by the AI end to end:
 - the sketch has one-line `PIXEL_ORDER` / `PIXEL_SPEED` settings;
 - `firmware/README.md` ends with a step-by-step troubleshooting ladder.
 
+### 52.1 The model led the screen by ~0.5 s (owner, 2026-10-05)
+
+- **Cause:** the console draws the junction a moment behind the live data, from its
+  motion buffer (a display clock 250 ms behind the newest frame, Section 30.15) plus
+  WebSocket and drawing time. The rig got each signal change the instant it happened.
+- **Fix:** `SignalLink` takes `delay_seconds`, set from `Config.HARDWARE_DELAY_SECONDS`
+  (0.5, the owner's measurement).
+  - Each change waits that long, then is sent, in order.
+  - The heartbeat still repeats the current line.
+  - 0 keeps the old send-at-once behaviour.
+- **Tuning:** if the model still leads the screen, raise it in `config.py`; if it now lags,
+  lower it.
+- **Tests:** `test_link_can_hold_frames_back_to_match_the_screen`.
+

@@ -16,6 +16,7 @@ Opening a serial port normally pulses DTR/RTS, which reboots an ESP32 —
 both lines are held low before the port opens, and the port is opened
 once per process (the console's), not once per run.
 """
+import collections
 import logging
 import threading
 import time
@@ -67,12 +68,19 @@ class SignalLink:
         baud: int = 115200,
         heartbeat_seconds: float = 1.0,
         retry_seconds: float = 2.0,
+        delay_seconds: float = 0.0,
     ):
         self._opener = opener or (lambda: open_serial(port, baud))
         self._heartbeat = heartbeat_seconds
         self._retry = retry_seconds
         self._cond = threading.Condition()
         self._pending: Optional[str] = None
+        # Changes wait this long before they are sent, so the real heads
+        # change together with the console's screen, which draws the
+        # junction a moment behind the live data (Section 52.1).
+        self._delay = max(0.0, delay_seconds)
+        self._queue: "collections.deque[tuple[float, str]]" = collections.deque()
+        self._last_queued: Optional[str] = None
         self._stop = False
         self._warned = False
         self.connected = False
@@ -101,9 +109,26 @@ class SignalLink:
     # ---------------------------------------------------------------- thread
     def _set(self, line: str) -> None:
         with self._cond:
-            if line != self._pending:
-                self._pending = line
+            if not self._delay:
+                if line != self._pending:
+                    self._pending = line
+                    self._cond.notify()
+                return
+            if line != self._last_queued:
+                self._last_queued = line
+                self._queue.append((time.monotonic() + self._delay, line))
                 self._cond.notify()
+
+    def _promote_due(self) -> None:
+        """Delayed mode: the newest change whose wait is over becomes the line to send."""
+        now = time.monotonic()
+        while self._queue and self._queue[0][0] <= now:
+            self._pending = self._queue.popleft()[1]
+
+    def _wait_for(self) -> float:
+        if not self._queue:
+            return self._heartbeat
+        return max(0.0, min(self._heartbeat, self._queue[0][0] - time.monotonic()))
 
     def _run(self) -> None:
         port = None
@@ -112,10 +137,12 @@ class SignalLink:
             with self._cond:
                 if self._stop:
                     break
-                self._cond.wait(timeout=self._heartbeat)
+                self._cond.wait(timeout=self._wait_for())
                 if self._stop:
                     break
+                self._promote_due()
                 line = self._pending
+
             if line is None:
                 continue
             if port is None:
@@ -196,7 +223,11 @@ def get_link():
                     logger.info("pyserial not installed - physical rig disabled.")
                     _link = _NoLink()
                 else:
-                    _link = SignalLink(port=getattr(Config, "HARDWARE_SERIAL_PORT", None), baud=getattr(Config, "HARDWARE_BAUD", 115200))
+                    _link = SignalLink(
+                        port=getattr(Config, "HARDWARE_SERIAL_PORT", None),
+                        baud=getattr(Config, "HARDWARE_BAUD", 115200),
+                        delay_seconds=getattr(Config, "HARDWARE_DELAY_SECONDS", 0.0),
+                    )
         return _link
 
 

@@ -110,6 +110,12 @@ class Config:
     HARDWARE_ENABLED = True
     HARDWARE_SERIAL_PORT = "COM3"  # the rig, on the owner's laptop (2026-10-05); None = auto-detect
     HARDWARE_BAUD = 115200
+    # How long the rig holds each change back, so the real heads switch together
+    # with the console's screen (which draws the junction a moment behind the
+    # live data: its smoothing buffer plus drawing). Owner measured ~0.5 s,
+    # 2026-10-05. Raise it if the model still leads the screen, lower it if it
+    # now lags; 0 = send at once.
+    HARDWARE_DELAY_SECONDS = 0.5
 
     @classmethod
     def get_sumo_binary(cls):
