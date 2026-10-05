@@ -1,5 +1,7 @@
 # Demo day — one page
 
+Running on a different laptop? Set it up first with `docs/SETUP_NEW_LAPTOP.md`.
+
 Everything in order, from a cold laptop to a running demo with the physical model.
 Wiring and flashing the board are in `firmware/README.md`; this page assumes the
 board already runs the `signal_link` sketch.
