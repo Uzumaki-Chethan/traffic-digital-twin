@@ -5,6 +5,9 @@ SUMO + TraCI, with an ML prediction layer (RandomForest), a rule-based
 adaptive Decision Engine, and a parallel-simulation Performance
 Evaluation framework that proves the AI beats SUMO's default control.
 
+> **New here? [SETUP.md](SETUP.md)** takes you from a fresh clone to the running console
+> (and the physical model) step by step.
+
 ---
 
 ## Architecture (the backbone — do not break this)
@@ -62,8 +65,8 @@ as of 2026-10-02). The tag **`prototype-3`** (2026-10-02) is the current revert 
 
 ## Quick start
 
-Requirements: Python 3.10+, SUMO installed with `SUMO_HOME` set,
-`pip install -r requirements.txt`.
+Requirements: Python 3.11+, SUMO 1.27 with `SUMO_HOME` set, Node.js (to build the console),
+Git LFS (for the model), `pip install -r requirements.txt`. Full step-by-step: **[SETUP.md](SETUP.md)**.
 
 ### Run everything from the browser (recommended)
 

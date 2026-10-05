@@ -108,7 +108,7 @@ class Config:
     # HARDWARE_SERIAL_PORT None = find the ESP32 by its USB chip (CP210x /
     # CH340); set e.g. "COM3" to force a port.
     HARDWARE_ENABLED = True
-    HARDWARE_SERIAL_PORT = "COM3"  # the rig, on the owner's laptop (2026-10-05); None = auto-detect
+    HARDWARE_SERIAL_PORT = None  # auto-detect, so it works on any laptop; e.g. "COM3" to force one
     HARDWARE_BAUD = 115200
     # How long the rig holds each change back, so the real heads switch together
     # with the console's screen (which draws the junction a moment behind the

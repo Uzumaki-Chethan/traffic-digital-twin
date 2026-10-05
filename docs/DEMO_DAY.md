@@ -1,6 +1,6 @@
 # Demo day — one page
 
-Running on a different laptop? Set it up first with `docs/SETUP_NEW_LAPTOP.md`.
+Running on a different laptop? Set it up first with `SETUP.md` (in the project folder).
 
 Everything in order, from a cold laptop to a running demo with the physical model.
 Wiring and flashing the board are in `firmware/README.md`; this page assumes the
