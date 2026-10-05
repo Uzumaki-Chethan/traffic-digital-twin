@@ -5095,3 +5095,28 @@ The rig is wired and driven by the AI end to end:
 - **Verified:** with a demo running, the longest task on opening Home went from 3825 ms to
   168 ms, and the city and its traffic appear normally.
 
+## SECTION 53 — Final prototype (CURRENT STATE)
+
+*2026-10-05 · tag `final-prototype` · branch `main` only*
+
+At the owner's instruction:
+- everything is on `main`;
+- every other branch (`design/glass-night`, `feature/perf-optimisation`,
+  `feature/performance-settings`) was deleted, locally and on GitHub, after checking that
+  each was fully contained in `main` (0 commits ahead);
+- this commit is tagged **`final-prototype`**.
+
+The earlier tags `prototype-1` … `prototype-4` remain as history.
+
+**What the final prototype contains:**
+- the AI pipeline and its 13/13 result against vehicle-actuated control;
+- the glass console, including the evaluation page, the decisions audit trail, and
+  emergency and incident dispatch;
+- the animated morning-city home page with the "Get, set, go" launch screen;
+- the physical model, driven live over USB and kept in step with the screen;
+- `SETUP.md` (from a fresh clone to running) and `docs/DEMO_DAY.md` (the day's checklist).
+
+**At max simulation speed** the rig keeps up. It sends only changes (an 18-byte line
+each), each held for the same 0.5 s so order is kept, and an amber of 3 simulated seconds
+still shows for a fraction of a second at 10x.
+

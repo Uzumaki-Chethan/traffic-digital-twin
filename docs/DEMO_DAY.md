@@ -59,5 +59,5 @@ board already runs the `signal_link` sketch.
 
 ## Revert point
 
-If anything breaks after a last-minute change, `git checkout prototype-4` is the state
-that was demo-ready on 2026-10-03.
+If anything breaks after a last-minute change, `git checkout final-prototype` is the
+finished, demo-ready state (2026-10-05): physical model live, all fixes in.
